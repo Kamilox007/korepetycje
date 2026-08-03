@@ -10,12 +10,36 @@ from sqlalchemy.orm import Session
 from . import models
 from .database import get_db
 
-# W produkcji ustaw zmienną środowiskową JWT_SECRET na losowy, długi ciąg.
-SECRET_KEY = os.environ.get("JWT_SECRET", "dev-secret-zmien-mnie-w-produkcji")
+# W produkcji ustaw APP_ENV=prod oraz JWT_SECRET na losowy, długi ciąg.
+APP_ENV = os.environ.get("APP_ENV", "dev").lower()
+_secret = os.environ.get("JWT_SECRET")
+if not _secret:
+    if APP_ENV != "dev":
+        raise RuntimeError(
+            "Brak zmiennej środowiskowej JWT_SECRET. Wygeneruj ją poleceniem:\n"
+            "  python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+        )
+    _secret = "dev-secret-zmien-mnie-w-produkcji"
+SECRET_KEY = _secret
+
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 dni
 # konto na haśle startowym dostaje token krótkoterminowy — wystarczy na ustawienie hasła
 PASSWORD_RESET_EXPIRE_MINUTES = 30
+
+# blokada konta po serii nieudanych prób
+MAX_FAILED_LOGINS = 5
+LOCKOUT_MINUTES = 15
+
+# Hash porównywany, gdy login nie istnieje — wyrównuje czas odpowiedzi.
+# Bez tego brak użytkownika zwraca odpowiedź natychmiast, a istniejący dopiero
+# po ~100 ms bcrypta, co pozwala wyliczyć listę loginów.
+_DUMMY_HASH = bcrypt.hashpw(b"x", bcrypt.gensalt()).decode("utf-8")
+
+
+def utcnow() -> datetime:
+    """Naiwny UTC — spójny z pozostałymi kolumnami DateTime w modelu."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
@@ -70,6 +94,44 @@ def get_current_user(
     user = db.get(models.User, int(user_id))
     if user is None:
         raise cred_exc
+    return user
+
+
+def authenticate(db: Session, username: str, password: str) -> models.User:
+    """Weryfikuje dane logowania, licząc nieudane próby i blokując konto.
+
+    Rzuca HTTPException 401 (złe dane) albo 429 (konto zablokowane).
+    Komunikat 401 jest identyczny dla nieistniejącego loginu i złego hasła.
+    """
+    user = db.query(models.User).filter(models.User.username == username).first()
+    bad = HTTPException(status_code=401, detail="Błędny login lub hasło")
+
+    if user is None:
+        # policz bcrypta mimo wszystko, żeby czas odpowiedzi nie zdradzał istnienia konta
+        bcrypt.checkpw(password.encode("utf-8")[:72], _DUMMY_HASH.encode("utf-8"))
+        raise bad
+
+    now = utcnow()
+    if user.locked_until and user.locked_until > now:
+        left = int((user.locked_until - now).total_seconds())
+        raise HTTPException(
+            status_code=429,
+            detail=f"Konto tymczasowo zablokowane. Spróbuj ponownie za {left // 60 + 1} min.",
+            headers={"Retry-After": str(left)},
+        )
+
+    if not verify_password(password, user.password_hash):
+        user.failed_logins = (user.failed_logins or 0) + 1
+        if user.failed_logins >= MAX_FAILED_LOGINS:
+            user.locked_until = now + timedelta(minutes=LOCKOUT_MINUTES)
+            user.failed_logins = 0
+        db.commit()
+        raise bad
+
+    if user.failed_logins or user.locked_until:
+        user.failed_logins = 0
+        user.locked_until = None
+        db.commit()
     return user
 
 

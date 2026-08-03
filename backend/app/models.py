@@ -20,6 +20,9 @@ class User(Base):
     display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     color: Mapped[str | None] = mapped_column(String(20), nullable=True)  # kolor korepetytora w kalendarzu
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
+    # licznik nieudanych logowań i moment, do którego konto jest zablokowane (UTC, naiwny)
+    failed_logins: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # jeśli rola == student, to konto wskazuje na rekord ucznia

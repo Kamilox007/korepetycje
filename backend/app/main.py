@@ -1,8 +1,12 @@
+import os
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from . import models, schemas, services, auth
@@ -46,6 +50,11 @@ def _migrate_schema():
             ucols = {c["name"] for c in insp.get_columns("users")}
             if "color" not in ucols:
                 conn.execute(text("ALTER TABLE users ADD COLUMN color VARCHAR(20)"))
+            if "failed_logins" not in ucols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN failed_logins INTEGER DEFAULT 0"))
+                conn.execute(text("UPDATE users SET failed_logins = 0 WHERE failed_logins IS NULL"))
+            if "locked_until" not in ucols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN locked_until DATETIME"))
     models.Base.metadata.create_all(bind=engine)
 
 
@@ -96,20 +105,37 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Korepetycje API", version="3.0", lifespan=lifespan)
 
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Origins frontendu, np. CORS_ORIGINS="https://korepetycje.example.com"
+# W dev domyślnie serwer Vite. Gwiazdka jest świadomie niedozwolona.
+_origins = [
+    o.strip()
+    for o in os.environ.get(
+        "CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+    ).split(",")
+    if o.strip() and o.strip() != "*"
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
 # ===================== AUTH =====================
 @app.post("/api/auth/login", response_model=schemas.LoginOut)
-def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.username == form.username).first()
-    if not user or not auth.verify_password(form.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Błędny login lub hasło")
+@limiter.limit("10/minute;40/hour")
+def login(
+    request: Request,
+    form: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
+    user = auth.authenticate(db, form.username, form.password)
     token = auth.create_access_token(user)
     return schemas.LoginOut(
         access_token=token,
@@ -126,7 +152,9 @@ def me(user: models.User = Depends(auth.get_current_user)):
 
 
 @app.post("/api/auth/change-password")
+@limiter.limit("10/hour")
 def change_password(
+    request: Request,
     payload: schemas.ChangePasswordIn,
     user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
