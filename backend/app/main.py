@@ -1,5 +1,6 @@
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from datetime import date, timedelta
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,57 +11,14 @@ from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from . import models, schemas, services, auth
-from .database import init_db, get_db, SessionLocal
+from .database import get_db, SessionLocal
 
 
-def _migrate_schema():
-    """Dodaje brakujące kolumny/tabele do istniejącej bazy bez utraty danych."""
-    from sqlalchemy import inspect, text
-    from .database import engine
+def seed_admin():
+    """Zapewnia konto administratora i przypisuje osierocone rekordy do organizacji.
 
-    insp = inspect(engine)
-    with engine.begin() as conn:
-        if "lessons" in insp.get_table_names():
-            cols = {c["name"] for c in insp.get_columns("lessons")}
-            if "origin_date" not in cols:
-                conn.execute(text("ALTER TABLE lessons ADD COLUMN origin_date DATE"))
-                conn.execute(text(
-                    "UPDATE lessons SET origin_date = date "
-                    "WHERE series_id IS NOT NULL AND origin_date IS NULL"
-                ))
-            if "assigned_tutor_id" not in cols:
-                conn.execute(text("ALTER TABLE lessons ADD COLUMN assigned_tutor_id INTEGER"))
-            if "subject_id" not in cols:
-                conn.execute(text("ALTER TABLE lessons ADD COLUMN subject_id INTEGER"))
-            if "level" not in cols:
-                conn.execute(text("ALTER TABLE lessons ADD COLUMN level VARCHAR(20)"))
-        if "lesson_series" in insp.get_table_names():
-            scols = {c["name"] for c in insp.get_columns("lesson_series")}
-            if "assigned_tutor_id" not in scols:
-                conn.execute(text("ALTER TABLE lesson_series ADD COLUMN assigned_tutor_id INTEGER"))
-            if "subject_id" not in scols:
-                conn.execute(text("ALTER TABLE lesson_series ADD COLUMN subject_id INTEGER"))
-            if "level" not in scols:
-                conn.execute(text("ALTER TABLE lesson_series ADD COLUMN level VARCHAR(20)"))
-        if "reschedule_requests" in insp.get_table_names():
-            rcols = {c["name"] for c in insp.get_columns("reschedule_requests")}
-            if "response" not in rcols:
-                conn.execute(text("ALTER TABLE reschedule_requests ADD COLUMN response TEXT"))
-        if "users" in insp.get_table_names():
-            ucols = {c["name"] for c in insp.get_columns("users")}
-            if "color" not in ucols:
-                conn.execute(text("ALTER TABLE users ADD COLUMN color VARCHAR(20)"))
-            if "failed_logins" not in ucols:
-                conn.execute(text("ALTER TABLE users ADD COLUMN failed_logins INTEGER DEFAULT 0"))
-                conn.execute(text("UPDATE users SET failed_logins = 0 WHERE failed_logins IS NULL"))
-            if "locked_until" not in ucols:
-                conn.execute(text("ALTER TABLE users ADD COLUMN locked_until DATETIME"))
-    models.Base.metadata.create_all(bind=engine)
-
-
-def seed_and_migrate():
-    """Zapewnia konto administratora i przypisuje osierocone rekordy do organizacji."""
-    _migrate_schema()
+    Schemat bazy jest w gestii Alembica — tu tylko dane.
+    """
     db = SessionLocal()
     try:
         admin = db.query(models.User).filter(models.User.role == "admin").first()
@@ -96,10 +54,33 @@ def seed_and_migrate():
         db.close()
 
 
+def _require_migrated_db():
+    """Nie startuj na bazie, która nie jest na najnowszej migracji."""
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    from alembic.runtime.migration import MigrationContext
+    from .database import engine
+
+    cfg = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    # script_location w ini jest względne wobec CWD — uniezależniamy się od tego,
+    # bo uvicorn bywa uruchamiany z dowolnego katalogu
+    cfg.set_main_option(
+        "script_location", str(Path(__file__).resolve().parents[1] / "alembic")
+    )
+    head = ScriptDirectory.from_config(cfg).get_current_head()
+    with engine.connect() as conn:
+        current = MigrationContext.configure(conn).get_current_revision()
+    if current != head:
+        raise RuntimeError(
+            f"Baza jest na migracji {current!r}, a kod oczekuje {head!r}. "
+            "Uruchom: alembic upgrade head"
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
-    seed_and_migrate()
+    _require_migrated_db()
+    seed_admin()
     yield
 
 

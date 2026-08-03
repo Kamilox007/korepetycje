@@ -1,11 +1,9 @@
 """Regresja dla luki nr 1: token wydany kontu na haśle startowym
 nie może otwierać żadnego endpointu poza zmianą hasła."""
-import os, tempfile, pathlib
-os.chdir(tempfile.mkdtemp())          # świeża baza w katalogu tymczasowym
-os.environ["JWT_SECRET"] = "test-secret"
-
-import sys
-sys.path.insert(0, str(pathlib.Path(__file__).parent))
+import sys, pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from testing_utils import bootstrap
+bootstrap()
 
 from fastapi.testclient import TestClient
 from app.main import app

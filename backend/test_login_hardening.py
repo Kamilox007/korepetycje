@@ -1,11 +1,10 @@
 """Regresja dla punktu 2: hardening logowania.
 Blokada konta, wyrównanie czasu odpowiedzi, CORS, wymuszony JWT_SECRET."""
-import os, sys, time, tempfile, pathlib, importlib
+import os, sys, time, pathlib, importlib
 
-os.chdir(tempfile.mkdtemp())
-os.environ["JWT_SECRET"] = "test-secret"
-os.environ["CORS_ORIGINS"] = "https://korepetycje.example.com"
-sys.path.insert(0, str(pathlib.Path(__file__).parent))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from testing_utils import bootstrap
+bootstrap(CORS_ORIGINS="https://korepetycje.example.com")
 
 from fastapi.testclient import TestClient
 from app.main import app, limiter

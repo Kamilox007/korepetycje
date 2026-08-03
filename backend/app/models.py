@@ -93,14 +93,14 @@ class Lesson(Base):
     tutor_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     # przypisany prowadzący (może być pusty)
     assigned_tutor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
-    student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), nullable=False)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), nullable=False, index=True)
     series_id: Mapped[int | None] = mapped_column(
         ForeignKey("lesson_series.id"), nullable=True
     )
     subject_id: Mapped[int | None] = mapped_column(ForeignKey("subjects.id"), nullable=True)
     level: Mapped[str | None] = mapped_column(String(20), nullable=True)  # podstawa | rozszerzenie
     title: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    date: Mapped[date] = mapped_column(Date, nullable=False)
+    date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     # pierwotna data slotu z serii (niezmienna mimo przesunięć) — None dla zajęć jednorazowych
     origin_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     start_time: Mapped[time] = mapped_column(Time, nullable=False)
@@ -121,7 +121,7 @@ class Payment(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     tutor_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), nullable=False)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), nullable=False, index=True)
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     date: Mapped[date] = mapped_column(Date, default=date.today)
     payer: Mapped[str | None] = mapped_column(String(200), nullable=True)
