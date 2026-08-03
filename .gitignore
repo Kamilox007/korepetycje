@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+backend/korepetycje.db
+node_modules/
+dist/

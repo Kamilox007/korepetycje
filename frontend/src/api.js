@@ -1,0 +1,153 @@
+const BASE = "/api";
+
+const TOKEN_KEY = "korepetycje_token";
+export function getToken() { return localStorage.getItem(TOKEN_KEY); }
+export function setToken(t) {
+  if (t) localStorage.setItem(TOKEN_KEY, t);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
+// callback wywoływany przy 401 (np. wylogowanie)
+let onUnauthorized = null;
+export function setUnauthorizedHandler(fn) { onUnauthorized = fn; }
+
+async function req(path, options = {}) {
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  const token = getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(BASE + path, { ...options, headers });
+  if (res.status === 401) {
+    setToken(null);
+    if (onUnauthorized) onUnauthorized();
+    throw new Error("401: sesja wygasła");
+  }
+  if (!res.ok) {
+    let detail = `${res.status}`;
+    try {
+      const j = await res.json();
+      detail = j.detail || JSON.stringify(j);
+    } catch { detail = await res.text(); }
+    throw new Error(detail);
+  }
+  if (res.status === 204) return null;
+  const ct = res.headers.get("content-type") || "";
+  return ct.includes("application/json") ? res.json() : null;
+}
+
+export const api = {
+  // ----- auth -----
+  login: async (username, password) => {
+    // OAuth2PasswordRequestForm wymaga form-urlencoded
+    const body = new URLSearchParams({ username, password });
+    const res = await fetch(BASE + "/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    });
+    if (!res.ok) {
+      let d = "Błąd logowania";
+      try { d = (await res.json()).detail || d; } catch {}
+      throw new Error(d);
+    }
+    return res.json();
+  },
+  me: () => req("/auth/me"),
+  changePassword: async (oldP, newP) => {
+    const res = await req("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ old_password: oldP, new_password: newP }),
+    });
+    // backend wydaje nowy, pełnoprawny token — stary był krótkoterminowy
+    if (res && res.access_token) setToken(res.access_token);
+    return res;
+  },
+
+  // ----- students (korepetytor) -----
+  listStudents: () => req("/students"),
+  createStudent: (data) => req("/students", { method: "POST", body: JSON.stringify(data) }),
+  updateStudent: (id, data) => req(`/students/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteStudent: (id) => req(`/students/${id}`, { method: "DELETE" }),
+  createStudentAccount: (id, data) =>
+    req(`/students/${id}/account`, { method: "POST", body: JSON.stringify(data) }),
+  deleteStudentAccount: (id) => req(`/students/${id}/account`, { method: "DELETE" }),
+
+  // ----- series -----
+  listSeries: () => req("/series"),
+  createSeries: (data) => req("/series", { method: "POST", body: JSON.stringify(data) }),
+  deleteSeries: (id) => req(`/series/${id}`, { method: "DELETE" }),
+
+  // ----- lessons -----
+  listLessons: ({ start, end, studentId } = {}) => {
+    const p = new URLSearchParams();
+    if (start) p.set("start", start);
+    if (end) p.set("end", end);
+    if (studentId) p.set("student_id", studentId);
+    return req(`/lessons?${p.toString()}`);
+  },
+  createLesson: (data) => req("/lessons", { method: "POST", body: JSON.stringify(data) }),
+  updateLesson: (id, data) => req(`/lessons/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteLesson: (id) => req(`/lessons/${id}`, { method: "DELETE" }),
+
+  // ----- payments -----
+  listPayments: (studentId) => req(`/payments${studentId ? `?student_id=${studentId}` : ""}`),
+  createPayment: (data) => req("/payments", { method: "POST", body: JSON.stringify(data) }),
+  deletePayment: (id) => req(`/payments/${id}`, { method: "DELETE" }),
+
+  // ----- summary -----
+  summary: () => req("/summary"),
+
+  // ----- reschedule (administracja) -----
+  listReschedule: () => req("/reschedule-requests"),
+  approveReschedule: (id, response) =>
+    req(`/reschedule-requests/${id}/approve`, { method: "POST", body: JSON.stringify({ response: response || null }) }),
+  rejectReschedule: (id, response) =>
+    req(`/reschedule-requests/${id}/reject`, { method: "POST", body: JSON.stringify({ response: response || null }) }),
+
+  // ----- zarządzanie użytkownikami (admin / sekretariat) -----
+  listUsers: () => req("/users"),
+  listTutors: () => req("/tutors"),
+  createUser: (data) => req("/users", { method: "POST", body: JSON.stringify(data) }),
+  updateUser: (id, data) => req(`/users/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteUser: (id) => req(`/users/${id}`, { method: "DELETE" }),
+  assignTutor: (lessonId, tutorId) =>
+    req(`/lessons/${lessonId}/assign${tutorId ? `?tutor_id=${tutorId}` : ""}`, { method: "POST" }),
+
+  // ----- korepetytor -----
+  tutorLessons: ({ start, end } = {}) => {
+    const p = new URLSearchParams();
+    if (start) p.set("start", start);
+    if (end) p.set("end", end);
+    return req(`/tutor/lessons?${p.toString()}`);
+  },
+  tutorUpdateLesson: (id, data) =>
+    req(`/tutor/lessons/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  tutorAvailability: () => req("/tutor/availability"),
+  tutorAddAvailability: (data) =>
+    req("/tutor/availability", { method: "POST", body: JSON.stringify(data) }),
+  tutorDeleteAvailability: (id) => req(`/tutor/availability/${id}`, { method: "DELETE" }),
+  tutorReschedule: () => req("/tutor/reschedule-requests"),
+  tutorApproveReschedule: (id, response) =>
+    req(`/tutor/reschedule-requests/${id}/approve`, { method: "POST", body: JSON.stringify({ response: response || null }) }),
+  tutorRejectReschedule: (id, response) =>
+    req(`/tutor/reschedule-requests/${id}/reject`, { method: "POST", body: JSON.stringify({ response: response || null }) }),
+
+  // ----- przedmioty -----
+  listSubjects: () => req("/subjects"),
+  createSubject: (data) => req("/subjects", { method: "POST", body: JSON.stringify(data) }),
+  deleteSubject: (id) => req(`/subjects/${id}`, { method: "DELETE" }),
+
+  // ----- panel ucznia -----
+  myLessons: ({ start, end } = {}) => {
+    const p = new URLSearchParams();
+    if (start) p.set("start", start);
+    if (end) p.set("end", end);
+    return req(`/me/lessons?${p.toString()}`);
+  },
+  mySummary: () => req("/me/summary"),
+  myPayments: () => req("/me/payments"),
+  myReschedule: () => req("/me/reschedule-requests"),
+  myLessonSlots: (lessonId) => req(`/me/lessons/${lessonId}/available-slots`),
+  requestReschedule: (data) =>
+    req("/me/reschedule-requests", { method: "POST", body: JSON.stringify(data) }),
+};
