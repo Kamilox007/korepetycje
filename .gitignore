@@ -4,3 +4,4 @@ __pycache__/
 backend/korepetycje.db
 node_modules/
 dist/
+test/
