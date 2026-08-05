@@ -20,6 +20,9 @@ services:
     restart: unless-stopped
     depends_on:
       - api
+    networks:
+      - default
+      - edge
     environment:
       DOMAIN: ${DOMAIN}
       SITE_DOMAIN: ${SITE_DOMAIN}
