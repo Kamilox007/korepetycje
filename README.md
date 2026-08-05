@@ -13,7 +13,7 @@ Wersja produkcyjna: <https://panel.kamilkrzywon.pl>
 |---|---|
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2.0, Pydantic v2 |
 | Migracje | Alembic (tryb `batch` — wymagany przez SQLite) |
-| Baza | SQLite (`DATABASE_URL` pozwala przejść na PostgreSQL) |
+| Baza | SQLite |
 | Uwierzytelnianie | JWT (HS256), hasła haszowane bcryptem |
 | Ochrona logowania | slowapi (limit per IP) + blokada konta w bazie |
 | Frontend | React 18, Vite 6, CSS bez frameworka |
