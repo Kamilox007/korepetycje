@@ -1,3 +1,4 @@
+![testy](https://github.com/Kamilox007/korepetycje/actions/workflows/testy.yml/badge.svg)
 # Korepetycje — panel zarządzania zajęciami i rozliczeniami
 
 Aplikacja webowa do prowadzenia korepetycji: terminarz, zajęcia cykliczne,
