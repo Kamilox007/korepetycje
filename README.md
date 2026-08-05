@@ -127,10 +127,26 @@ python -c "import secrets; print(secrets.token_urlsafe(64))"
 
 ## Wdrożenie
 
+Sieć współdzielona z aplikacjami stojącymi za tym samym reverse proxy —
+jednorazowo, przed pierwszym uruchomieniem:
+
+```bash
+docker network create edge
+```
+
+To jedyny element konfiguracji serwera, który nie wynika z żadnego pliku
+w repozytorium. Przy odtwarzaniu maszyny od zera trzeba o nim pamiętać.
+
 ```bash
 cp .env.example .env && nano .env
 docker compose up -d --build
 ```
+
+Caddy w tej usłudze terminuje TLS dla wszystkich domen na serwerze — także
+dla strony `kamilkrzywon.pl`, która stoi w osobnym repozytorium
+([kamilkrzywon-pl](https://github.com/Kamilox007/kamilkrzywon-pl)) i dołącza
+do sieci `edge` pod nazwą `site`. Uruchom ją **przed** panelem, żeby Caddy
+miał dokąd kierować ruch.
 
 | Co zmieniłeś | Co uruchomić |
 |---|---|
