@@ -20,7 +20,6 @@ services:
     restart: unless-stopped
     depends_on:
       - api
-      - site
     environment:
       DOMAIN: ${DOMAIN}
       SITE_DOMAIN: ${SITE_DOMAIN}
@@ -49,14 +48,11 @@ services:
       LITESTREAM_SECRET_ACCESS_KEY: ${B2_APP_KEY}
     command: replicate
   
-  site:
-    build: ./site
-    restart: unless-stopped
-    expose:
-      - "80"
-
 volumes:
   db-data:
   caddy-data:
   caddy-config:
   caddy-logs:
+networks:
+  edge:
+    external: true
