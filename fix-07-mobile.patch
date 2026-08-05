@@ -1,0 +1,138 @@
+diff --git a/frontend/src/Calendar.jsx b/frontend/src/Calendar.jsx
+index 569ddd0..ad6d41c 100644
+--- a/frontend/src/Calendar.jsx
++++ b/frontend/src/Calendar.jsx
+@@ -31,7 +31,13 @@ function lessonStyle(l) {
+ }
+ 
+ export default function Calendar({ students, onChanged }) {
+-  const [view, setView] = usePersistentState("cal_view", "week");
++  // Na telefonie tydzień jest nieczytelny — startujemy od dnia.
++  // Dotyczy tylko pierwszego uruchomienia; późniejszy wybór użytkownika
++  // zapisuje się i ma pierwszeństwo.
++  const [view, setView] = usePersistentState(
++    "cal_view",
++    typeof window !== "undefined" && window.innerWidth < 820 ? "day" : "week"
++  );
+   const [anchorISO, setAnchorISO] = usePersistentState("cal_anchor", toISODate(new Date()));
+   const anchor = parseISO(anchorISO);
+   const setAnchor = (d) => setAnchorISO(toISODate(d instanceof Date ? d : parseISO(d)));
+diff --git a/frontend/src/styles.css b/frontend/src/styles.css
+index b8508d0..58cd4ca 100644
+--- a/frontend/src/styles.css
++++ b/frontend/src/styles.css
+@@ -294,3 +294,114 @@ tbody tr:hover { background: var(--surface-2); }
+   background: var(--accent-soft); color: var(--accent);
+   padding: 9px 12px; border-radius: var(--radius-sm); font-size: 13px;
+ }
++
++/* ==========================================================================
++   Mobile — do 820 px.
++   Reguły niżej działają WYŁĄCZNIE na wąskich ekranach; widok desktopowy
++   pozostaje nietknięty.
++   ========================================================================== */
++@media (max-width: 820px) {
++
++  /* --- układ: pasek boczny staje się paskiem górnym --- */
++  .app { flex-direction: column; }
++
++  .sidebar {
++    width: 100%;
++    height: auto;
++    flex-direction: row;
++    align-items: center;
++    gap: 6px;
++    padding: 8px 10px;
++    border-right: none;
++    border-bottom: 1px solid var(--border);
++    /* poziome przewijanie zakładek zamiast zawijania do kilku rzędów */
++    overflow-x: auto;
++    -webkit-overflow-scrolling: touch;
++    scrollbar-width: none;
++    z-index: 20;
++  }
++  .sidebar::-webkit-scrollbar { display: none; }
++
++  .brand { margin: 0 10px 0 2px; font-size: 15px; white-space: nowrap; }
++  .brand small { display: none; }
++
++  .nav-item { flex-shrink: 0; white-space: nowrap; padding: 10px 12px; }
++  .sidebar .spacer { display: none; }
++
++  .sidebar-user {
++    border-top: none;
++    border-left: 1px solid var(--border);
++    margin: 0 0 0 4px;
++    padding: 0 0 0 8px;
++    display: flex;
++    align-items: center;
++    flex-shrink: 0;
++  }
++  .sidebar-user > .muted { display: none; }
++
++  .main { padding: 16px 12px; max-width: 100%; }
++
++  .page-head { flex-wrap: wrap; gap: 10px; }
++  .page-head h1 { font-size: 19px; }
++  .row { flex-wrap: wrap; }
++
++  /* --- tabele: przewijanie poziome zamiast rozpychania strony --- */
++  .card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
++  .card table { min-width: 620px; }
++  th, td { padding: 10px; }
++
++  /* --- kalendarz --- */
++  .cal-head { flex-wrap: wrap; gap: 8px; }
++  .cal-head .range { min-width: 0; flex: 1 1 100%; order: -1; }
++
++  /* Widok tygodnia: 7 kolumn nie zmieści się, więc przewijamy w bok
++     zamiast ściskać dni do nieczytelnej szerokości. */
++  .week {
++    grid-template-columns: repeat(7, minmax(132px, 1fr));
++    overflow-x: auto;
++    -webkit-overflow-scrolling: touch;
++    padding-bottom: 6px;
++  }
++  /* Widok miesiąca mieści się w 7 kolumnach, jeśli zamiast tekstu w kaflach
++     pokażemy same paski. Gęstość zajęć nadal widać, a nic nie wystaje. */
++  .month-cell { min-height: 62px; padding: 3px; }
++  .month-name { padding: 6px 2px; font-size: 9px; }
++  .month-day-num { font-size: 12px; margin-bottom: 3px; }
++  .mini-chip {
++    font-size: 0;
++    height: 5px;
++    padding: 0;
++    margin-bottom: 3px;
++    border-radius: 3px;
++    border-left-width: 0;
++  }
++  .more { font-size: 9px; }
++  .hours-col { width: 48px; }
++
++  /* --- formularze i modale --- */
++  .field-row { grid-template-columns: 1fr; }
++  .overlay { padding: 0; align-items: flex-end; }
++  .modal {
++    max-width: 100%;
++    max-height: 92vh;
++    border-radius: var(--radius) var(--radius) 0 0;
++  }
++  .modal-foot { flex-direction: column-reverse; }
++  .modal-foot button { width: 100%; }
++
++  /* Safari na iOS przybliża stronę przy fokusie na polu o foncie < 16 px.
++     To jedyny powód tej wartości — nie estetyka. */
++  input, select, textarea { font-size: 16px; }
++
++  /* Palec potrzebuje ok. 44 px; myszka nie. */
++  button, .nav-item, .seg { min-height: 44px; }
++
++  .metrics { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
++  .metric .value { font-size: 20px; }
++}
++
++/* Bardzo wąskie telefony */
++@media (max-width: 380px) {
++  .main { padding: 12px 8px; }
++  .metrics { grid-template-columns: 1fr 1fr; }
++}

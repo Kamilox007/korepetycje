@@ -31,7 +31,13 @@ function lessonStyle(l) {
 }
 
 export default function Calendar({ students, onChanged }) {
-  const [view, setView] = usePersistentState("cal_view", "week");
+  // Na telefonie tydzień jest nieczytelny — startujemy od dnia.
+  // Dotyczy tylko pierwszego uruchomienia; późniejszy wybór użytkownika
+  // zapisuje się i ma pierwszeństwo.
+  const [view, setView] = usePersistentState(
+    "cal_view",
+    typeof window !== "undefined" && window.innerWidth < 820 ? "day" : "week"
+  );
   const [anchorISO, setAnchorISO] = usePersistentState("cal_anchor", toISODate(new Date()));
   const anchor = parseISO(anchorISO);
   const setAnchor = (d) => setAnchorISO(toISODate(d instanceof Date ? d : parseISO(d)));
