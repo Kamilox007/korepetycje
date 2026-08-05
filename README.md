@@ -173,6 +173,11 @@ Przy długo działającym procesie potrzebny jest impuls dobowy:
 Alternatywnie `POST /api/maintenance/generate-lessons` (rola staff, idempotentne).
 
 ## Testy
+Testy wymagają dodatkowej zależności spoza obrazu produkcyjnego:
+
+```bash
+pip install -r requirements-dev.txt
+```
 
 ```bash
 cd backend
