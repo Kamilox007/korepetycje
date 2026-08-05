@@ -35,3 +35,28 @@
 		}
 	}
 }
+{$SITE_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy site:80
+
+	header {
+		# Bez includeSubDomains — patrz uwaga niżej.
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output file /var/log/caddy/site.log {
+			roll_size 10MB
+			roll_keep 5
+		}
+	}
+}
+
+www.{$SITE_DOMAIN} {
+	header Strict-Transport-Security "max-age=31536000"
+	redir https://{$SITE_DOMAIN}{uri} permanent
+}
