@@ -1,6 +1,22 @@
 from datetime import date, timedelta
+
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+
 from . import models
+
+# Do jak dawna w przód materializujemy wystąpienia serii.
+DEFAULT_HORIZON_DAYS = 120
+# Twardy limit — bez niego klient mógłby poprosić o ?end=2099-01-01
+# i kazać wygenerować tysiące wierszy na serię.
+MAX_HORIZON_DAYS = 400
+
+
+def clamp_horizon(end: date | None) -> date:
+    """Horyzont generowania, ograniczony niezależnie od tego, o co poprosi klient."""
+    today = date.today()
+    requested = end or (today + timedelta(days=DEFAULT_HORIZON_DAYS))
+    return min(requested, today + timedelta(days=MAX_HORIZON_DAYS))
 
 
 def generate_lessons_for_series(
@@ -44,6 +60,7 @@ def generate_lessons_for_series(
     }
 
     created = 0
+    pending: list[models.Lesson] = []
     while current <= horizon:
         if current not in existing_origins and current not in skipped:
             lesson = models.Lesson(
@@ -58,19 +75,33 @@ def generate_lessons_for_series(
                 origin_date=current,
                 start_time=series.start_time,
                 duration_min=series.duration_min,
-                price=series.price,
+                price_grosze=series.price_grosze,
             )
-            db.add(lesson)
-            created += 1
+            pending.append(lesson)
         current += timedelta(days=7)
 
+    # Zapis pojedynczo: jeśli równoległe żądanie zdążyło utworzyć ten sam slot,
+    # unique constraint go odrzuci, a my po prostu idziemy dalej zamiast
+    # wywracać całą operację.
+    for lesson in pending:
+        try:
+            with db.begin_nested():
+                db.add(lesson)
+            created += 1
+        except IntegrityError:
+            pass
     if created:
         db.commit()
     return created
 
 
-def regenerate_all(db: Session, until: date, tutor_id: int | None = None) -> int:
-    """Generuje brakujące zajęcia dla aktywnych serii (opcjonalnie jednego korepetytora)."""
+def regenerate_all(db: Session, until: date | None = None, tutor_id: int | None = None) -> int:
+    """Generuje brakujące zajęcia dla aktywnych serii (opcjonalnie jednego korepetytora).
+
+    Operacja zapisująca — NIE wołać z handlerów GET. Uruchamiana przy starcie
+    aplikacji, po zmianie serii oraz z endpointu konserwacyjnego (cron).
+    """
+    until = clamp_horizon(until)
     total = 0
     q = db.query(models.LessonSeries).filter(
         models.LessonSeries.active == True  # noqa: E712

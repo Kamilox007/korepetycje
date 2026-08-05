@@ -55,8 +55,14 @@ con.close()
 r = alembic(workdir, "upgrade", "head")
 check("ponowny upgrade head", r.returncode == 0)
 
+from alembic.config import Config
+from alembic.script import ScriptDirectory
+_cfg = Config(str(BACKEND / "alembic.ini"))
+_cfg.set_main_option("script_location", str(BACKEND / "alembic"))
+HEAD = ScriptDirectory.from_config(_cfg).get_current_head()
+
 r = alembic(workdir, "current")
-check("baza raportuje rewizję 0002", "0002" in r.stdout)
+check(f"baza raportuje najnowszą rewizję ({HEAD})", HEAD in r.stdout)
 
 # --- aplikacja nie startuje na nieaktualnej bazie ---
 alembic(workdir, "downgrade", "0001")

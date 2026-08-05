@@ -1,0 +1,31 @@
+diff --git a/backend/app/models.py b/backend/app/models.py
+index 2fdbefe..7ac4727 100644
+--- a/backend/app/models.py
++++ b/backend/app/models.py
+@@ -1,12 +1,25 @@
+ from datetime import datetime, date, time
+ from sqlalchemy import (
++    MetaData,
+     Integer, String, Float, Boolean, Date, Time, DateTime, ForeignKey, Text
+ )
+ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+ 
+ 
++# Bez tego SQLAlchemy tworzy constrainty bez nazw, a Alembic w batch mode
++# (jedyny tryb działający na SQLite) odmawia wtedy pracy:
++# "ValueError: Constraint must have a name".
++NAMING_CONVENTION = {
++    "ix": "ix_%(table_name)s_%(column_0_N_name)s",
++    "uq": "uq_%(table_name)s_%(column_0_N_name)s",
++    "ck": "ck_%(table_name)s_%(constraint_name)s",
++    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
++    "pk": "pk_%(table_name)s",
++}
++
++
+ class Base(DeclarativeBase):
+-    pass
++    metadata = MetaData(naming_convention=NAMING_CONVENTION)
+ 
+ 
+ class User(Base):

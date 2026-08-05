@@ -1,12 +1,28 @@
 from datetime import datetime, date, time
 from sqlalchemy import (
-    Integer, String, Float, Boolean, Date, Time, DateTime, ForeignKey, Text
+    MetaData,
+    Integer, String, Float, Boolean, Date, Time, DateTime, ForeignKey, Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from .money import to_grosze, to_zlote
+
+
+# Bez tego SQLAlchemy tworzy constrainty bez nazw, a Alembic w batch mode
+# (jedyny tryb działający na SQLite) odmawia wtedy pracy:
+# "ValueError: Constraint must have a name".
+NAMING_CONVENTION = {
+    "ix": "ix_%(table_name)s_%(column_0_N_name)s",
+    "uq": "uq_%(table_name)s_%(column_0_N_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s",
+}
+
 
 class Base(DeclarativeBase):
-    pass
+    metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
 class User(Base):
@@ -41,7 +57,7 @@ class Student(Base):
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     contact: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    default_price: Mapped[float] = mapped_column(Float, default=0.0)
+    default_price_grosze: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -57,6 +73,15 @@ class Student(Base):
     payments: Mapped[list["Payment"]] = relationship(
         back_populates="student", cascade="all, delete-orphan"
     )
+
+    @property
+    def default_price(self) -> float:
+        """Złote — tylko do (de)serializacji. Arytmetyka wyłącznie na default_price_grosze."""
+        return to_zlote(self.default_price_grosze)
+
+    @default_price.setter
+    def default_price(self, value) -> None:
+        self.default_price_grosze = to_grosze(value)
 
 
 class LessonSeries(Base):
@@ -74,7 +99,7 @@ class LessonSeries(Base):
     weekday: Mapped[int] = mapped_column(Integer, nullable=False)
     start_time: Mapped[time] = mapped_column(Time, nullable=False)
     duration_min: Mapped[int] = mapped_column(Integer, default=60)
-    price: Mapped[float] = mapped_column(Float, default=0.0)
+    price_grosze: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -84,10 +109,26 @@ class LessonSeries(Base):
         back_populates="series", cascade="all, delete-orphan"
     )
 
+    @property
+    def price(self) -> float:
+        """Złote — tylko do (de)serializacji. Arytmetyka wyłącznie na price_grosze."""
+        return to_zlote(self.price_grosze)
+
+    @price.setter
+    def price(self, value) -> None:
+        self.price_grosze = to_grosze(value)
+
 
 class Lesson(Base):
     """Pojedyncze wystąpienie zajęć. Może pochodzić z serii lub być jednorazowe."""
     __tablename__ = "lessons"
+    __table_args__ = (
+        # Jeden slot serii = najwyżej jedno wystąpienie. Deduplikacja w Pythonie
+        # (existing_origins w services) jest podatna na wyścig przy równoległych
+        # żądaniach — to jest gwarancja na poziomie bazy. NULL-e w SQL nie kolidują,
+        # więc zajęcia jednorazowe (series_id IS NULL) pozostają nietknięte.
+        UniqueConstraint("series_id", "origin_date", name="uq_lessons_series_origin"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     tutor_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
@@ -105,7 +146,7 @@ class Lesson(Base):
     origin_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     start_time: Mapped[time] = mapped_column(Time, nullable=False)
     duration_min: Mapped[int] = mapped_column(Integer, default=60)
-    price: Mapped[float] = mapped_column(Float, default=0.0)
+    price_grosze: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     completed: Mapped[bool] = mapped_column(Boolean, default=False)
     cancelled: Mapped[bool] = mapped_column(Boolean, default=False)
     rescheduled: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -113,6 +154,15 @@ class Lesson(Base):
 
     student: Mapped["Student"] = relationship(back_populates="lessons")
     series: Mapped["LessonSeries"] = relationship(back_populates="lessons")
+
+    @property
+    def price(self) -> float:
+        """Złote — tylko do (de)serializacji. Arytmetyka wyłącznie na price_grosze."""
+        return to_zlote(self.price_grosze)
+
+    @price.setter
+    def price(self, value) -> None:
+        self.price_grosze = to_grosze(value)
 
 
 class Payment(Base):
@@ -122,13 +172,22 @@ class Payment(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     tutor_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), nullable=False, index=True)
-    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    amount_grosze: Mapped[int] = mapped_column(Integer, nullable=False)
     date: Mapped[date] = mapped_column(Date, default=date.today)
     payer: Mapped[str | None] = mapped_column(String(200), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     student: Mapped["Student"] = relationship(back_populates="payments")
+
+    @property
+    def amount(self) -> float:
+        """Złote — tylko do (de)serializacji. Arytmetyka wyłącznie na amount_grosze."""
+        return to_zlote(self.amount_grosze)
+
+    @amount.setter
+    def amount(self, value) -> None:
+        self.amount_grosze = to_grosze(value)
 
 
 class RescheduleRequest(Base):

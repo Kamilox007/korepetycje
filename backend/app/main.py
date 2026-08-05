@@ -10,7 +10,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
-from . import models, schemas, services, auth
+from . import models, schemas, services, auth, money
 from .database import get_db, SessionLocal
 
 
@@ -77,10 +77,20 @@ def _require_migrated_db():
         )
 
 
+def _generate_upcoming() -> int:
+    """Materializuje wystąpienia serii na najbliższe miesiące."""
+    db = SessionLocal()
+    try:
+        return services.regenerate_all(db)
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _require_migrated_db()
     seed_admin()
+    _generate_upcoming()
     yield
 
 
@@ -426,7 +436,7 @@ def create_series(
     db.commit()
     db.refresh(series)
     # generator przenosi assigned_tutor_id, subject_id i level na wystąpienia
-    services.generate_lessons_for_series(db, series, date.today() + timedelta(days=90))
+    services.generate_lessons_for_series(db, series, services.clamp_horizon(None))
     return series
 
 
@@ -468,6 +478,15 @@ def _lesson_out(l: models.Lesson, db: Session) -> schemas.LessonOut:
     return item
 
 
+@app.post("/api/maintenance/generate-lessons")
+def generate_lessons(
+    user: models.User = Depends(auth.require_staff), db: Session = Depends(get_db)
+):
+    """Dosypuje brakujące wystąpienia serii. Do wywołania z crona raz na dobę."""
+    created = services.regenerate_all(db)
+    return {"created": created, "horizon": services.clamp_horizon(None)}
+
+
 @app.get("/api/lessons", response_model=list[schemas.LessonOut])
 def list_lessons(
     start: date | None = None,
@@ -476,9 +495,6 @@ def list_lessons(
     user: models.User = Depends(auth.require_staff),
     db: Session = Depends(get_db),
 ):
-    horizon = end or (date.today() + timedelta(days=90))
-    services.regenerate_all(db, horizon)
-
     q = db.query(models.Lesson)
     if start:
         q = q.filter(models.Lesson.date >= start)
@@ -498,7 +514,8 @@ def create_lesson(
 ):
     student = _get_student(db, payload.student_id)
     data = payload.model_dump()
-    if not data.get("price"):
+    if data.get("price") is None:
+        # `not data["price"]` nadpisywało też świadome 0 (lekcja próbna)
         data["price"] = student.default_price
     lesson = models.Lesson(tutor_id=user.id, **data)
     db.add(lesson)
@@ -628,30 +645,30 @@ def delete_payment(
 # ===================== SUMMARY (administracja) =====================
 def _summary_for_students(students):
     rows = []
-    total_due = total_paid = 0.0
+    total_due = total_paid = 0  # w groszach — sumowanie float kumulowało błąd
     for s in students:
         lessons = [l for l in s.lessons if not l.cancelled]
         completed = [l for l in lessons if l.completed]
-        due = round(sum(l.price for l in completed), 2)
-        paid = round(sum(p.amount for p in s.payments), 2)
+        due = sum(l.price_grosze for l in completed)
+        paid = sum(p.amount_grosze for p in s.payments)
         rows.append(
             schemas.StudentSummary(
                 student_id=s.id,
                 student_name=s.name,
                 lessons_total=len(lessons),
                 lessons_completed=len(completed),
-                amount_due=due,
-                amount_paid=paid,
-                balance=round(paid - due, 2),
+                amount_due=money.to_zlote(due),
+                amount_paid=money.to_zlote(paid),
+                balance=money.to_zlote(paid - due),
             )
         )
         total_due += due
         total_paid += paid
     return schemas.SummaryOut(
         students=rows,
-        total_due=round(total_due, 2),
-        total_paid=round(total_paid, 2),
-        total_balance=round(total_paid - total_due, 2),
+        total_due=money.to_zlote(total_due),
+        total_paid=money.to_zlote(total_paid),
+        total_balance=money.to_zlote(total_paid - total_due),
     )
 
 
@@ -800,8 +817,6 @@ def tutor_lessons(
     user: models.User = Depends(auth.require_tutor),
     db: Session = Depends(get_db),
 ):
-    horizon = end or (date.today() + timedelta(days=90))
-    services.regenerate_all(db, horizon)
     q = db.query(models.Lesson).filter(models.Lesson.assigned_tutor_id == user.id)
     if start:
         q = q.filter(models.Lesson.date >= start)
@@ -888,8 +903,6 @@ def my_lessons(
     db: Session = Depends(get_db),
 ):
     student = _student_for_user(db, user)
-    horizon = end or (date.today() + timedelta(days=90))
-    services.regenerate_all(db, horizon)
     q = db.query(models.Lesson).filter(models.Lesson.student_id == student.id)
     if start:
         q = q.filter(models.Lesson.date >= start)
