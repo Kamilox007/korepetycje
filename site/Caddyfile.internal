@@ -1,6 +1,14 @@
+# Caddy wewnątrz kontenera `site` — wyłącznie serwowanie plików, bez TLS.
+# Terminacja HTTPS i certyfikaty pozostają w usłudze `web`.
 :80 {
 	root * /srv
-	try_files {path} {path}/index.html {path}.html /404.html
 	file_server
 	encode zstd gzip
+
+	# Strona statyczna: brak fallbacku na index.html.
+	# Nieistniejący adres ma zwrócić 404, a nie stronę główną.
+	handle_errors {
+		rewrite * /404.html
+		file_server
+	}
 }

@@ -1,24 +1,16 @@
-# build output
-dist/
-# generated types
-.astro/
-
-# dependencies
+# zależności
 node_modules/
 
-# logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
+# artefakty builda
+dist/
+.astro/
 
+# katalog roboczy kompilacji CV — PDF trafia do public/ i JEST commitowany
+.cv-build/
 
-# environment variables
+# środowisko
 .env
 .env.production
 
-# macOS-specific files
+# system
 .DS_Store
-
-# jetbrains setting folder
-.idea/

@@ -1,0 +1,36 @@
+---
+import Wpis from '../../layouts/Wpis.astro';
+import { getCollection, render } from 'astro:content';
+
+export async function getStaticPaths() {
+	const projekty = await getCollection('projekty', ({ data }) => !data.szkic);
+	return projekty.map((p) => ({ params: { slug: p.id }, props: { p } }));
+}
+
+const { p } = Astro.props;
+const { Content } = await render(p);
+
+const linki = [
+	p.data.repo && { href: p.data.repo, label: 'Kod źródłowy' },
+	p.data.demo && { href: p.data.demo, label: 'Demo' },
+].filter(Boolean) as { href: string; label: string }[];
+---
+
+<Wpis
+	title={p.data.title}
+	opis={p.data.opis}
+	tagi={p.data.stack}
+	powrot={{ href: '/projekty', label: 'Wszystkie projekty' }}
+>
+	{linki.length > 0 && (
+		<p class="mono">
+			{linki.map((l, i) => (
+				<>
+					{i > 0 && ' · '}
+					<a href={l.href}>{l.label}</a>
+				</>
+			))}
+		</p>
+	)}
+	<Content />
+</Wpis>

@@ -1,0 +1,33 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getCollection } from 'astro:content';
+
+const wpisy = (await getCollection('blog', ({ data }) => !data.szkic))
+	.sort((a, b) => b.data.data.valueOf() - a.data.data.valueOf());
+
+const fmt = (d: Date) => d.toLocaleDateString('pl-PL', { year: 'numeric', month: 'long', day: 'numeric' });
+---
+
+<Base title="Notatki — Kamil Krzywoń" opis="Notatki techniczne: uczenie maszynowe, Python, systemy produkcyjne.">
+	<h1>Notatki</h1>
+	<p class="cichy">
+		Rzeczy, które chciałem zrozumieć na tyle dobrze, żeby móc je zapisać.
+		<a href="/rss.xml">RSS</a>.
+	</p>
+
+	{wpisy.length === 0 ? (
+		<p class="cichy" style="margin-top:2rem">Pierwszy wpis w przygotowaniu.</p>
+	) : (
+		<ul class="spis" style="margin-top:2rem">
+			{wpisy.map((w) => (
+				<li>
+					<a href={`/blog/${w.id}`}>
+						<span class="meta">{fmt(w.data.data)}</span>
+						<span class="tytul">{w.data.title}</span>
+						<span class="opis">{w.data.opis}</span>
+					</a>
+				</li>
+			))}
+		</ul>
+	)}
+</Base>

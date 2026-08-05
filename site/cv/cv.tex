@@ -1,0 +1,187 @@
+%-----------------------------------------------------------------------------
+% Kamil Krzywoń — CV
+% ML / AI Engineer & Data Scientist
+% Single-column, ATS-friendly, modern LaTeX template
+%
+% Kompilacja: npm run cv  (z katalogu site/)
+% Wynik: public/cv.pdf — plik JEST commitowany, obraz Dockera nie ma TeX-a.
+%-----------------------------------------------------------------------------
+\documentclass[10pt, a4paper]{article}
+
+% ----- Packages -----
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage[margin=1.2cm]{geometry}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{fontawesome5}
+\usepackage{tabularx}
+\usepackage{ragged2e}
+\usepackage{microtype}
+\usepackage{lmodern}
+\usepackage[default,scale=0.95]{opensans}
+\renewcommand{\familydefault}{\sfdefault}
+
+% ----- Colors -----
+\definecolor{accent}{HTML}{0E4D7A}     % deep blue — name & section rules
+\definecolor{subtle}{HTML}{4A4A4A}     % body text
+\definecolor{muted}{HTML}{7A7A7A}      % secondary info (dates, locations)
+\color{subtle}
+
+% ----- Hyperlink style -----
+\hypersetup{
+    colorlinks=true,
+    urlcolor=accent,
+    linkcolor=accent,
+    pdftitle={Kamil Krzywoń — CV},
+    pdfauthor={Kamil Krzywoń}
+}
+
+% ----- Page setup -----
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+
+% ----- Section formatting -----
+\titleformat{\section}
+    {\color{accent}\large\bfseries}
+    {}{0pt}{\MakeUppercase}[\vspace{1pt}\color{accent}\titlerule\vspace{2pt}]
+\titlespacing*{\section}{0pt}{6pt}{4pt}
+
+% ----- Helper commands -----
+\newcommand{\entry}[4]{%
+    \noindent\begin{tabularx}{\textwidth}{@{}X r@{}}
+        \textbf{#1} & \textcolor{muted}{#2} \\
+        \textit{#3} & \textcolor{muted}{\textit{#4}} \\
+    \end{tabularx}\vspace{2pt}
+}
+
+\newcommand{\project}[3]{%
+    \noindent\textbf{#1}\,\textcolor{muted}{\,---\, #2}\\[1pt]
+    #3\vspace{3pt}
+}
+
+\newcommand{\skillrow}[2]{%
+    \noindent\makebox[3.5cm][l]{\textbf{#1}}#2\\[2pt]
+}
+
+\setlist[itemize]{leftmargin=1.2em, topsep=2pt, itemsep=1pt, parsep=0pt}
+
+%-----------------------------------------------------------------------------
+\begin{document}
+
+% ============================== HEADER ==============================
+\begin{center}
+    {\Huge\bfseries\color{accent} Kamil Krzywoń}\\[4pt]
+    {\large\color{muted} ML / AI Engineer \,|\, Data Scientist}\\[6pt]
+    \small
+    \faEnvelope[regular]\ \href{mailto:kamil.krzywon24@gmail.com}{kamil.krzywon24@gmail.com}
+    \;\;\textbar\;\;
+    \faPhone\ +48 667 865 281
+    \;\;\textbar\;\;
+    \faMapMarker*\ Cieszyn, Poland
+    \\[2pt]
+    \faGithub\ \href{https://github.com/Kamilox007}{https://github.com/Kamilox007}
+    \;\;\textbar\;\;
+    \faLinkedin\ \href{https://www.linkedin.com/in/kamil-krzywo\%C5\%84-349354314/}{linkedin.com/in/kamil-krzywoń}
+\end{center}
+
+\vspace{4pt}
+
+% ============================== SUMMARY ==============================
+\section*{Profile}
+Final-year Computer Science student at Poznań University of Technology specialising in
+Artificial Intelligence. Hands-on experience building machine learning models in Python
+with PyTorch, TensorFlow, and scikit-learn, with a growing focus on NLP and large language
+models.
+
+% ============================== EDUCATION ==============================
+\section*{Education}
+
+\entry{Poznań University of Technology}{Oct 2021 -- Sep 2026 (expected)}
+      {M.Sc. \& B.Sc., Computer Science --- specialisation: Artificial Intelligence}{Poznań, Poland}
+\vspace{2pt}
+\begin{itemize}
+    \item \textbf{Master's thesis (in progress):} \emph{Robust value-based method for group decision support.}
+    \item \textbf{Relevant coursework:} Machine Learning, Deep Learning, Natural Language Processing,
+          Probability \& Statistics, Linear Algebra, Optimization, Algorithms \& Data Structures, Databases.
+\end{itemize}
+
+% ============================== EXPERIENCE ==============================
+\section*{Experience}
+
+\entry{bit4mation Polska Sp. z o.o.}{Aug 2024}
+      {Software Engineering Intern}{Poznań, Poland}
+% DO UZUPEŁNIENIA — nie znam szczegółów tego stażu. Dwa punkty wystarczą:
+% czego dotyczył projekt, w jakim stacku, co konkretnie zrobiłeś.
+% \begin{itemize}
+%     \item ...
+%     \item ...
+% \end{itemize}
+\vspace{3pt}
+
+\entry{Echo Edukacji Sp. z o.o.}{Oct 2024 -- Jun 2025}
+      {Math and Physics Tutor}{Poznań, Poland}
+% DO UZUPEŁNIENIA — np. liczba uczniów, poziom (matura / studia), wyniki.
+\vspace{3pt}
+
+\entry{Private Tutoring (Self-Employed)}{Jun 2025 -- Present}
+      {Math and Physics Tutor}{Poznań, Poland}
+\begin{itemize}
+    \item Teach mathematics and physics at secondary level, including final-exam preparation.
+    \item Built and operate the scheduling and billing platform used to run the practice
+          (see \emph{Projects})
+\end{itemize}
+
+% ============================== SKILLS ==============================
+\section*{Technical Skills}
+
+\skillrow{Programming}{Python (advanced), SQL}
+\skillrow{ML \& Deep Learning}{PyTorch, TensorFlow, scikit-learn, Hugging Face Transformers}
+\skillrow{Data \& Visualisation}{pandas, NumPy, matplotlib, seaborn}
+\skillrow{Backend \& Web}{FastAPI, SQLAlchemy, Alembic, REST APIs, React}
+\skillrow{MLOps \& Tools}{Git, Docker, MLflow, pytest, Linux, \LaTeX}
+\skillrow{Databases}{PostgreSQL, MongoDB, SQLite}
+\skillrow{Cloud}{AWS (basic)}
+\skillrow{Focus areas}{Classical ML, NLP, Large Language Models, Reinforcement Learning}
+
+% ============================== PROJECTS ==============================
+\vspace{-12pt}
+\section*{Projects}
+
+\project{Tutoring Management Platform --- production system}
+        {Python, FastAPI, SQLAlchemy, React, Docker, Caddy}
+        {Full-stack application for lesson scheduling, billing, and student accounts,
+         in daily production use. JWT auth with role-based access control, account lockout,
+         per-IP rate limiting. Deployed via Docker
+         Compose behind Caddy on a Linux VPS, with Alembic migrations, continuous database
+         replication to object storage (Litestream), and a regression test suite.}
+
+\project{6 nimmt! — Reinforcement Learning Card-Game Agent}
+        {Python, PyTorch}
+        {Built an AI agent that learns to play the card game \emph{6 nimmt!} using
+         Deep Q-Networks (DQN). Designed the game environment, state representation, and
+         reward shaping; trained and evaluated multiple bot variants in self-play. University project.}
+
+\project{Machine Learning Mini-Projects}
+        {Python, scikit-learn, pandas, PyTorch}
+        {Collection of smaller end-to-end ML projects covering classification, regression,
+         and exploratory data analysis on tabular and text data --- including data cleaning,
+         feature engineering, model selection, and evaluation with cross-validation.}
+
+% ============================== LANGUAGES ==============================
+\section*{Languages}
+\skillrow{Polish}{Native}
+\skillrow{English}{B2 / C1 (upper-intermediate to advanced)}
+% ============================== INTERESTS ==============================
+\vspace{-12pt}
+
+\section*{Interests}
+
+ML enthusiast \,$\bullet$\, Mathematics \,$\bullet$\, Physics \,$\bullet$\,
+Video games \,$\bullet$\, Board games
+
+\end{document}

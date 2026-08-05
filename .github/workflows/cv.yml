@@ -1,0 +1,38 @@
+# Opcjonalne: kompilacja CV w CI zamiast lokalnie.
+# Plik przenieś do KATALOGU GŁÓWNEGO repo: .github/workflows/cv.yml
+name: Kompilacja CV
+
+on:
+  push:
+    paths: ['site/cv/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Kompilacja LaTeX
+        uses: xu-cheng/latex-action@v3
+        with:
+          working_directory: site/cv
+          root_file: cv.tex
+          latexmk_use_xelatex: false
+
+      - name: Publikacja PDF
+        run: |
+          mkdir -p site/public
+          mv site/cv/cv.pdf site/public/cv.pdf
+          if git diff --quiet -- site/public/cv.pdf; then
+            echo "PDF bez zmian."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/public/cv.pdf
+          git commit -m "cv: przebudowa PDF z cv.tex"
+          git push

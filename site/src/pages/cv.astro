@@ -1,0 +1,35 @@
+---
+import Base from '../layouts/Base.astro';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const plik = path.join(process.cwd(), 'public', 'cv.pdf');
+const istnieje = fs.existsSync(plik);
+const zbudowane = istnieje
+	? fs.statSync(plik).mtime.toLocaleDateString('pl-PL', { year: 'numeric', month: 'long', day: 'numeric' })
+	: null;
+---
+
+<Base title="CV — Kamil Krzywoń" opis="Życiorys zawodowy: wykształcenie, projekty, umiejętności.">
+	<h1>CV</h1>
+
+	{istnieje ? (
+		<>
+			<p class="mono cichy">
+				Skład: LaTeX · wersja z {zbudowane}
+			</p>
+			<p>
+				<a href="/cv.pdf">Pobierz PDF</a>
+			</p>
+			<object data="/cv.pdf" type="application/pdf" style="width:100%;height:70vh;border:1px solid var(--linia);margin-top:1.5rem">
+				<p class="cichy">
+					Twoja przeglądarka nie wyświetla PDF-ów w oknie. <a href="/cv.pdf">Otwórz plik</a>.
+				</p>
+			</object>
+		</>
+	) : (
+		<p class="cichy">
+			Plik <code>public/cv.pdf</code> nie został jeszcze zbudowany. Uruchom <code>npm run cv</code>.
+		</p>
+	)}
+</Base>

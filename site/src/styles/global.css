@@ -1,0 +1,255 @@
+/* standard.css = osie wght + opsz (projekt korzysta z obu).
+   Podzbiory mają unicode-range, więc przeglądarka pobiera tylko potrzebne. */
+@import '@fontsource-variable/newsreader/standard.css';
+@import '@fontsource/ibm-plex-mono/latin-400.css';
+@import '@fontsource/ibm-plex-mono/latin-ext-400.css';
+@import '@fontsource/ibm-plex-mono/latin-500.css';
+@import '@fontsource/ibm-plex-mono/latin-ext-500.css';
+@import 'katex/dist/katex.min.css';
+
+:root {
+  --papier: #faf9f6;
+  --atrament: #16181c;
+  --cichy: #6b6f76;
+  --linia: #e2e2dc;
+  --link: #1b3fd1;
+  --zazn: #ece5cf;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --serif: 'Newsreader Variable', Newsreader, Georgia, serif;
+  --miara: 34rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --papier: #131519;
+    --atrament: #e9e9e4;
+    --cichy: #9297a0;
+    --linia: #2a2d33;
+    --link: #93a9ff;
+    --zazn: #2e2a1c;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--papier);
+  color: var(--atrament);
+  font-family: var(--serif);
+  font-size: 1.125rem;
+  line-height: 1.6;
+  font-variation-settings: 'opsz' 16;
+  text-rendering: optimizeLegibility;
+}
+
+.arkusz {
+  max-width: var(--miara);
+  margin: 0 auto;
+  padding: 2rem 1.5rem 6rem;
+}
+
+/* --- nagłówek dokumentu --- */
+
+.pasek {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--linia);
+  margin-bottom: 3rem;
+}
+
+.sygnatura {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--atrament);
+  text-decoration: none;
+}
+
+.pasek nav { display: flex; gap: 1.25rem; flex-wrap: wrap; }
+
+.pasek nav a {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--cichy);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 2px;
+}
+
+.pasek nav a:hover,
+.pasek nav a[aria-current='page'] {
+  color: var(--atrament);
+  border-bottom-color: var(--link);
+}
+
+/* --- typografia --- */
+
+h1 {
+  font-size: clamp(2rem, 6vw, 2.9rem);
+  line-height: 1.12;
+  font-weight: 500;
+  font-variation-settings: 'opsz' 44;
+  letter-spacing: -0.015em;
+  margin: 0 0 0.75rem;
+  text-wrap: balance;
+}
+
+h2 {
+  font-size: 1.3rem;
+  font-weight: 500;
+  font-variation-settings: 'opsz' 24;
+  margin: 3rem 0 1rem;
+  letter-spacing: -0.005em;
+}
+
+h3 { font-size: 1.1rem; font-weight: 500; margin: 2rem 0 0.5rem; }
+
+p { margin: 0 0 1.1rem; }
+
+a { color: var(--link); text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+
+.mono { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.02em; }
+.cichy { color: var(--cichy); }
+
+/* numeracja sekcji — dokument, nie ozdoba */
+.numer {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--link);
+  margin-right: 0.6rem;
+}
+
+/* --- streszczenie --- */
+
+.streszczenie {
+  border-top: 1px solid var(--linia);
+  border-bottom: 1px solid var(--linia);
+  padding: 1.5rem 0;
+  margin: 2.5rem 0 0;
+}
+
+.streszczenie h2 {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--cichy);
+  margin: 0 0 0.9rem;
+  font-weight: 500;
+}
+
+.streszczenie p:last-child { margin-bottom: 0; }
+
+/* --- spis pozycji --- */
+
+.spis { list-style: none; padding: 0; margin: 0; }
+
+.spis li { border-bottom: 1px solid var(--linia); }
+
+.spis a {
+  display: block;
+  padding: 1.1rem 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.spis a:hover .tytul { color: var(--link); }
+
+.spis .tytul { font-size: 1.1rem; display: block; margin-bottom: 0.25rem; }
+.spis .opis { color: var(--cichy); font-size: 0.95rem; display: block; }
+
+.meta {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--cichy);
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+/* --- znaczniki --- */
+
+.znaczniki { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.6rem 0; }
+
+.znacznik {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--cichy);
+  border: 1px solid var(--linia);
+  padding: 0.15rem 0.45rem;
+  border-radius: 2px;
+}
+
+/* --- treść markdown --- */
+
+.tresc :where(h2, h3) { font-variation-settings: 'opsz' 20; }
+.tresc img { max-width: 100%; height: auto; }
+.tresc blockquote {
+  margin: 1.5rem 0;
+  padding-left: 1.1rem;
+  border-left: 2px solid var(--zazn);
+  color: var(--cichy);
+}
+.tresc code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  background: var(--zazn);
+  padding: 0.1em 0.3em;
+  border-radius: 2px;
+}
+.tresc pre {
+  padding: 1rem;
+  border: 1px solid var(--linia);
+  border-radius: 3px;
+  overflow-x: auto;
+  font-size: 0.85rem;
+}
+.tresc pre code { background: none; padding: 0; }
+.tresc table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+.tresc th, .tresc td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--linia); }
+
+.katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.4rem 0; }
+
+/* --- stopka --- */
+
+.stopka {
+  margin-top: 5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--linia);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--cichy);
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* --- dostępność --- */
+
+:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
+
+.pomin {
+  position: absolute;
+  left: -9999px;
+}
+.pomin:focus {
+  left: 0.5rem;
+  top: 0.5rem;
+  background: var(--papier);
+  padding: 0.5rem 0.8rem;
+  z-index: 10;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
