@@ -1,0 +1,37 @@
+# DOMAIN pochodzi z .env. Caddy sam pobiera i odnawia certyfikat Let's Encrypt.
+# Jeśli DNS jeszcze nie wskazuje na serwer, podmień na :80 — wtedy działa po HTTP
+# bez certyfikatu, ale NIE zostawiaj tego na dłużej: token leci wtedy otwartym tekstem.
+{$DOMAIN} {
+	encode zstd gzip
+
+	# API — wszystko pod /api trafia do backendu
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	# Frontend — reszta to pliki statyczne.
+	# try_files z fallbackiem na index.html jest konieczne dla SPA: bez tego
+	# odświeżenie strony na dowolnym adresie innym niż / zwróci 404.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		# HSTS — przeglądarka odmówi połączenia po HTTP przez rok.
+		# Włącz DOPIERO gdy HTTPS działa, bo cofnięcie jest bolesne.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 10MB
+			roll_keep 5
+		}
+	}
+}

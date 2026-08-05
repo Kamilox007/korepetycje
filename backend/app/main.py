@@ -478,6 +478,13 @@ def _lesson_out(l: models.Lesson, db: Session) -> schemas.LessonOut:
     return item
 
 
+@app.get("/api/health")
+def health():
+    """Sonda dla healthchecka Dockera. Bez autoryzacji i bez dotykania bazy —
+    ma odpowiadać na pytanie "czy proces żyje", nic więcej."""
+    return {"status": "ok"}
+
+
 @app.post("/api/maintenance/generate-lessons")
 def generate_lessons(
     user: models.User = Depends(auth.require_staff), db: Session = Depends(get_db)
