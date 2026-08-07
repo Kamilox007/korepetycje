@@ -1,0 +1,24 @@
+# Bazy danych — obraz nie może ich zawierać. DATABASE_URL wskazuje na /data,
+# ale COPY . . wciągnąłby plik do warstwy obrazu razem z danymi.
+*.db
+*.db-shm
+*.db-wal
+*.backup-*.db
+
+# Środowiska i cache — pip odtwarza je w kontenerze od zera
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+
+# Testy nie są uruchamiane w obrazie produkcyjnym
+test_*.py
+testing_utils.py
+requirements-dev.txt
+
+# Skrypty deweloperskie
+run.sh
+bootstrap_alembic.py
+
+.env

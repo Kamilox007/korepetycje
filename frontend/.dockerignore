@@ -1,0 +1,13 @@
+# npm install odtwarza zależności w kontenerze
+node_modules
+
+# Wynik poprzedniego builda — powstaje na nowo w warstwie budującej
+dist
+
+# Testy end-to-end nie biorą udziału w budowaniu
+e2e
+playwright.config.js
+test-results
+playwright-report
+
+.env
