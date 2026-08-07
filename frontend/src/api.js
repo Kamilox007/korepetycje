@@ -1,11 +1,9 @@
 const BASE = "/api";
 
-const TOKEN_KEY = "korepetycje_token";
-export function getToken() { return localStorage.getItem(TOKEN_KEY); }
-export function setToken(t) {
-  if (t) localStorage.setItem(TOKEN_KEY, t);
-  else localStorage.removeItem(TOKEN_KEY);
-}
+// Token nie jest przechowywany po stronie JavaScriptu. Backend wystawia go
+// w ciasteczku httponly, którego skrypty nie odczytają — dzięki temu XSS
+// nie wystarcza do przejęcia sesji. Przeglądarka dołącza je automatycznie,
+// bo frontend i API są serwowane z tej samej domeny.
 
 // callback wywoływany przy 401 (np. wylogowanie)
 let onUnauthorized = null;
@@ -13,12 +11,13 @@ export function setUnauthorizedHandler(fn) { onUnauthorized = fn; }
 
 async function req(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
-  const token = getToken();
-  if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(BASE + path, { ...options, headers });
+  const res = await fetch(BASE + path, {
+    ...options,
+    headers,
+    credentials: "same-origin",
+  });
   if (res.status === 401) {
-    setToken(null);
     if (onUnauthorized) onUnauthorized();
     throw new Error("401: sesja wygasła");
   }
@@ -44,6 +43,7 @@ export const api = {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
+      credentials: "same-origin",
     });
     if (!res.ok) {
       let d = "Błąd logowania";
@@ -53,15 +53,15 @@ export const api = {
     return res.json();
   },
   me: () => req("/auth/me"),
-  changePassword: async (oldP, newP) => {
-    const res = await req("/auth/change-password", {
+  changePassword: (oldP, newP) =>
+    // Backend odświeża ciasteczko w odpowiedzi — po stronie JS nie ma nic
+    // do zapisania. Stary token był krótkoterminowy, nowy jest pełny.
+    req("/auth/change-password", {
       method: "POST",
       body: JSON.stringify({ old_password: oldP, new_password: newP }),
-    });
-    // backend wydaje nowy, pełnoprawny token — stary był krótkoterminowy
-    if (res && res.access_token) setToken(res.access_token);
-    return res;
-  },
+    }),
+
+  logout: () => req("/auth/logout", { method: "POST" }),
 
   // ----- students (korepetytor) -----
   listStudents: () => req("/students"),

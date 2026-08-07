@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { api } from "./api";
+import { useConfirm } from "./Confirm";
 
 const PRESET_COLORS = ["#378ADD", "#1D9E75", "#D85A30", "#D4537E", "#7F77DD", "#BA7517", "#888780"];
 
 export default function Subjects() {
+  const confirm = useConfirm();
   const [subjects, setSubjects] = useState([]);
   const [name, setName] = useState("");
   const [color, setColor] = useState(PRESET_COLORS[0]);
@@ -28,7 +30,14 @@ export default function Subjects() {
   }
 
   async function remove(s) {
-    if (!confirm(`Usunąć przedmiot „${s.name}"? Zostanie odłączony od istniejących zajęć (zajęcia zostaną).`)) return;
+    const ok = await confirm({
+      title: "Usunąć przedmiot?",
+      message: `Przedmiot „${s.name}" zostanie usunięty z listy.`,
+      consequence:
+        "Istniejące zajęcia zostaną zachowane, ale stracą przypisanie do tego przedmiotu.",
+      confirmLabel: "Usuń przedmiot",
+    });
+    if (!ok) return;
     await api.deleteSubject(s.id);
     load();
   }

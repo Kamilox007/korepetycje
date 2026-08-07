@@ -7,6 +7,7 @@ import {
   DAYS_SHORT, DAYS_PL, MONTHS_PL, startOfWeek, addDays, toISODate, parseISO,
   sameDay, fmtMoney, fmtTime, monthGrid, pyWeekday,
 } from "./dates";
+import { useConfirm } from "./Confirm";
 
 const VIEWS = [
   { id: "day", label: "Dzień" },
@@ -478,6 +479,7 @@ function MonthView({ anchor, today, lessonsFor, onPick, onPickDay, onDropDay }) 
 }
 
 function EditLesson({ lesson, onClose, onSaved }) {
+  const confirm = useConfirm();
   const [date, setDate] = useState(lesson.date);
   const [time, setTime] = useState(fmtTime(lesson.start_time));
   const [price, setPrice] = useState(lesson.price);
@@ -507,7 +509,15 @@ function EditLesson({ lesson, onClose, onSaved }) {
     onSaved();
   }
   async function remove() {
-    if (!confirm("Usunąć te zajęcia?")) return;
+    const ok = await confirm({
+      title: "Usunąć zajęcia?",
+      message: `${lesson.student_name} — ${lesson.date}, godz. ${String(lesson.start_time).slice(0, 5)}.`,
+      consequence:
+        "Zajęcia znikną z terminarza i przestaną być liczone do salda. " +
+        "Jeśli chcesz zachować ślad, zamiast usuwać oznacz je jako odwołane.",
+      confirmLabel: "Usuń zajęcia",
+    });
+    if (!ok) return;
     setBusy(true);
     await api.deleteLesson(lesson.id);
     onSaved();

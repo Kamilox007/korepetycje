@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { api } from "./api";
 import Modal from "./Modal";
 import { DAYS_PL, fmtMoney, fmtTime } from "./dates";
+import { useConfirm } from "./Confirm";
 
 export default function Students({ students, reload }) {
+  const confirm = useConfirm();
   const [series, setSeries] = useState([]);
   const [showStudent, setShowStudent] = useState(false);
   const [showSeries, setShowSeries] = useState(false);
@@ -15,13 +17,30 @@ export default function Students({ students, reload }) {
   useEffect(() => { loadSeries(); }, []);
 
   async function removeStudent(s) {
-    if (!confirm(`Usunąć ucznia ${s.name} wraz z całą historią?`)) return;
+    const ok = await confirm({
+      title: "Usunąć ucznia?",
+      message: `Konto i cała historia ucznia ${s.name} zostaną usunięte.`,
+      consequence:
+        "Razem z uczniem znikną wszystkie jego zajęcia, wpłaty i saldo. " +
+        "Tej operacji nie da się cofnąć.",
+      requireText: s.name,
+      confirmLabel: "Usuń ucznia",
+    });
+    if (!ok) return;
     await api.deleteStudent(s.id);
     reload();
   }
 
   async function removeSeries(srs) {
-    if (!confirm("Zakończyć tę serię cykliczną? Przyszłe nieodbyte zajęcia zostaną usunięte.")) return;
+    const ok = await confirm({
+      title: "Zakończyć serię?",
+      message: "Zajęcia cykliczne przestaną się generować.",
+      consequence:
+        "Przyszłe, jeszcze nieodbyte terminy zostaną usunięte. " +
+        "Zajęcia już odbyte i rozliczenia zostają nietknięte.",
+      confirmLabel: "Zakończ serię",
+    });
+    if (!ok) return;
     await api.deleteSeries(srs.id);
     loadSeries();
     reload();

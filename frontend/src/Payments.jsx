@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { api } from "./api";
 import Modal from "./Modal";
 import { fmtMoney } from "./dates";
+import { useConfirm } from "./Confirm";
 
 export default function Payments({ students, reload }) {
+  const confirm = useConfirm();
   const [payments, setPayments] = useState([]);
   const [showForm, setShowForm] = useState(false);
 
@@ -13,7 +15,13 @@ export default function Payments({ students, reload }) {
   useEffect(() => { load(); }, []);
 
   async function remove(p) {
-    if (!confirm("Usunąć tę wpłatę?")) return;
+    const ok = await confirm({
+      title: "Usunąć wpłatę?",
+      message: `Wpłata ${fmtMoney(p.amount)} z dnia ${p.date} zostanie usunięta.`,
+      consequence: "Saldo ucznia zmieni się natychmiast. Operacji nie da się cofnąć.",
+      confirmLabel: "Usuń wpłatę",
+    });
+    if (!ok) return;
     await api.deletePayment(p.id);
     load();
     reload();

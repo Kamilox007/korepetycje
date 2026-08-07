@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { usePersistentState } from "./usePersistentState";
-import { api, getToken, setToken, setUnauthorizedHandler } from "./api";
+import { api, setUnauthorizedHandler } from "./api";
 import Login from "./Login";
 import ChangePassword from "./ChangePassword";
 import Calendar from "./Calendar";
@@ -33,20 +33,20 @@ export default function App() {
   useEffect(() => {
     setUnauthorizedHandler(() => setAuth(null));
     (async () => {
-      if (getToken()) {
-        try {
-          const me = await api.me();
-          setAuth(me);
-          setForcePw(me.must_change_password);
-        } catch { setToken(null); }
-      }
+      // Nie da się sprawdzić ciasteczka httponly z JS, więc o istnieniu sesji
+      // pytamy backend. 401 przy starcie oznacza po prostu brak zalogowania.
+      try {
+        const me = await api.me();
+        setAuth(me);
+        setForcePw(me.must_change_password);
+      } catch { /* brak sesji */ }
       setLoading(false);
     })();
   }, []);
 
   async function handleLogin(username, password) {
     const res = await api.login(username, password);
-    setToken(res.access_token);
+    // Ciasteczko ustawił backend w odpowiedzi — tu zostaje tylko stan interfejsu.
     setAuth({
       role: res.role, username: res.username,
       display_name: res.display_name, must_change_password: res.must_change_password,
@@ -54,7 +54,12 @@ export default function App() {
     setForcePw(res.must_change_password);
   }
 
-  function logout() { setToken(null); setAuth(null); }
+  async function logout() {
+    // Ciasteczka httponly nie da się skasować z JavaScriptu — musi to zrobić
+    // backend, inaczej wylogowanie byłoby pozorne.
+    try { await api.logout(); } catch { /* i tak czyścimy stan */ }
+    setAuth(null);
+  }
 
   if (loading) return <div className="empty" style={{ marginTop: 80 }}>Ładowanie…</div>;
   if (!auth) return <Login onLogin={handleLogin} />;

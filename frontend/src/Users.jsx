@@ -2,10 +2,12 @@ import { useState, useEffect } from "react";
 import { api } from "./api";
 import Modal from "./Modal";
 import { TUTOR_COLORS } from "./colors";
+import { useConfirm } from "./Confirm";
 
 const ROLE_LABEL = { admin: "Administrator", secretary: "Sekretariat", tutor: "Korepetytor", student: "Uczeń" };
 
 export default function Users({ myRole }) {
+  const confirm = useConfirm();
   const [users, setUsers] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [colorFor, setColorFor] = useState(null);
@@ -18,7 +20,15 @@ export default function Users({ myRole }) {
   useEffect(() => { load(); }, []);
 
   async function remove(u) {
-    if (!confirm(`Usunąć konto ${u.display_name || u.username}?`)) return;
+    const ok = await confirm({
+      title: "Usunąć konto?",
+      message: `Konto ${u.display_name || u.username} (${u.username}) zostanie usunięte.`,
+      consequence:
+        "Użytkownik natychmiast straci dostęp do aplikacji. " +
+        "Dane ucznia powiązane z kontem zostają.",
+      confirmLabel: "Usuń konto",
+    });
+    if (!ok) return;
     try { await api.deleteUser(u.id); load(); }
     catch (e) { alert(e.message); }
   }

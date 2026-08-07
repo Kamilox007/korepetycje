@@ -295,6 +295,10 @@ tbody tr:hover { background: var(--surface-2); }
   padding: 9px 12px; border-radius: var(--radius-sm); font-size: 13px;
 }
 
+/* Okno potwierdzenia otwarte na tle innego modala (np. edycji zajęć)
+   musi leżeć wyżej, inaczej zniknie pod spodem. */
+.overlay.overlay-confirm { z-index: 100; }
+
 /* ==========================================================================
    Mobile — do 820 px.
    Reguły niżej działają WYŁĄCZNIE na wąskich ekranach; widok desktopowy
