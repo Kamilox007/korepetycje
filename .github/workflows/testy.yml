@@ -1,0 +1,30 @@
+name: testy
+on: [push, pull_request]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: pip install -r backend/requirements-dev.txt
+      - name: Regresje
+        working-directory: backend
+        env:
+          JWT_SECRET: test-secret
+        run: |
+          for t in test_*.py; do echo "== $t"; python "$t" || exit 1; done
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend

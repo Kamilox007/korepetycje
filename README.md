@@ -1,3 +1,4 @@
+![testy](https://github.com/Kamilox007/korepetycje/actions/workflows/testy.yml/badge.svg)
 # Korepetycje — panel zarządzania zajęciami i rozliczeniami
 
 Aplikacja webowa do prowadzenia korepetycji: terminarz, zajęcia cykliczne,
@@ -12,7 +13,7 @@ Wersja produkcyjna: <https://panel.kamilkrzywon.pl>
 |---|---|
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2.0, Pydantic v2 |
 | Migracje | Alembic (tryb `batch` — wymagany przez SQLite) |
-| Baza | SQLite (`DATABASE_URL` pozwala przejść na PostgreSQL) |
+| Baza | SQLite |
 | Uwierzytelnianie | JWT (HS256), hasła haszowane bcryptem |
 | Ochrona logowania | slowapi (limit per IP) + blokada konta w bazie |
 | Frontend | React 18, Vite 6, CSS bez frameworka |
@@ -172,6 +173,11 @@ Przy długo działającym procesie potrzebny jest impuls dobowy:
 Alternatywnie `POST /api/maintenance/generate-lessons` (rola staff, idempotentne).
 
 ## Testy
+Testy wymagają dodatkowej zależności spoza obrazu produkcyjnego:
+
+```bash
+pip install -r requirements-dev.txt
+```
 
 ```bash
 cd backend
