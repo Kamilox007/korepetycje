@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useId } from "react";
 import { api } from "./api";
 import Modal from "./Modal";
 import { usePersistentState } from "./usePersistentState";
@@ -479,6 +479,7 @@ function MonthView({ anchor, today, lessonsFor, onPick, onPickDay, onDropDay }) 
 }
 
 function EditLesson({ lesson, onClose, onSaved }) {
+  const uid = useId();
   const confirm = useConfirm();
   const [date, setDate] = useState(lesson.date);
   const [time, setTime] = useState(fmtTime(lesson.start_time));
@@ -545,21 +546,21 @@ function EditLesson({ lesson, onClose, onSaved }) {
         </p>
       )}
       <div className="field-row">
-        <div><label>Data</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
-        <div><label>Godzina</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></div>
+        <div><label htmlFor={`${uid}-data-1`}>Data</label><input id={`${uid}-data-1`} type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+        <div><label htmlFor={`${uid}-godzina-2`}>Godzina</label><input id={`${uid}-godzina-2`} type="time" value={time} onChange={(e) => setTime(e.target.value)} /></div>
       </div>
-      <div><label>Cena (PLN)</label><input type="number" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
+      <div><label htmlFor={`${uid}-cena-pln-3`}>Cena (PLN)</label><input id={`${uid}-cena-pln-3`} type="number" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
       <div className="field-row">
         <div>
-          <label>Przedmiot</label>
-          <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
+          <label htmlFor={`${uid}-przedmiot-4`}>Przedmiot</label>
+          <select id={`${uid}-przedmiot-4`} value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
             <option value="">— brak —</option>
             {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
         <div>
-          <label>Poziom</label>
-          <select value={level} onChange={(e) => setLevel(e.target.value)}>
+          <label htmlFor={`${uid}-poziom-5`}>Poziom</label>
+          <select id={`${uid}-poziom-5`} value={level} onChange={(e) => setLevel(e.target.value)}>
             <option value="">—</option>
             <option value="podstawa">podstawa</option>
             <option value="rozszerzenie">rozszerzenie</option>
@@ -567,8 +568,8 @@ function EditLesson({ lesson, onClose, onSaved }) {
         </div>
       </div>
       <div>
-        <label>Prowadzący korepetytor</label>
-        <select value={tutorId} onChange={(e) => setTutorId(e.target.value)}>
+        <label htmlFor={`${uid}-prowadzacy-korepetytor-6`}>Prowadzący korepetytor</label>
+        <select id={`${uid}-prowadzacy-korepetytor-6`} value={tutorId} onChange={(e) => setTutorId(e.target.value)}>
           <option value="">— nieprzypisany —</option>
           {tutors.map((t) => <option key={t.id} value={t.id}>{t.display_name}</option>)}
         </select>
@@ -583,12 +584,13 @@ function EditLesson({ lesson, onClose, onSaved }) {
           onChange={(e) => { setCancelled(e.target.checked); if (e.target.checked) setCompleted(false); }} />
         <label htmlFor="canc" style={{ margin: 0 }}>Odwołane</label>
       </div>
-      <div><label>Notatka</label><textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} /></div>
+      <div><label htmlFor={`${uid}-notatka-7`}>Notatka</label><textarea id={`${uid}-notatka-7`} rows={2} value={note} onChange={(e) => setNote(e.target.value)} /></div>
     </Modal>
   );
 }
 
 function AddLesson({ date, time: initialTime, students, onClose, onSaved }) {
+  const uid = useId();
   const [studentId, setStudentId] = useState(students[0]?.id || "");
   const [d, setD] = useState(date);
   const [time, setTime] = useState(initialTime || "16:00");
@@ -617,8 +619,8 @@ function AddLesson({ date, time: initialTime, students, onClose, onSaved }) {
       </>}
     >
       <div>
-        <label>Uczeń</label>
-        <select value={studentId} onChange={(e) => {
+        <label htmlFor={`${uid}-uczen-8`}>Uczeń</label>
+        <select id={`${uid}-uczen-8`} value={studentId} onChange={(e) => {
           setStudentId(e.target.value);
           const s = students.find((x) => x.id === Number(e.target.value));
           if (s) setPrice(s.default_price);
@@ -627,10 +629,10 @@ function AddLesson({ date, time: initialTime, students, onClose, onSaved }) {
         </select>
       </div>
       <div className="field-row">
-        <div><label>Data</label><input type="date" value={d} onChange={(e) => setD(e.target.value)} /></div>
-        <div><label>Godzina</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></div>
+        <div><label htmlFor={`${uid}-data-9`}>Data</label><input id={`${uid}-data-9`} type="date" value={d} onChange={(e) => setD(e.target.value)} /></div>
+        <div><label htmlFor={`${uid}-godzina-10`}>Godzina</label><input id={`${uid}-godzina-10`} type="time" value={time} onChange={(e) => setTime(e.target.value)} /></div>
       </div>
-      <div><label>Cena (PLN)</label><input type="number" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
+      <div><label htmlFor={`${uid}-cena-pln-11`}>Cena (PLN)</label><input id={`${uid}-cena-pln-11`} type="number" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
     </Modal>
   );
 }

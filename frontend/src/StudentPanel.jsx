@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { usePersistentState } from "./usePersistentState";
 import { api } from "./api";
 import Modal from "./Modal";
@@ -169,6 +169,7 @@ export default function StudentPanel() {
 }
 
 function RequestForm({ lesson, onClose, onSent }) {
+  const uid = useId();
   const [slots, setSlots] = useState(null); // null=ładowanie, {has_tutor, days, tutor_name}
   const [selectedDay, setSelectedDay] = useState("");
   const [time, setTime] = useState("");
@@ -225,8 +226,8 @@ function RequestForm({ lesson, onClose, onSent }) {
             Dostępne terminy korepetytora{slots.tutor_name ? ` (${slots.tutor_name})` : ""} na najbliższe 2 tygodnie:
           </p>
           <div>
-            <label>Wybierz dzień</label>
-            <select value={selectedDay} onChange={(e) => { setSelectedDay(e.target.value); setTime(""); }}>
+            <label htmlFor={`${uid}-wybierz-dzien-1`}>Wybierz dzień</label>
+            <select id={`${uid}-wybierz-dzien-1`} value={selectedDay} onChange={(e) => { setSelectedDay(e.target.value); setTime(""); }}>
               <option value="">— wybierz —</option>
               {slots.days.map((d) => {
                 const dt = parseISO(d.date);
@@ -241,8 +242,8 @@ function RequestForm({ lesson, onClose, onSent }) {
           </div>
           {dayObj && (
             <div>
-              <label>Wybierz godzinę</label>
-              <select value={time} onChange={(e) => setTime(e.target.value)}>
+              <label htmlFor={`${uid}-wybierz-godzine-2`}>Wybierz godzinę</label>
+              <select id={`${uid}-wybierz-godzine-2`} value={time} onChange={(e) => setTime(e.target.value)}>
                 <option value="">— wybierz —</option>
                 {timeOptions(dayObj).map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
@@ -259,14 +260,14 @@ function RequestForm({ lesson, onClose, onSent }) {
               : "Wpisz proponowany termin ręcznie."}
           </p>
           <div className="field-row">
-            <div><label>Proponowana data</label><input type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} /></div>
-            <div><label>Proponowana godzina</label><input type="time" value={manualTime} onChange={(e) => setManualTime(e.target.value)} /></div>
+            <div><label htmlFor={`${uid}-proponowana-data-3`}>Proponowana data</label><input id={`${uid}-proponowana-data-3`} type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} /></div>
+            <div><label htmlFor={`${uid}-proponowana-godzina-4`}>Proponowana godzina</label><input id={`${uid}-proponowana-godzina-4`} type="time" value={manualTime} onChange={(e) => setManualTime(e.target.value)} /></div>
           </div>
         </>
       )}
 
-      <div><label>Wiadomość (opcjonalnie)</label>
-        <textarea rows={2} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="np. powód zmiany" /></div>
+      <div><label htmlFor={`${uid}-wiadomosc-opcjonalnie-5`}>Wiadomość (opcjonalnie)</label>
+        <textarea id={`${uid}-wiadomosc-opcjonalnie-5`} rows={2} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="np. powód zmiany" /></div>
     </Modal>
   );
 }

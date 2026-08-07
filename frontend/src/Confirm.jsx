@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useRef, useState, useId } from "react";
 import Modal from "./Modal";
 
 /**
@@ -21,6 +21,7 @@ export function useConfirm() {
 }
 
 export function ConfirmProvider({ children }) {
+  const uid = useId();
   const [req, setReq] = useState(null);
   const [typed, setTyped] = useState("");
   const resolveRef = useRef(null);
@@ -75,10 +76,10 @@ export function ConfirmProvider({ children }) {
 
           {wymagaWpisania && (
             <div className="field" style={{ marginTop: 14 }}>
-              <label>
+              <label htmlFor={`${uid}-aby-potwierdzic-wpisz-1`}>
                 Aby potwierdzić, wpisz: <strong>{req.requireText}</strong>
               </label>
-              <input
+              <input id={`${uid}-aby-potwierdzic-wpisz-1`}
                 autoFocus
                 value={typed}
                 onChange={(e) => setTyped(e.target.value)}

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useId } from "react";
 import Modal from "./Modal";
 import { api } from "./api";
 
 export default function ChangePassword({ forced, onDone, onClose, onLogout }) {
+  const uid = useId();
   const [oldP, setOldP] = useState("");
   const [newP, setNewP] = useState("");
   const [newP2, setNewP2] = useState("");
@@ -40,12 +41,12 @@ export default function ChangePassword({ forced, onDone, onClose, onLogout }) {
         </p>
       )}
       {err && <div className="err">{err}</div>}
-      <div><label>Dotychczasowe hasło</label>
-        <input type="password" value={oldP} onChange={(e) => setOldP(e.target.value)} /></div>
-      <div><label>Nowe hasło</label>
-        <input type="password" value={newP} onChange={(e) => setNewP(e.target.value)} /></div>
-      <div><label>Powtórz nowe hasło</label>
-        <input type="password" value={newP2} onChange={(e) => setNewP2(e.target.value)} /></div>
+      <div><label htmlFor={`${uid}-dotychczasowe-haso-1`}>Dotychczasowe hasło</label>
+        <input id={`${uid}-dotychczasowe-haso-1`} type="password" value={oldP} onChange={(e) => setOldP(e.target.value)} /></div>
+      <div><label htmlFor={`${uid}-nowe-haso-2`}>Nowe hasło</label>
+        <input id={`${uid}-nowe-haso-2`} type="password" value={newP} onChange={(e) => setNewP(e.target.value)} /></div>
+      <div><label htmlFor={`${uid}-powtorz-nowe-haso-3`}>Powtórz nowe hasło</label>
+        <input id={`${uid}-powtorz-nowe-haso-3`} type="password" value={newP2} onChange={(e) => setNewP2(e.target.value)} /></div>
     </Modal>
   );
 }

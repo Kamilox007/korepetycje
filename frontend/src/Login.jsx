@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useId } from "react";
 
 export default function Login({ onLogin }) {
+  const uid = useId();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
@@ -27,12 +28,12 @@ export default function Login({ onLogin }) {
         </div>
         {err && <div className="err">{err}</div>}
         <div>
-          <label>Login</label>
-          <input value={username} onChange={(e) => setUsername(e.target.value)} autoFocus />
+          <label htmlFor={`${uid}-login-1`}>Login</label>
+          <input id={`${uid}-login-1`} value={username} onChange={(e) => setUsername(e.target.value)} autoFocus />
         </div>
         <div>
-          <label>Hasło</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <label htmlFor={`${uid}-haso-2`}>Hasło</label>
+          <input id={`${uid}-haso-2`} type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
         <button className="primary" type="submit" disabled={busy || !username || !password} style={{ width: "100%" }}>
           {busy ? "Logowanie…" : "Zaloguj się"}

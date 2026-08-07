@@ -1,5 +1,6 @@
-![testy](https://github.com/Kamilox007/korepetycje/actions/workflows/testy.yml/badge.svg)
 # Korepetycje — panel zarządzania zajęciami i rozliczeniami
+
+![testy](https://github.com/Kamilox007/korepetycje/actions/workflows/testy.yml/badge.svg)
 
 Aplikacja webowa do prowadzenia korepetycji: terminarz, zajęcia cykliczne,
 rozliczenia i konta uczniów. Backend w FastAPI, frontend w React, wdrożenie
@@ -14,9 +15,10 @@ Wersja produkcyjna: <https://panel.kamilkrzywon.pl>
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2.0, Pydantic v2 |
 | Migracje | Alembic (tryb `batch` — wymagany przez SQLite) |
 | Baza | SQLite |
-| Uwierzytelnianie | JWT (HS256), hasła haszowane bcryptem |
+| Uwierzytelnianie | JWT (HS256) w ciasteczku httpOnly, hasła haszowane bcryptem |
 | Ochrona logowania | slowapi (limit per IP) + blokada konta w bazie |
 | Frontend | React 18, Vite 6, CSS bez frameworka |
+| Testy | skrypty regresji (backend) + Playwright (end-to-end) |
 | Wdrożenie | Docker Compose: `api` + `web` (Caddy) + `litestream` |
 | TLS | Let's Encrypt przez Caddy, odnawiany automatycznie |
 | Backup | Litestream → Backblaze B2, replikacja ciągła |
@@ -120,6 +122,9 @@ Zmienne środowiskowe (`.env`, wzór w `.env.example`):
 | `DATABASE_URL` | domyślnie SQLite; Postgres przez `postgresql+psycopg://…` |
 | `B2_KEY_ID`, `B2_APP_KEY` | poświadczenia Backblaze B2 dla Litestream |
 
+`APP_ENV` steruje też flagą `Secure` na ciasteczku sesyjnym — w `dev` jest
+wyłączona, bo po HTTP przeglądarka odrzuciłaby takie ciasteczko.
+
 Generowanie sekretu:
 
 ```bash
@@ -160,6 +165,10 @@ Rekord A domeny musi wskazywać na serwer **przed** pierwszym uruchomieniem —
 Caddy od razu występuje o certyfikat, a Let's Encrypt limituje nieudane
 walidacje.
 
+Po wdrożeniu zmiany w uwierzytelnianiu wszyscy zalogowani muszą podać login
+i hasło ponownie — stare tokeny z `localStorage` przestają być wysyłane,
+a ciasteczka jeszcze nie ma.
+
 ### Zadanie okresowe
 
 Wystąpienia serii są materializowane przy starcie i przy tworzeniu serii.
@@ -173,24 +182,52 @@ Przy długo działającym procesie potrzebny jest impuls dobowy:
 Alternatywnie `POST /api/maintenance/generate-lessons` (rola staff, idempotentne).
 
 ## Testy
-Testy wymagają dodatkowej zależności spoza obrazu produkcyjnego:
+
+### Backend — regresje
+
+Wymagają dodatkowej zależności spoza obrazu produkcyjnego:
 
 ```bash
+cd backend
 pip install -r requirements-dev.txt
 ```
 
 ```bash
-cd backend
 python test_forced_password.py    # wymuszona zmiana hasła
 python test_login_hardening.py    # blokada konta, limity, CORS, JWT_SECRET
 python test_migrations.py         # cykl migracji, blokada startu na starym schemacie
 python test_series_generator.py   # unikalność slotu, klamra horyzontu, GET bez zapisu
 python test_money.py              # arytmetyka w groszach, zamrożona stawka
+python test_cookie_session.py     # sesja w ciasteczku httpOnly, wylogowanie
 ```
 
 Każdy zestaw pracuje na własnej bazie w katalogu tymczasowym i nie dotyka bazy
 deweloperskiej. Wszystkie to regresje konkretnych błędów — jeśli któryś zacznie
 padać po zmianie, prawdopodobnie ta zmiana cofnęła poprawkę.
+
+### Frontend — end-to-end (Playwright)
+
+```bash
+cd frontend
+npm install
+npx playwright install chromium    # jednorazowo, ~150 MB
+npm run e2e                        # pełny przebieg: desktop + emulacja telefonu
+npm run e2e:ui                     # tryb interaktywny, krok po kroku
+npm run e2e:report                 # raport z ostatniego przebiegu
+```
+
+Playwright sam uruchamia backend i frontend, na **osobnej bazie `e2e.db`**
+kasowanej przy każdym przebiegu — testy tworzą i usuwają uczniów, więc nie
+mogą dotykać bazy deweloperskiej ani produkcyjnej. Sesja startowa (logowanie
+plus wymuszona zmiana hasła) przygotowywana jest raz w `e2e/auth.setup.js`
+i zapisywana do `e2e/.auth/`.
+
+Zakres: potwierdzenia usuwania, wylogowanie przeżywające odświeżenie strony,
+warstwowanie okien modalnych oraz układ mobilny (brak poziomego przewijania
+strony, przewijalny pasek nawigacji).
+
+Po nieudanym przebiegu `npm run e2e:report` pokazuje wideo, zrzuty i ślad,
+po którym da się przewijać stan DOM krok po kroku.
 
 ## Decyzje projektowe
 
@@ -217,6 +254,27 @@ jest wymuszona przez bazę, bo deduplikacja w Pythonie jest podatna na wyścig.
 
 **Generowanie nie odbywa się w handlerach GET.** Odczyt nie ma efektów ubocznych,
 a horyzont generowania jest zaklamrowany niezależnie od parametrów żądania.
+Ma to też skutek uboczny dla bezpieczeństwa — patrz punkt niżej.
+
+**Sesja w ciasteczku httpOnly, bez tokenu CSRF.** Token nie jest dostępny dla
+JavaScriptu, więc XSS nie wystarcza do jego wykradzenia. Ochronę przed CSRF
+daje `SameSite=Lax`: przeglądarka nie dołącza ciasteczka do żądań POST, PATCH
+i DELETE inicjowanych z obcych witryn, a wszystkie operacje zmieniające stan
+używają tych metod. Warunkiem poprawności jest to, że żaden GET nie zmienia
+danych. Nagłówek `Authorization` nadal działa — korzystają z niego `/docs`,
+`curl` i zadania crona.
+
+**Potwierdzenia usuwania we własnym oknie, nie przez `confirm()`.** Natywne
+okno przeglądarki da się wyłączyć („nie pokazuj więcej okien dialogowych"),
+po czym `confirm()` zwraca `false` i usuwanie po cichu przestaje działać.
+Komunikaty opisują konsekwencje, a nie samą czynność; usunięcie ucznia —
+jedyna operacja kasująca historię finansową — wymaga przepisania jego nazwiska.
+
+**Etykiety powiązane z kontrolkami przez `htmlFor`/`id`.** Identyfikatory
+generuje `useId()`, bo część formularzy bywa otwarta jednocześnie i statyczne
+`id` dawałyby duplikaty w DOM. Dzięki temu czytnik ekranu odczytuje
+przeznaczenie pola, kliknięcie w etykietę ustawia w nim kursor, a testy
+chwytają pola po widocznym tekście zamiast po strukturze HTML.
 
 ## Model danych
 
@@ -251,11 +309,15 @@ w konfiguracji — nie adres repliki. Podanie obu naraz kończy się błędem.
 
 ## Znany dług techniczny
 
-- Token w `localStorage` zamiast httpOnly cookie (podatność na XSS)
 - Kolumny `tutor_id` na `students`/`lessons`/`payments` nie są używane do
   filtrowania — trzymają autora rekordu, nie właściciela
 - `cascade="all, delete-orphan"` na `Student.payments` kasuje historię wpłat
   razem z uczniem; docelowo miękkie usuwanie
+- Zmiana hasła nie unieważnia sesji otwartych na innych urządzeniach — JWT są
+  bezstanowe, brak rejestru aktywnych sesji i wylogowania zdalnego
 - `_summary_for_students` ładuje relacje do Pythona zamiast liczyć `GROUP BY`
 - Frontend bez routera (nawigacja w stanie) i bez TypeScriptu; `Calendar.jsx`
   wymaga rozbicia
+- Wybór koloru (`ColorPicker`, kafelki w Przedmiotach) to klikalne `<span>` —
+  niedostępne z klawiatury i bez semantyki grupy wyboru
+- Brak `PATCH /api/series` — zmiana ceny cyklu wymaga skasowania i odtworzenia

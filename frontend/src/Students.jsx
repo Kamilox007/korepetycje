@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { api } from "./api";
 import Modal from "./Modal";
 import { DAYS_PL, fmtMoney, fmtTime } from "./dates";
@@ -146,6 +146,7 @@ export default function Students({ students, reload }) {
 }
 
 function AccountForm({ student, onClose, onSaved }) {
+  const uid = useId();
   const suggested = student.name.toLowerCase().replace(/[^a-z0-9]+/g, ".").replace(/^\.|\.$/g, "");
   const [username, setUsername] = useState(suggested);
   const [password, setPassword] = useState(genPassword());
@@ -195,11 +196,11 @@ function AccountForm({ student, onClose, onSaved }) {
       </>}
     >
       {err && <div className="err">{err}</div>}
-      <div><label>Login ucznia</label>
-        <input value={username} onChange={(e) => setUsername(e.target.value)} /></div>
-      <div><label>Hasło startowe</label>
+      <div><label htmlFor={`${uid}-login-ucznia-1`}>Login ucznia</label>
+        <input id={`${uid}-login-ucznia-1`} value={username} onChange={(e) => setUsername(e.target.value)} /></div>
+      <div><label htmlFor={`${uid}-haso-startowe-2`}>Hasło startowe</label>
         <div className="row">
-          <input value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input id={`${uid}-haso-startowe-2`} value={password} onChange={(e) => setPassword(e.target.value)} />
           <button onClick={() => setPassword(genPassword())} title="Wygeneruj">↻</button>
         </div>
       </div>
@@ -211,6 +212,7 @@ function AccountForm({ student, onClose, onSaved }) {
 }
 
 function StudentForm({ onClose, onSaved }) {
+  const uid = useId();
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
   const [price, setPrice] = useState(0);
@@ -233,22 +235,23 @@ function StudentForm({ onClose, onSaved }) {
       </>}
     >
       <div>
-        <label>Imię i nazwisko</label>
-        <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="np. Jessika Kowalska" />
+        <label htmlFor={`${uid}-imie-i-nazwisko-3`}>Imię i nazwisko</label>
+        <input id={`${uid}-imie-i-nazwisko-3`} value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="np. Jessika Kowalska" />
       </div>
       <div>
-        <label>Kontakt (opcjonalnie)</label>
-        <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="telefon, e-mail, rodzic..." />
+        <label htmlFor={`${uid}-kontakt-opcjonalnie-4`}>Kontakt (opcjonalnie)</label>
+        <input id={`${uid}-kontakt-opcjonalnie-4`} value={contact} onChange={(e) => setContact(e.target.value)} placeholder="telefon, e-mail, rodzic..." />
       </div>
       <div>
-        <label>Domyślna cena za zajęcia (PLN)</label>
-        <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
+        <label htmlFor={`${uid}-domyslna-cena-za-zajecia-pln-5`}>Domyślna cena za zajęcia (PLN)</label>
+        <input id={`${uid}-domyslna-cena-za-zajecia-pln-5`} type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
       </div>
     </Modal>
   );
 }
 
 function SeriesForm({ students, onClose, onSaved }) {
+  const uid = useId();
   const [studentId, setStudentId] = useState(students[0]?.id || "");
   const [weekday, setWeekday] = useState(0);
   const [time, setTime] = useState("16:00");
@@ -302,8 +305,8 @@ function SeriesForm({ students, onClose, onSaved }) {
       </>}
     >
       <div>
-        <label>Uczeń</label>
-        <select value={studentId} onChange={(e) => {
+        <label htmlFor={`${uid}-uczen-6`}>Uczeń</label>
+        <select id={`${uid}-uczen-6`} value={studentId} onChange={(e) => {
           setStudentId(e.target.value);
           const s = students.find((x) => x.id === Number(e.target.value));
           if (s) setPrice(s.default_price);
@@ -313,15 +316,15 @@ function SeriesForm({ students, onClose, onSaved }) {
       </div>
       <div className="field-row">
         <div>
-          <label>Przedmiot</label>
-          <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
+          <label htmlFor={`${uid}-przedmiot-7`}>Przedmiot</label>
+          <select id={`${uid}-przedmiot-7`} value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
             <option value="">— brak —</option>
             {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
         <div>
-          <label>Poziom</label>
-          <select value={level} onChange={(e) => setLevel(e.target.value)}>
+          <label htmlFor={`${uid}-poziom-8`}>Poziom</label>
+          <select id={`${uid}-poziom-8`} value={level} onChange={(e) => setLevel(e.target.value)}>
             <option value="">—</option>
             <option value="podstawa">podstawa</option>
             <option value="rozszerzenie">rozszerzenie</option>
@@ -330,35 +333,35 @@ function SeriesForm({ students, onClose, onSaved }) {
       </div>
       <div className="field-row">
         <div>
-          <label>Dzień tygodnia</label>
-          <select value={weekday} onChange={(e) => setWeekday(e.target.value)}>
+          <label htmlFor={`${uid}-dzien-tygodnia-9`}>Dzień tygodnia</label>
+          <select id={`${uid}-dzien-tygodnia-9`} value={weekday} onChange={(e) => setWeekday(e.target.value)}>
             {DAYS_PL.map((d, i) => <option key={i} value={i}>{d}</option>)}
           </select>
         </div>
         <div>
-          <label>Godzina</label>
-          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+          <label htmlFor={`${uid}-godzina-10`}>Godzina</label>
+          <input id={`${uid}-godzina-10`} type="time" value={time} onChange={(e) => setTime(e.target.value)} />
         </div>
       </div>
       <div>
-        <label>Prowadzący korepetytor</label>
-        <select value={tutorId} onChange={(e) => setTutorId(e.target.value)}>
+        <label htmlFor={`${uid}-prowadzacy-korepetytor-11`}>Prowadzący korepetytor</label>
+        <select id={`${uid}-prowadzacy-korepetytor-11`} value={tutorId} onChange={(e) => setTutorId(e.target.value)}>
           <option value="">— nieprzypisany —</option>
           {tutors.map((t) => <option key={t.id} value={t.id}>{t.display_name}</option>)}
         </select>
       </div>
       <div>
-        <label>Cena za zajęcia (PLN)</label>
-        <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
+        <label htmlFor={`${uid}-cena-za-zajecia-pln-12`}>Cena za zajęcia (PLN)</label>
+        <input id={`${uid}-cena-za-zajecia-pln-12`} type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
       </div>
       <div className="field-row">
         <div>
-          <label>Data rozpoczęcia</label>
-          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          <label htmlFor={`${uid}-data-rozpoczecia-13`}>Data rozpoczęcia</label>
+          <input id={`${uid}-data-rozpoczecia-13`} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
         </div>
         <div>
-          <label>Data zakończenia (opcj.)</label>
-          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          <label htmlFor={`${uid}-data-zakonczenia-opcj-14`}>Data zakończenia (opcj.)</label>
+          <input id={`${uid}-data-zakonczenia-opcj-14`} type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         </div>
       </div>
       <p className="muted" style={{ fontSize: 12, margin: 0 }}>

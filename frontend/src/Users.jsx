@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { api } from "./api";
 import Modal from "./Modal";
 import { TUTOR_COLORS } from "./colors";
@@ -118,6 +118,7 @@ function ColorPicker({ value, onChange }) {
 }
 
 function ColorModal({ user, onClose, onSaved }) {
+  const uid = useId();
   const [color, setColor] = useState(user.color || TUTOR_COLORS[0]);
   const [busy, setBusy] = useState(false);
   async function save() {
@@ -138,6 +139,7 @@ function ColorModal({ user, onClose, onSaved }) {
 }
 
 function UserForm({ myRole, onClose, onSaved }) {
+  const uid = useId();
   const [role, setRole] = useState("tutor");
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
@@ -189,18 +191,18 @@ function UserForm({ myRole, onClose, onSaved }) {
       </>}>
       {err && <div className="err">{err}</div>}
       <div>
-        <label>Rola</label>
-        <select value={role} onChange={(e) => setRole(e.target.value)}>
+        <label htmlFor={`${uid}-rola`}>Rola</label>
+        <select id={`${uid}-rola`} value={role} onChange={(e) => setRole(e.target.value)}>
           {roleOptions.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
       </div>
-      <div><label>Imię i nazwisko</label>
-        <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="np. Jan Kowalski" /></div>
-      <div><label>Login</label>
-        <input value={username} onChange={(e) => setUsername(e.target.value)} /></div>
-      <div><label>Hasło startowe</label>
+      <div><label htmlFor={`${uid}-imie-i-nazwisko-2`}>Imię i nazwisko</label>
+        <input id={`${uid}-imie-i-nazwisko-2`} value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="np. Jan Kowalski" /></div>
+      <div><label htmlFor={`${uid}-login-3`}>Login</label>
+        <input id={`${uid}-login-3`} value={username} onChange={(e) => setUsername(e.target.value)} /></div>
+      <div><label htmlFor={`${uid}-haso-startowe-4`}>Hasło startowe</label>
         <div className="row">
-          <input value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input id={`${uid}-haso-startowe-4`} value={password} onChange={(e) => setPassword(e.target.value)} />
           <button onClick={() => setPassword(gen())} title="Wygeneruj">↻</button>
         </div>
       </div>

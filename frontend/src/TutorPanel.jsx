@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { usePersistentState } from "./usePersistentState";
 import { api } from "./api";
 import Modal from "./Modal";
@@ -165,6 +165,7 @@ function TutorRequests({ requests, onDecide }) {
 }
 
 function TutorDecisionModal({ decision, onClose, onDone }) {
+  const uid = useId();
   const { req, action } = decision;
   const approve = action === "approve";
   const [response, setResponse] = useState("");
@@ -191,8 +192,8 @@ function TutorDecisionModal({ decision, onClose, onDone }) {
       </p>
       {req.message && <p className="muted" style={{ fontSize: 13, margin: 0 }}>Wiadomość ucznia: {req.message}</p>}
       <div>
-        <label>Komentarz dla ucznia {approve ? "(opcjonalnie)" : "(np. dlaczego termin nie pasuje)"}</label>
-        <textarea rows={3} value={response} onChange={(e) => setResponse(e.target.value)}
+        <label htmlFor={`${uid}-komentarz-dla-ucznia-1`}>Komentarz dla ucznia {approve ? "(opcjonalnie)" : "(np. dlaczego termin nie pasuje)"}</label>
+        <textarea id={`${uid}-komentarz-dla-ucznia-1`} rows={3} value={response} onChange={(e) => setResponse(e.target.value)}
           placeholder={approve ? "np. Potwierdzam nowy termin" : "np. Mam wtedy inne zajęcia"} />
       </div>
     </Modal>
@@ -201,6 +202,7 @@ function TutorDecisionModal({ decision, onClose, onDone }) {
 
 
 function EditTutorLesson({ lesson, onClose, onSaved }) {
+  const uid = useId();
   const [date, setDate] = useState(lesson.date);
   const [time, setTime] = useState(fmtTime(lesson.start_time));
   const [completed, setCompleted] = useState(lesson.completed);
@@ -225,14 +227,14 @@ function EditTutorLesson({ lesson, onClose, onSaved }) {
       </>}
     >
       <div className="field-row">
-        <div><label>Data</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
-        <div><label>Godzina</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></div>
+        <div><label htmlFor={`${uid}-data-2`}>Data</label><input id={`${uid}-data-2`} type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+        <div><label htmlFor={`${uid}-godzina-3`}>Godzina</label><input id={`${uid}-godzina-3`} type="time" value={time} onChange={(e) => setTime(e.target.value)} /></div>
       </div>
       <div className="toggle-line">
         <input type="checkbox" id="done" checked={completed} onChange={(e) => setCompleted(e.target.checked)} />
         <label htmlFor="done" style={{ margin: 0 }}>Zajęcia się odbyły</label>
       </div>
-      <div><label>Notatka</label><textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} /></div>
+      <div><label htmlFor={`${uid}-notatka-4`}>Notatka</label><textarea id={`${uid}-notatka-4`} rows={2} value={note} onChange={(e) => setNote(e.target.value)} /></div>
       <p className="muted" style={{ fontSize: 12, margin: 0 }}>
         Jako korepetytor możesz zmienić termin i oznaczyć odbycie. Cena i rozliczenia są po stronie administracji.
       </p>
@@ -241,6 +243,7 @@ function EditTutorLesson({ lesson, onClose, onSaved }) {
 }
 
 function Availability({ avail, reload }) {
+  const uid = useId();
   const [weekday, setWeekday] = useState(0);
   const [start, setStart] = useState("14:00");
   const [end, setEnd] = useState("20:00");
@@ -264,13 +267,13 @@ function Availability({ avail, reload }) {
       <div className="card" style={{ padding: "16px 20px", marginBottom: 20 }}>
         <div className="row" style={{ alignItems: "flex-end", gap: 12 }}>
           <div style={{ flex: 1 }}>
-            <label>Dzień</label>
-            <select value={weekday} onChange={(e) => setWeekday(e.target.value)}>
+            <label htmlFor={`${uid}-dzien-5`}>Dzień</label>
+            <select id={`${uid}-dzien-5`} value={weekday} onChange={(e) => setWeekday(e.target.value)}>
               {DAYS_PL.map((d, i) => <option key={i} value={i}>{d}</option>)}
             </select>
           </div>
-          <div><label>Od</label><input type="time" value={start} onChange={(e) => setStart(e.target.value)} /></div>
-          <div><label>Do</label><input type="time" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
+          <div><label htmlFor={`${uid}-od-6`}>Od</label><input id={`${uid}-od-6`} type="time" value={start} onChange={(e) => setStart(e.target.value)} /></div>
+          <div><label htmlFor={`${uid}-do-7`}>Do</label><input id={`${uid}-do-7`} type="time" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
           <button className="primary" onClick={add} disabled={busy}>Dodaj</button>
         </div>
       </div>

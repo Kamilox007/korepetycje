@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { api } from "./api";
 import { useConfirm } from "./Confirm";
 
 const PRESET_COLORS = ["#378ADD", "#1D9E75", "#D85A30", "#D4537E", "#7F77DD", "#BA7517", "#888780"];
 
 export default function Subjects() {
+  const uid = useId();
   const confirm = useConfirm();
   const [subjects, setSubjects] = useState([]);
   const [name, setName] = useState("");
@@ -50,8 +51,8 @@ export default function Subjects() {
       <div className="card" style={{ padding: "16px 20px", marginBottom: 20 }}>
         <div className="row" style={{ alignItems: "flex-end", gap: 12 }}>
           <div style={{ flex: 1 }}>
-            <label>Nazwa przedmiotu</label>
-            <input value={name} onChange={(e) => setName(e.target.value)}
+            <label htmlFor={`${uid}-nazwa-przedmiotu-1`}>Nazwa przedmiotu</label>
+            <input id={`${uid}-nazwa-przedmiotu-1`} value={name} onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && add()} placeholder="np. Matematyka" />
           </div>
           <div>

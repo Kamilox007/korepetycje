@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { api } from "./api";
 import Modal from "./Modal";
 import { fmtTime } from "./dates";
@@ -81,6 +81,7 @@ export default function Requests({ reload }) {
 }
 
 function DecisionModal({ decision, onClose, onDone }) {
+  const uid = useId();
   const { req, action } = decision;
   const approve = action === "approve";
   const [response, setResponse] = useState("");
@@ -110,8 +111,8 @@ function DecisionModal({ decision, onClose, onDone }) {
       </p>
       {req.message && <p className="muted" style={{ fontSize: 13, margin: 0 }}>Wiadomość ucznia: {req.message}</p>}
       <div>
-        <label>Komentarz dla ucznia {approve ? "(opcjonalnie)" : "(np. dlaczego termin nie pasuje)"}</label>
-        <textarea rows={3} value={response} onChange={(e) => setResponse(e.target.value)}
+        <label htmlFor={`${uid}-komentarz-dla-ucznia-1`}>Komentarz dla ucznia {approve ? "(opcjonalnie)" : "(np. dlaczego termin nie pasuje)"}</label>
+        <textarea id={`${uid}-komentarz-dla-ucznia-1`} rows={3} value={response} onChange={(e) => setResponse(e.target.value)}
           placeholder={approve ? "np. Potwierdzam nowy termin" : "np. Mam wtedy inne zajęcia, proszę o inny termin"} />
       </div>
     </Modal>

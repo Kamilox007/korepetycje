@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { api } from "./api";
 import Modal from "./Modal";
 import { fmtMoney } from "./dates";
@@ -73,6 +73,7 @@ export default function Payments({ students, reload }) {
 }
 
 function PaymentForm({ students, onClose, onSaved }) {
+  const uid = useId();
   const [studentId, setStudentId] = useState(students[0]?.id || "");
   const [amount, setAmount] = useState("");
   const today = new Date().toISOString().slice(0, 10);
@@ -110,28 +111,28 @@ function PaymentForm({ students, onClose, onSaved }) {
       </>}
     >
       <div>
-        <label>Za którego ucznia</label>
-        <select value={studentId} onChange={(e) => setStudentId(e.target.value)}>
+        <label htmlFor={`${uid}-za-ktorego-ucznia-1`}>Za którego ucznia</label>
+        <select id={`${uid}-za-ktorego-ucznia-1`} value={studentId} onChange={(e) => setStudentId(e.target.value)}>
           {students.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
       </div>
       <div className="field-row">
         <div>
-          <label>Kwota (PLN)</label>
-          <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus placeholder="810" />
+          <label htmlFor={`${uid}-kwota-pln-2`}>Kwota (PLN)</label>
+          <input id={`${uid}-kwota-pln-2`} type="number" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus placeholder="810" />
         </div>
         <div>
-          <label>Data wpłaty</label>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <label htmlFor={`${uid}-data-wpaty-3`}>Data wpłaty</label>
+          <input id={`${uid}-data-wpaty-3`} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
       </div>
       <div>
-        <label>Kto zapłacił (opcjonalnie)</label>
-        <input value={payer} onChange={(e) => setPayer(e.target.value)} placeholder="np. Pani Monika" />
+        <label htmlFor={`${uid}-kto-zapaci-opcjonalnie-4`}>Kto zapłacił (opcjonalnie)</label>
+        <input id={`${uid}-kto-zapaci-opcjonalnie-4`} value={payer} onChange={(e) => setPayer(e.target.value)} placeholder="np. Pani Monika" />
       </div>
       <div>
-        <label>Notatka (opcjonalnie)</label>
-        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="np. gotówka, za czerwiec" />
+        <label htmlFor={`${uid}-notatka-opcjonalnie-5`}>Notatka (opcjonalnie)</label>
+        <input id={`${uid}-notatka-opcjonalnie-5`} value={note} onChange={(e) => setNote(e.target.value)} placeholder="np. gotówka, za czerwiec" />
       </div>
       {payer && sName && (
         <p className="muted" style={{ fontSize: 12, margin: 0 }}>
