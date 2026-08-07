@@ -10,3 +10,4 @@ test/
 id_*
 *.pem
 *-ssh
+*.patch
