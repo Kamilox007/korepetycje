@@ -1,8 +1,6 @@
 # Bazy danych — obraz nie może ich zawierać. DATABASE_URL wskazuje na /data,
 # ale COPY . . wciągnąłby plik do warstwy obrazu razem z danymi.
-*.db
-*.db-shm
-*.db-wal
+*.db*
 *.backup-*.db
 
 # Środowiska i cache — pip odtwarza je w kontenerze od zera
