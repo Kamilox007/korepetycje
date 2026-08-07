@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
@@ -41,7 +41,40 @@ def utcnow() -> datetime:
     """Naiwny UTC — spójny z pozostałymi kolumnami DateTime w modelu."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
+# auto_error=False: brak nagłówka nie jest błędem, bo token może przyjść
+# w ciasteczku. Rozstrzyga get_current_user.
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login", auto_error=False)
+
+# Nazwa ciasteczka sesyjnego. httponly, więc JavaScript go nie odczyta —
+# to jest cała różnica względem trzymania tokenu w localStorage.
+COOKIE_NAME = "korepetycje_session"
+
+
+def set_session_cookie(response: Response, user: models.User) -> None:
+    """Wystawia token w ciasteczku niedostępnym dla JS."""
+    minutes = (
+        PASSWORD_RESET_EXPIRE_MINUTES
+        if user.must_change_password
+        else TOKEN_EXPIRE_MINUTES
+    )
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=create_access_token(user),
+        max_age=minutes * 60,
+        httponly=True,
+        # Bez HTTPS przeglądarka odrzuciłaby ciasteczko Secure — w dev po HTTP.
+        secure=APP_ENV != "dev",
+        # Lax blokuje wysyłanie ciasteczka przy żądaniach POST/PATCH/DELETE
+        # inicjowanych z obcych witryn, co samo w sobie zamyka CSRF dla
+        # wszystkich operacji zmieniających stan. GET-y są tylko do odczytu.
+        samesite="lax",
+        path="/",
+    )
+
+
+def clear_session_cookie(response: Response) -> None:
+    response.delete_cookie(key=COOKIE_NAME, path="/", httponly=True,
+                           secure=APP_ENV != "dev", samesite="lax")
 
 
 def hash_password(password: str) -> str:
@@ -75,14 +108,23 @@ def create_access_token(user: models.User) -> str:
 
 
 def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    request: Request,
+    header_token: str | None = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> models.User:
+    """Token z ciasteczka, a jeśli go nie ma — z nagłówka Authorization.
+
+    Kolejność ma znaczenie: przeglądarka korzysta z ciasteczka, a /docs, curl
+    i zadania crona z nagłówka. Jedna funkcja obsługuje oba przypadki.
+    """
     cred_exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Nieprawidłowy lub wygasły token",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    token = request.cookies.get(COOKIE_NAME) or header_token
+    if not token:
+        raise cred_exc
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")

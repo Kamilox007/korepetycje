@@ -2,7 +2,7 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from datetime import date, timedelta
-from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi import FastAPI, Depends, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -123,10 +123,14 @@ app.add_middleware(
 @limiter.limit("10/minute;40/hour")
 def login(
     request: Request,
+    response: Response,
     form: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
     user = auth.authenticate(db, form.username, form.password)
+    auth.set_session_cookie(response, user)
+    # Token wraca też w treści — dla /docs, curl i zadań crona.
+    # Przeglądarka go ignoruje i korzysta z ciasteczka.
     token = auth.create_access_token(user)
     return schemas.LoginOut(
         access_token=token,
@@ -146,6 +150,7 @@ def me(user: models.User = Depends(auth.get_current_user)):
 @limiter.limit("10/hour")
 def change_password(
     request: Request,
+    response: Response,
     payload: schemas.ChangePasswordIn,
     user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
@@ -161,7 +166,16 @@ def change_password(
     db.commit()
     db.refresh(user)
     # konto miało token krótkoterminowy — wydaj pełny, żeby nie wylogowywać użytkownika
+    auth.set_session_cookie(response, user)
     return {"ok": True, "access_token": auth.create_access_token(user)}
+
+
+@app.post("/api/auth/logout")
+def logout(response: Response):
+    """Kasuje ciasteczko sesyjne. Bez tego wylogowanie po stronie przeglądarki
+    byłoby pozorne — ciasteczko httponly jest nieusuwalne z JavaScriptu."""
+    auth.clear_session_cookie(response)
+    return {"ok": True}
 
 
 # ===================== ZARZĄDZANIE UŻYTKOWNIKAMI =====================
