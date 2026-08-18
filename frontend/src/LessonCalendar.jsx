@@ -21,6 +21,10 @@ export default function LessonCalendar({
   setView,
   onPick,
   label,
+  // Optional. When given, lessons can be dragged onto another day and this is
+  // called with (lesson, isoDate). Left out for the student panel, where moving
+  // a lesson needs the tutor's approval rather than a drag.
+  onMove,
 }) {
   const today = new Date();
 
@@ -70,9 +74,11 @@ export default function LessonCalendar({
       </div>
 
       {view === "month" ? (
-        <MonthView anchor={anchor} today={today} lessonsFor={lessonsFor} onPick={onPick} label={label} />
+        <MonthView anchor={anchor} today={today} lessonsFor={lessonsFor}
+                   onPick={onPick} label={label} onMove={onMove} />
       ) : (
-        <WeekView weekStart={weekStart} today={today} lessonsFor={lessonsFor} onPick={onPick} label={label} />
+        <WeekView weekStart={weekStart} today={today} lessonsFor={lessonsFor}
+                  onPick={onPick} label={label} onMove={onMove} />
       )}
     </div>
   );
@@ -82,9 +88,46 @@ function chipClass(l) {
   return `mini-chip${l.completed ? " done" : ""}${l.cancelled ? " cancelled" : ""}`;
 }
 
-function MonthView({ anchor, today, lessonsFor, onPick, label }) {
+/** A lesson tile. Draggable only when moving is allowed and the lesson is still
+ *  open: a completed or cancelled one has nothing left to reschedule. */
+function Chip({ lesson, label, onPick, onMove, style }) {
+  const movable = Boolean(onMove) && !lesson.completed && !lesson.cancelled;
+  return (
+    <div
+      className={chipClass(lesson)}
+      style={style}
+      draggable={movable}
+      onDragStart={(e) => { e.stopPropagation(); window.__dragLesson = lesson; }}
+      onDragEnd={() => { window.__dragLesson = null; }}
+      onClick={(e) => { e.stopPropagation(); onPick && onPick(lesson); }}
+      title={`${fmtTime(lesson.start_time)} ${label(lesson)}`}
+    >
+      {fmtTime(lesson.start_time)} {label(lesson)}
+    </div>
+  );
+}
+
+/** Drop handling shared by the month cell and the week column. */
+function dropProps(iso, onMove, setOver) {
+  if (!onMove) return {};
+  return {
+    onDragOver: (e) => { if (window.__dragLesson) { e.preventDefault(); setOver(iso); } },
+    onDragLeave: (e) => { if (e.target === e.currentTarget) setOver(null); },
+    onDrop: (e) => {
+      e.preventDefault();
+      setOver(null);
+      const l = window.__dragLesson;
+      window.__dragLesson = null;
+      // Dropping onto the same day is a no-op, not an update.
+      if (l && l.date !== iso) onMove(l, iso);
+    },
+  };
+}
+
+function MonthView({ anchor, today, lessonsFor, onPick, label, onMove }) {
   const cells = monthGrid(anchor);
   const month = anchor.getMonth();
+  const [overIso, setOverIso] = useState(null);
   return (
     <div className="card" style={{ padding: 0, overflow: "hidden" }}>
       <div className="month-names">
@@ -96,21 +139,16 @@ function MonthView({ anchor, today, lessonsFor, onPick, label }) {
           const out = day.getMonth() !== month;
           const shown = dl.slice(0, 3);
           const extra = dl.length - shown.length;
+          const iso = toISODate(day);
           return (
             <div
               key={i}
-              className={`month-cell${out ? " out" : ""}${sameDay(day, today) ? " today" : ""}`}
+              className={`month-cell${out ? " out" : ""}${sameDay(day, today) ? " today" : ""}${overIso === iso ? " drop-over" : ""}`}
+              {...dropProps(iso, onMove, setOverIso)}
             >
               <div className="month-day-num">{day.getDate()}</div>
               {shown.map((l) => (
-                <div
-                  key={l.id}
-                  className={chipClass(l)}
-                  onClick={() => onPick && onPick(l)}
-                  title={`${fmtTime(l.start_time)} ${label(l)}`}
-                >
-                  {fmtTime(l.start_time)} {label(l)}
-                </div>
+                <Chip key={l.id} lesson={l} label={label} onPick={onPick} onMove={onMove} />
               ))}
               {extra > 0 && <div className="more">+{extra} więcej</div>}
             </div>
@@ -121,14 +159,21 @@ function MonthView({ anchor, today, lessonsFor, onPick, label }) {
   );
 }
 
-function WeekView({ weekStart, today, lessonsFor, onPick, label }) {
+function WeekView({ weekStart, today, lessonsFor, onPick, label, onMove }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const [overIso, setOverIso] = useState(null);
   return (
     <div className="week">
       {days.map((day, i) => {
         const dl = lessonsFor(day);
+        const iso = toISODate(day);
         return (
-          <div key={i} className={`card day-col${sameDay(day, today) ? " today" : ""}`} style={{ padding: 10 }}>
+          <div
+            key={i}
+            className={`card day-col${sameDay(day, today) ? " today" : ""}${overIso === iso ? " drop-over" : ""}`}
+            style={{ padding: 10 }}
+            {...dropProps(iso, onMove, setOverIso)}
+          >
             <div className="day-head" style={{ marginBottom: 8 }}>
               <span className="day-name">{DAYS_SHORT[i]}</span>{" "}
               <span className="day-num">{day.getDate()}</span>
@@ -137,15 +182,8 @@ function WeekView({ weekStart, today, lessonsFor, onPick, label }) {
               <div className="muted" style={{ fontSize: 12 }}>—</div>
             ) : (
               dl.map((l) => (
-                <div
-                  key={l.id}
-                  className={chipClass(l)}
-                  style={{ marginBottom: 4 }}
-                  onClick={() => onPick && onPick(l)}
-                  title={`${fmtTime(l.start_time)} ${label(l)}`}
-                >
-                  {fmtTime(l.start_time)} {label(l)}
-                </div>
+                <Chip key={l.id} lesson={l} label={label} onPick={onPick}
+                      onMove={onMove} style={{ marginBottom: 4 }} />
               ))
             )}
           </div>

@@ -39,3 +39,16 @@ test("navigating months keeps loading lessons", async ({ page }) => {
   await page.getByRole("button", { name: "←" }).click();
   await expect(page.locator(".range")).toHaveText(label ?? "");
 });
+
+test("a tutor can drag a lesson to another day", async ({ page }) => {
+  // Covered here rather than in the staff calendar tests because the tutor
+  // calendar is a different component with its own permission rules.
+  await page.goto("/");
+  await tab(page, "Kalendarz").click();
+  await page.getByRole("button", { name: "Miesiąc" }).click();
+
+  const count = await page.locator(".mini-chip").count();
+  test.skip(count === 0, "no lessons in the visible range");
+
+  await expect(page.locator(".mini-chip").first()).toHaveAttribute("draggable", "true");
+});

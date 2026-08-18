@@ -37,6 +37,19 @@ export default function TutorPanel() {
   }
   useEffect(() => { load(); }, [anchor]);
 
+  async function moveLesson(lesson, isoDate) {
+    // Optimistic: the tile follows the cursor immediately, otherwise dragging
+    // feels broken while the request is in flight.
+    setLessons((prev) => prev.map((l) => (l.id === lesson.id ? { ...l, date: isoDate } : l)));
+    try {
+      await api.tutorUpdateLesson(lesson.id, { date: isoDate });
+      await load();
+    } catch {
+      setErr("Nie udało się przenieść zajęć.");
+      await load();
+    }
+  }
+
   const today = new Date();
   const upcoming = lessons
     .filter((l) => !l.cancelled)
@@ -82,6 +95,7 @@ export default function TutorPanel() {
           setView={setView}
           onPick={(l) => { if (!l.completed && !l.cancelled) setEditing(l); }}
           label={(l) => l.student_name}
+          onMove={moveLesson}
         />
       )}
 
