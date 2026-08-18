@@ -192,7 +192,7 @@ export default function Students({ students, reload }) {
         <SeriesEditForm
           series={editSeries}
           onClose={() => setEditSeries(null)}
-          onSaved={() => { setEditSeries(null); reload(); }}
+          onSaved={() => { setEditSeries(null); loadSeries(); reload(); }}
         />
       )}
 
