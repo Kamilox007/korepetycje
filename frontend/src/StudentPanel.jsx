@@ -1,6 +1,7 @@
 import { useState, useEffect, useId } from "react";
 import { usePersistentState } from "./usePersistentState";
 import { api } from "./api";
+import LessonCalendar from "./LessonCalendar";
 import Modal from "./Modal";
 import {
   DAYS_PL, MONTHS_PL, parseISO, pyWeekday, fmtMoney, fmtTime, toISODate, addDays,
@@ -14,12 +15,16 @@ export default function StudentPanel() {
   const [requests, setRequests] = useState([]);
   const [reqFor, setReqFor] = useState(null);
   const [err, setErr] = useState("");
+  const [mode, setMode] = usePersistentState("student_lessons_mode", "calendar");
+  const [anchor, setAnchor] = useState(new Date());
+  const [view, setView] = usePersistentState("student_cal_view", "week");
 
   async function loadAll() {
     try {
-      const today = new Date();
-      const start = toISODate(addDays(today, -7));
-      const end = toISODate(addDays(today, 60));
+      // Zakres podąża za tym, co widać w kalendarzu — inaczej przejście
+      // na kolejny miesiąc pokazywałoby pusty widok.
+      const start = toISODate(addDays(anchor, -45));
+      const end = toISODate(addDays(anchor, 75));
       const [l, s, p, r] = await Promise.all([
         api.myLessons({ start, end }),
         api.mySummary(),
@@ -32,7 +37,7 @@ export default function StudentPanel() {
       setErr("Nie udało się pobrać danych.");
     }
   }
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => { loadAll(); }, [anchor]);
 
   const today = new Date();
   const upcoming = lessons
@@ -74,6 +79,29 @@ export default function StudentPanel() {
       )}
 
       {tab === "lessons" && (
+        <div className="view-switch" style={{ marginBottom: 12 }}>
+          <button className={`seg${mode === "calendar" ? " active" : ""}`} onClick={() => setMode("calendar")}>
+            Kalendarz
+          </button>
+          <button className={`seg${mode === "list" ? " active" : ""}`} onClick={() => setMode("list")}>
+            Lista
+          </button>
+        </div>
+      )}
+
+      {tab === "lessons" && mode === "calendar" && (
+        <LessonCalendar
+          lessons={lessons}
+          anchor={anchor}
+          setAnchor={setAnchor}
+          view={view}
+          setView={setView}
+          onPick={(l) => { if (!l.completed && !l.cancelled) setReqFor(l); }}
+          label={(l) => l.subject_name || "Zajęcia"}
+        />
+      )}
+
+      {tab === "lessons" && mode === "list" && (
         <div className="card">
           {upcoming.length === 0 ? (
             <div className="empty"><p>Brak nadchodzących zajęć.</p></div>

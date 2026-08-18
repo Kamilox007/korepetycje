@@ -2,6 +2,7 @@ import { useState, useEffect, useId } from "react";
 import { usePersistentState } from "./usePersistentState";
 import { api } from "./api";
 import Modal from "./Modal";
+import LessonCalendar from "./LessonCalendar";
 import {
   DAYS_PL, MONTHS_PL, parseISO, pyWeekday, fmtTime, toISODate, addDays,
 } from "./dates";
@@ -14,12 +15,16 @@ export default function TutorPanel() {
   const [editing, setEditing] = useState(null);
   const [decision, setDecision] = useState(null);
   const [err, setErr] = useState("");
+  const [mode, setMode] = usePersistentState("tutor_lessons_mode", "calendar");
+  const [anchor, setAnchor] = useState(new Date());
+  const [view, setView] = usePersistentState("tutor_cal_view", "week");
 
   async function load() {
     try {
-      const today = new Date();
-      const start = toISODate(addDays(today, -7));
-      const end = toISODate(addDays(today, 60));
+      // Zakres podąża za tym, co widać w kalendarzu — inaczej przejście
+      // na kolejny miesiąc pokazywałoby pusty widok.
+      const start = toISODate(addDays(anchor, -45));
+      const end = toISODate(addDays(anchor, 75));
       const [l, a, r] = await Promise.all([
         api.tutorLessons({ start, end }),
         api.tutorAvailability(),
@@ -30,7 +35,7 @@ export default function TutorPanel() {
       setErr("Nie udało się pobrać danych.");
     }
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [anchor]);
 
   const today = new Date();
   const upcoming = lessons
@@ -58,6 +63,29 @@ export default function TutorPanel() {
       {err && <div className="err">{err}</div>}
 
       {tab === "lessons" && (
+        <div className="view-switch" style={{ marginBottom: 12 }}>
+          <button className={`seg${mode === "calendar" ? " active" : ""}`} onClick={() => setMode("calendar")}>
+            Kalendarz
+          </button>
+          <button className={`seg${mode === "list" ? " active" : ""}`} onClick={() => setMode("list")}>
+            Lista
+          </button>
+        </div>
+      )}
+
+      {tab === "lessons" && mode === "calendar" && (
+        <LessonCalendar
+          lessons={lessons}
+          anchor={anchor}
+          setAnchor={setAnchor}
+          view={view}
+          setView={setView}
+          onPick={(l) => { if (!l.completed && !l.cancelled) setEditing(l); }}
+          label={(l) => l.student_name}
+        />
+      )}
+
+      {tab === "lessons" && mode === "list" && (
         <div className="card">
           {upcoming.length === 0 ? (
             <div className="empty"><p>Nie masz przypisanych zajęć.</p></div>
