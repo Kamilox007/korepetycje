@@ -1,26 +1,26 @@
 import { test, expect } from "@playwright/test";
-import { potwierdzenie, dodajUcznia } from "./pomocniki";
+import { confirmDialog, addStudent } from "./helpers";
 
 /**
- * Uruchamiane w emulacji telefonu (projekt „mobile" w konfiguracji).
- * Sprawdza to, czego nie widać na desktopie: układ z patcha 07 i zachowanie
- * okien przy wysuniętej klawiaturze.
+ * Runs under phone emulation (the "mobile" project in the config). Covers what
+ * a desktop run cannot see: the layout from patch 07 and how dialogs behave with
+ * the on-screen keyboard open.
  */
-test("nawigacja mieści się na ekranie i przewija w poziomie", async ({ page }) => {
+test("navigation fits the screen and scrolls horizontally", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("button", { name: "Kalendarz" })).toBeVisible();
 
-  // Strona nie może przewijać się w poziomie. To jest właściwe kryterium —
-  // pojedyncze elementy MOGĄ wystawać poza ekran, jeśli siedzą w kontenerze
-  // z własnym przewijaniem (jak zakładki w pasku nawigacji).
-  const przewijaSieWPoziomie = await page.evaluate(
+  // The page itself must not scroll horizontally. That is the right criterion:
+  // individual elements MAY extend past the viewport when they sit in a container
+  // with its own scrolling, such as the tabs in the navigation bar.
+  const scrollsHorizontally = await page.evaluate(
     () => document.documentElement.scrollWidth > window.innerWidth + 1
   );
-  expect(przewijaSieWPoziomie).toBeFalsy();
+  expect(scrollsHorizontally).toBeFalsy();
 
-  // A elementy poza takimi kontenerami wystawać nie mogą.
-  const wystajace = await page.evaluate(() => {
-    const wKontenerzePrzewijanym = (el) => {
+  // Elements outside such containers must not overflow.
+  const overflowing = await page.evaluate(() => {
+    const insideScrollContainer = (el) => {
       for (let e = el.parentElement; e; e = e.parentElement) {
         const ov = getComputedStyle(e).overflowX;
         if (ov === "auto" || ov === "scroll") return true;
@@ -29,43 +29,43 @@ test("nawigacja mieści się na ekranie i przewija w poziomie", async ({ page })
     };
     return [...document.querySelectorAll("body *")]
       .filter((e) => e.getBoundingClientRect().right > window.innerWidth + 1)
-      .filter((e) => !wKontenerzePrzewijanym(e))
+      .filter((e) => !insideScrollContainer(e))
       .map((e) => e.className || e.tagName)
       .slice(0, 5);
   });
-  expect(wystajace).toEqual([]);
+  expect(overflowing).toEqual([]);
 
-  // Pasek nawigacji jest przewijalny, a nie zawinięty do kilku rzędów.
-  const pasek = page.locator(".sidebar");
-  const przewijalny = await pasek.evaluate((e) => e.scrollWidth > e.clientWidth);
-  expect(przewijalny).toBeTruthy();
+  // The navigation bar scrolls rather than wrapping onto several rows.
+  const navbar = page.locator(".sidebar");
+  const scrollable = await navbar.evaluate((e) => e.scrollWidth > e.clientWidth);
+  expect(scrollable).toBeTruthy();
 });
 
-test("okno potwierdzenia jest użyteczne przy wysuniętej klawiaturze", async ({ page }) => {
+test("the confirmation dialog stays usable with the keyboard open", async ({ page }) => {
   await page.goto("/");
-  const nazwa = "Halina Mobilna";
-  await dodajUcznia(page, nazwa);
+  const name = "Helen Mobile";
+  await addStudent(page, name);
 
   await page
-    .getByRole("row", { name: new RegExp(nazwa) })
+    .getByRole("row", { name: new RegExp(name) })
     .getByRole("button", { name: "Usuń" })
     .click();
 
-  const okno = potwierdzenie(page);
-  await okno.getByPlaceholder(nazwa).fill(nazwa);
+  const dialog = confirmDialog(page);
+  await dialog.getByPlaceholder(name).fill(name);
 
-  // Przycisk musi być widoczny i klikalny mimo pola tekstowego u góry.
-  const przycisk = okno.getByRole("button", { name: "Usuń ucznia" });
-  await expect(przycisk).toBeInViewport();
-  await przycisk.click();
-  await expect(page.getByRole("cell", { name: nazwa })).toHaveCount(0);
+  // The button must remain visible and clickable despite the text field above.
+  const button = dialog.getByRole("button", { name: "Usuń ucznia" });
+  await expect(button).toBeInViewport();
+  await button.click();
+  await expect(page.getByRole("cell", { name })).toHaveCount(0);
 });
 
-test("tabele przewijają się w poziomie zamiast rozpychać stronę", async ({ page }) => {
+test("tables scroll horizontally instead of stretching the page", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Płatności" }).click();
 
-  const szerokoscStrony = await page.evaluate(() => document.body.scrollWidth);
-  const szerokoscOkna = await page.evaluate(() => window.innerWidth);
-  expect(szerokoscStrony).toBeLessThanOrEqual(szerokoscOkna + 1);
+  const pageWidth = await page.evaluate(() => document.body.scrollWidth);
+  const viewportWidth = await page.evaluate(() => window.innerWidth);
+  expect(pageWidth).toBeLessThanOrEqual(viewportWidth + 1);
 });

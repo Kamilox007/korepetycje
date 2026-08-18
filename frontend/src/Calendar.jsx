@@ -15,13 +15,13 @@ const VIEWS = [
   { id: "month", label: "Miesiąc" },
 ];
 
-// styl kafelka zajęć wg koloru przypisanego korepetytora.
-// Zajęcia odbyte/odwołane zachowują własną stylistykę (zwracamy null).
+// Lesson tile styling based on the assigned tutor's colour.
+// Completed and cancelled lessons keep their own styling (we return null).
 function lessonStyle(l) {
   if (l.completed || l.cancelled) return null;
   const c = l.assigned_tutor_color;
   if (!c) {
-    // bez przypisanego korepetytora — neutralne tło, przerywana obwódka
+    // no tutor assigned: neutral background, dashed border
     return {
       background: "var(--surface-2)",
       borderLeftColor: UNASSIGNED_COLOR,
@@ -32,9 +32,8 @@ function lessonStyle(l) {
 }
 
 export default function Calendar({ students, onChanged }) {
-  // Na telefonie tydzień jest nieczytelny — startujemy od dnia.
-  // Dotyczy tylko pierwszego uruchomienia; późniejszy wybór użytkownika
-  // zapisuje się i ma pierwszeństwo.
+  // A week view is unreadable on a phone, so start on the day view. This only
+  // applies to the very first run; the user's later choice is stored and wins.
   const [view, setView] = usePersistentState(
     "cal_view",
     typeof window !== "undefined" && window.innerWidth < 820 ? "day" : "week"
@@ -172,7 +171,7 @@ export default function Calendar({ students, onChanged }) {
           onPick={setEditing}
           onAdd={(iso) => setAdding(iso)}
           onDropDay={(lesson, isoDate) => {
-            // upuszczenie na inny dzień — otwórz edycję z nową datą
+            // dropped on another day: open the editor with the new date
             if (lesson.date === isoDate) return;
             setEditing({ ...lesson, date: isoDate, _movedTo: isoDate });
           }}
@@ -216,8 +215,8 @@ const DAY_START_HOUR = 7;
 const DAY_END_HOUR = 22;
 const HOUR_PX = 56;
 
-// Rozkłada nakładające się w czasie zajęcia na kolumny obok siebie.
-// Zwraca mapę id -> { col, cols } (numer kolumny i liczba kolumn w grupie).
+// Lays lessons that overlap in time out into side-by-side columns.
+// Returns a map of id -> { col, cols }: column index and columns in the group.
 function computeColumns(lessons) {
   const toMin = (t) => {
     const [h, m] = (t || "0:0").slice(0, 5).split(":").map(Number);
@@ -273,7 +272,7 @@ function DayView({ day, lessons, onPick, onAdd, onDropTime }) {
   function heightFor(min) {
     return Math.max(22, (min / 60) * HOUR_PX);
   }
-  // pozycja Y -> godzina zaokrąglona do 15 min, w granicach dnia
+  // Y position -> time rounded to 15 minutes, clamped to the day
   function timeFromY(y, durationMin) {
     let totalMin = (y / HOUR_PX) * 60 + DAY_START_HOUR * 60;
     totalMin = Math.round(totalMin / 15) * 15;
@@ -340,12 +339,12 @@ function DayView({ day, lessons, onPick, onAdd, onDropTime }) {
           )}
           {(() => {
             const layout = computeColumns(lessons);
-            const GAP = 3; // px między kolumnami
+            const GAP = 3; // px between columns
             return lessons.map((l) => {
               const top = topFor(fmtTime(l.start_time));
               const dragging = drag && drag.lesson.id === l.id;
               const lay = layout[l.id] || { col: 0, cols: 1 };
-              // szerokość i lewy offset w procentach, z marginesami kolumny
+              // width and left offset in percent, accounting for column gaps
               const widthPct = 100 / lay.cols;
               const leftStyle = `calc(${lay.col * widthPct}% + 8px)`;
               const widthStyle = `calc(${widthPct}% - ${8 + GAP}px)`;

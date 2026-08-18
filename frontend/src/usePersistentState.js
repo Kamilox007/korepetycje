@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 
-// Jak useState, ale wartość przeżywa odświeżenie strony (localStorage).
-// Klucz powinien być unikalny w obrębie aplikacji.
+// Like useState, but the value survives a page reload (localStorage).
+// The key should be unique across the application.
 export function usePersistentState(key, initial) {
   const [value, setValue] = useState(() => {
     try {

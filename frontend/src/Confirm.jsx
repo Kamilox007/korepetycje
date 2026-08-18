@@ -2,15 +2,15 @@ import { createContext, useCallback, useContext, useRef, useState, useId } from 
 import Modal from "./Modal";
 
 /**
- * Potwierdzenia operacji nieodwracalnych.
+ * Confirmation dialogs for irreversible operations.
  *
- * Zastępuje natywne confirm(), które wygląda obco, na telefonie wyskakuje jako
- * alert systemowy, a przede wszystkim daje się wyłączyć w przeglądarce —
- * wtedy zwraca false i operacja po cichu przestaje działać.
+ * Replaces the native confirm(), which looks out of place, appears as a system
+ * alert on phones, and above all can be disabled in the browser: it then returns
+ * false and the operation silently stops working.
  *
- * Użycie:
+ * Usage:
  *   const confirm = useConfirm();
- *   if (!(await confirm({ title: "Usunąć?", message: "..." }))) return;
+ *   if (!(await confirm({ title: "Delete?", message: "..." }))) return;
  */
 const ConfirmContext = createContext(null);
 
@@ -41,11 +41,11 @@ export function ConfirmProvider({ children }) {
     }
   }
 
-  // Przy operacjach naprawdę nieodwracalnych żądamy przepisania nazwy.
-  // Kliknięcie „tak” z rozpędu jest łatwe; przepisanie nazwiska ucznia
-  // wymaga świadomego spojrzenia na to, co się kasuje.
-  const wymagaWpisania = Boolean(req?.requireText);
-  const potwierdzone = !wymagaWpisania || typed.trim() === req.requireText;
+  // For genuinely irreversible operations we require the name to be retyped.
+  // Clicking "yes" on autopilot is easy; retyping a student's name forces a
+  // deliberate look at what is being deleted.
+  const requiresTyping = Boolean(req?.requireText);
+  const confirmed = !requiresTyping || typed.trim() === req.requireText;
 
   return (
     <ConfirmContext.Provider value={confirm}>
@@ -60,7 +60,7 @@ export function ConfirmProvider({ children }) {
               <button onClick={() => close(false)}>Anuluj</button>
               <button
                 className={req.danger === false ? "" : "danger"}
-                disabled={!potwierdzone}
+                disabled={!confirmed}
                 onClick={() => close(true)}
               >
                 {req.confirmLabel || "Usuń"}
@@ -74,7 +74,7 @@ export function ConfirmProvider({ children }) {
             <p className="muted" style={{ marginTop: 10 }}>{req.consequence}</p>
           )}
 
-          {wymagaWpisania && (
+          {requiresTyping && (
             <div className="field" style={{ marginTop: 14 }}>
               <label htmlFor={`${uid}-aby-potwierdzic-wpisz-1`}>
                 Aby potwierdzić, wpisz: <strong>{req.requireText}</strong>
@@ -84,7 +84,7 @@ export function ConfirmProvider({ children }) {
                 value={typed}
                 onChange={(e) => setTyped(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && potwierdzone) close(true);
+                  if (e.key === "Enter" && confirmed) close(true);
                 }}
                 placeholder={req.requireText}
               />

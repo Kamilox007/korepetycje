@@ -1,23 +1,23 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Testy end-to-end uruchamiane wyłącznie lokalnie i w CI.
- * Nigdy przeciwko produkcji — scenariusze tworzą i kasują dane.
+ * End-to-end tests, run locally and in CI only.
+ * Never against production: these scenarios create and delete data.
  */
-const ADRES = "http://127.0.0.1:5173";
+const BASE_URL = "http://127.0.0.1:5173";
 
 export default defineConfig({
   testDir: "./e2e",
-  fullyParallel: false, // wspólna baza — testy nie mogą sobie wchodzić w drogę
+  fullyParallel: false, // shared database: tests must not run into each other
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: process.env.CI ? "github" : "html",
 
   use: {
-    baseURL: ADRES,
-    // Ślady tylko z nieudanych przebiegów — otwierasz je `npx playwright show-trace`
-    // i przewijasz krok po kroku ze zrzutami DOM.
+    baseURL: BASE_URL,
+    // Traces only from failed runs. Open one with `npx playwright show-trace`
+    // and step through it with DOM snapshots.
     trace: "retain-on-failure",
     video: "retain-on-failure",
     screenshot: "only-on-failure",
@@ -26,15 +26,15 @@ export default defineConfig({
   },
 
   projects: [
-    // Logowanie i wymuszona zmiana hasła wykonują się raz; pozostałe projekty
-    // startują z gotową sesją zapisaną do pliku.
+    // Login and the forced password change happen once; the other projects start
+    // from the saved session file.
     { name: "setup", testMatch: /auth\.setup\.js/ },
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"], storageState: "e2e/.auth/admin.json" },
       dependencies: ["setup"],
-      // Bez tego chromium uruchamia też testy mobilne, które zakładają
-      // wąski ekran — projekt bez testMatch łapie wszystkie pliki.
+      // Without this, chromium also picks up the mobile tests, which assume a
+      // narrow screen: a project without testMatch matches every file.
       testIgnore: /mobile\.spec\.js/,
     },
     {
@@ -47,18 +47,18 @@ export default defineConfig({
 
   webServer: [
     {
-      // Świeża baza przy każdym przebiegu — testy kasują uczniów i wpłaty,
-      // więc nie mogą dotykać bazy deweloperskiej.
-      // Kasowanie przez Node, bo `rm` nie istnieje w Windows, a `del` w bashu.
+      // A fresh database on every run: the tests delete students and payments,
+      // so they must not touch the development database.
+      // Deleted via Node, because `rm` does not exist on Windows nor `del` in bash.
       command: [
         `node -e "require('fs').rmSync('e2e.db',{force:true})"`,
         "alembic upgrade head",
         "uvicorn app.main:app --port 8000",
       ].join(" && "),
       cwd: "../backend",
-      // url zamiast port: Playwright czeka na odpowiedź spod konkretnego
-      // adresu, a nie tylko na zajęcie portu. Bez tego test rusza, zanim
-      // serwer faktycznie zacznie odpowiadać.
+      // url rather than port: Playwright waits for a response from a specific
+      // address instead of merely for the port to be taken. Without it the tests
+      // start before the server actually answers.
       url: "http://127.0.0.1:8000/api/health",
       reuseExistingServer: false,
       timeout: 120_000,
@@ -71,11 +71,11 @@ export default defineConfig({
       stderr: "pipe",
     },
     {
-      // --host 127.0.0.1 jest konieczne: domyślnie Vite wiąże się z "localhost",
-      // które na Windowsie bywa rozwiązywane najpierw na IPv6 (::1) — wtedy
-      // połączenie pod 127.0.0.1 jest odrzucane.
+      // --host 127.0.0.1 is required: by default Vite binds to "localhost",
+      // which on Windows may resolve to IPv6 (::1) first, and a connection to
+      // 127.0.0.1 is then refused.
       command: "npm run dev -- --port 5173 --host 127.0.0.1",
-      url: ADRES,
+      url: BASE_URL,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
     },

@@ -1,21 +1,21 @@
-// Gotowa paleta kolorów korepetytorów (kontrastowe, czytelne na jasnym tle)
+// Fixed tutor colour palette: high contrast, legible on a light background
 export const TUTOR_COLORS = [
-  "#e6194b", // czerwony
-  "#3cb44b", // zielony
-  "#4363d8", // niebieski
-  "#f58231", // pomarańczowy
-  "#911eb4", // fioletowy
-  "#008080", // morski
-  "#e6a700", // złoty
-  "#f032e6", // różowy
-  "#9a6324", // brązowy
-  "#469990", // turkusowy
+  "#e6194b", // red
+  "#3cb44b", // green
+  "#4363d8", // blue
+  "#f58231", // orange
+  "#911eb4", // purple
+  "#008080", // teal
+  "#e6a700", // gold
+  "#f032e6", // pink
+  "#9a6324", // brown
+  "#469990", // turquoise
 ];
 
-// kolor neutralny dla zajęć bez przypisanego korepetytora
+// neutral colour for lessons with no tutor assigned
 export const UNASSIGNED_COLOR = "#9b9fab";
 
-// rozjaśnia kolor hex do tła (miesza z bielą)
+// lighten a hex colour for use as a background (mix with white)
 export function tint(hex, amount = 0.85) {
   if (!hex) return null;
   const h = hex.replace("#", "");

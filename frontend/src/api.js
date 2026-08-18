@@ -1,11 +1,11 @@
 const BASE = "/api";
 
 // Token nie jest przechowywany po stronie JavaScriptu. Backend wystawia go
-// w ciasteczku httponly, którego skrypty nie odczytają — dzięki temu XSS
-// nie wystarcza do przejęcia sesji. Przeglądarka dołącza je automatycznie,
-// bo frontend i API są serwowane z tej samej domeny.
+// in an httponly cookie that scripts cannot read, so XSS is not enough to
+// hijack a session. The browser attaches it automatically, because the frontend
+// and the API are served from the same domain.
 
-// callback wywoływany przy 401 (np. wylogowanie)
+// callback invoked on 401 (e.g. to log the user out)
 let onUnauthorized = null;
 export function setUnauthorizedHandler(fn) { onUnauthorized = fn; }
 
@@ -54,8 +54,8 @@ export const api = {
   },
   me: () => req("/auth/me"),
   changePassword: (oldP, newP) =>
-    // Backend odświeża ciasteczko w odpowiedzi — po stronie JS nie ma nic
-    // do zapisania. Stary token był krótkoterminowy, nowy jest pełny.
+    // The backend refreshes the cookie in its response, so there is nothing to
+    // store here. The old token was short-lived, the new one is full length.
     req("/auth/change-password", {
       method: "POST",
       body: JSON.stringify({ old_password: oldP, new_password: newP }),
@@ -104,7 +104,7 @@ export const api = {
   rejectReschedule: (id, response) =>
     req(`/reschedule-requests/${id}/reject`, { method: "POST", body: JSON.stringify({ response: response || null }) }),
 
-  // ----- zarządzanie użytkownikami (admin / sekretariat) -----
+  // ----- user management (admin / secretary) -----
   listUsers: () => req("/users"),
   listTutors: () => req("/tutors"),
   createUser: (data) => req("/users", { method: "POST", body: JSON.stringify(data) }),

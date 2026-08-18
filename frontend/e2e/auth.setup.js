@@ -1,32 +1,32 @@
 import { test as setup, expect } from "@playwright/test";
-import { poleLogin, poleHaslo, HASLO } from "./pomocniki";
+import { loginField, passwordField, PASSWORD } from "./helpers";
 
-const PLIK_SESJI = "e2e/.auth/admin.json";
+const SESSION_FILE = "e2e/.auth/admin.json";
 
 /**
- * Świeża baza tworzy konto admin/admin z wymuszoną zmianą hasła. Ten krok
- * przechodzi tę ścieżkę raz i zapisuje sesję do pliku — pozostałe testy
- * startują już zalogowane.
+ * A fresh database creates an admin/admin account with a forced password change.
+ * This step walks that path once and saves the session to a file, so the other
+ * tests start already signed in.
  *
- * Uwaga: sesja siedzi w ciasteczku httponly. Playwright zapisuje ciasteczka
- * w storageState, więc mechanizm działa mimo że JS ich nie widzi.
+ * Note: the session lives in an httponly cookie. Playwright stores cookies in
+ * storageState, so this works even though JS cannot see them.
  */
-setup("logowanie i wymuszona zmiana hasła", async ({ page }) => {
+setup("login and forced password change", async ({ page }) => {
   await page.goto("/");
 
-  await poleLogin(page).fill("admin");
-  await poleHaslo(page).fill("admin");
+  await loginField(page).fill("admin");
+  await passwordField(page).fill("admin");
   await page.getByRole("button", { name: "Zaloguj się" }).click();
 
-  // Backend odrzuca wszystko poza zmianą hasła, więc interfejs pokazuje
-  // wyłącznie ten formularz — bez zakładek i bez paneli.
+  // The backend rejects everything but the password change, so the UI shows
+  // only this form: no tabs, no panels.
   await page.getByLabel("Dotychczasowe hasło").fill("admin");
-  await page.getByLabel("Nowe hasło", { exact: true }).fill(HASLO);
-  await page.getByLabel("Powtórz nowe hasło").fill(HASLO);
+  await page.getByLabel("Nowe hasło", { exact: true }).fill(PASSWORD);
+  await page.getByLabel("Powtórz nowe hasło").fill(PASSWORD);
   await page.getByRole("button", { name: "Zapisz hasło" }).click();
 
-  // Po zmianie hasła aplikacja montuje właściwy panel.
+  // Once the password is changed the app mounts the real panel.
   await expect(page.getByRole("button", { name: "Kalendarz" })).toBeVisible();
 
-  await page.context().storageState({ path: PLIK_SESJI });
+  await page.context().storageState({ path: SESSION_FILE });
 });

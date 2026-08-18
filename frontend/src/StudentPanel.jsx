@@ -170,7 +170,7 @@ export default function StudentPanel() {
 
 function RequestForm({ lesson, onClose, onSent }) {
   const uid = useId();
-  const [slots, setSlots] = useState(null); // null=ładowanie, {has_tutor, days, tutor_name}
+  const [slots, setSlots] = useState(null); // null = loading, {has_tutor, days, tutor_name}
   const [selectedDay, setSelectedDay] = useState("");
   const [time, setTime] = useState("");
   const [manualDate, setManualDate] = useState(lesson.date);
@@ -185,7 +185,7 @@ function RequestForm({ lesson, onClose, onSent }) {
   const usePicker = slots && slots.has_tutor && slots.days.length > 0;
   const dayObj = usePicker ? slots.days.find((d) => d.date === selectedDay) : null;
 
-  // gotowe godziny startu z backendu (uwzględniają czas trwania zajęć)
+  // start times precomputed by the backend (they account for lesson duration)
   function timeOptions(day) {
     return day ? day.slots : [];
   }

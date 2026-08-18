@@ -13,8 +13,8 @@ import Subjects from "./Subjects";
 import TutorPanel from "./TutorPanel";
 import StudentPanel from "./StudentPanel";
 
-// zakładki administracji (admin + sekretariat). Użytkownicy widoczne dla obu,
-// ale sekretariat nie zobaczy tam kont administracji (filtruje backend).
+// Staff tabs (admin + secretary). Users is visible to both, but a secretary
+// will not see staff accounts there; the backend filters them out.
 const STAFF_TABS = [
   { id: "calendar", label: "Kalendarz" },
   { id: "students", label: "Uczniowie" },
@@ -33,8 +33,8 @@ export default function App() {
   useEffect(() => {
     setUnauthorizedHandler(() => setAuth(null));
     (async () => {
-      // Nie da się sprawdzić ciasteczka httponly z JS, więc o istnieniu sesji
-      // pytamy backend. 401 przy starcie oznacza po prostu brak zalogowania.
+      // An httponly cookie cannot be inspected from JS, so we ask the backend
+      // whether a session exists. A 401 at startup simply means "not logged in".
       try {
         const me = await api.me();
         setAuth(me);
@@ -46,7 +46,7 @@ export default function App() {
 
   async function handleLogin(username, password) {
     const res = await api.login(username, password);
-    // Ciasteczko ustawił backend w odpowiedzi — tu zostaje tylko stan interfejsu.
+    // The backend set the cookie in its response; only UI state is left to do here.
     setAuth({
       role: res.role, username: res.username,
       display_name: res.display_name, must_change_password: res.must_change_password,
@@ -55,8 +55,8 @@ export default function App() {
   }
 
   async function logout() {
-    // Ciasteczka httponly nie da się skasować z JavaScriptu — musi to zrobić
-    // backend, inaczej wylogowanie byłoby pozorne.
+    // An httponly cookie cannot be cleared from JavaScript; the backend has to
+    // do it, otherwise logging out would be cosmetic.
     try { await api.logout(); } catch { /* i tak czyścimy stan */ }
     setAuth(null);
   }
@@ -66,8 +66,8 @@ export default function App() {
 
   const isStaff = auth.role === "admin" || auth.role === "secretary";
 
-  // dopóki konto jest na haśle startowym, backend odrzuca wszystko poza zmianą hasła —
-  // nie montuj paneli, bo ich zapytania zwrócą 403
+  // While the account sits on its starting password the backend rejects everything
+  // but the password change, so do not mount the panels: their requests return 403.
   if (forcePw) {
     return <ChangePassword forced onDone={() => setForcePw(false)} onLogout={logout} />;
   }
@@ -103,7 +103,7 @@ function Sidebar({ auth, subtitle, onLogout, tabs, activeTab, setTab, badge }) {
   );
 }
 
-// prosty shell dla ról bez zakładek (korepetytor, uczeń)
+// Simple shell for roles without tabs (tutor, student)
 function RoleShell({ auth, subtitle, onLogout, children }) {
   return (
     <div className="app">

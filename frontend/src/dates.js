@@ -22,7 +22,7 @@ export function parseISO(s) {
   return new Date(y, m - 1, d);
 }
 
-// poniedziałek tygodnia zawierającego d
+// the Monday of the week containing d
 export function startOfWeek(d) {
   const n = new Date(d);
   n.setDate(n.getDate() - pyWeekday(n));
@@ -60,14 +60,14 @@ export function endOfMonth(d) {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0);
 }
 
-// siatka miesiąca: pełne tygodnie (pon–niedz) obejmujące cały miesiąc
+// month grid: whole weeks (Mon-Sun) covering the entire month
 export function monthGrid(d) {
   const first = startOfMonth(d);
   const gridStart = startOfWeek(first);
   const last = endOfMonth(d);
   const cells = [];
   let cur = new Date(gridStart);
-  // dopóki nie wyjdziemy poza ostatni dzień miesiąca i nie domkniemy tygodnia
+  // until we pass the last day of the month and close the final week
   while (cur <= last || pyWeekday(cur) !== 0) {
     cells.push(new Date(cur));
     cur = addDays(cur, 1);
