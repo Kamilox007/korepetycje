@@ -62,38 +62,40 @@ export default function TransferQR() {
       )}
 
       <div className="transfer-row">
-        <div>
+        <figure className="transfer-qr">
           <canvas ref={canvasRef} aria-label="Kod QR przelewu" />
-          <p className="muted" style={{ fontSize: 12, maxWidth: 220, marginBottom: 0 }}>
+          <figcaption className="muted">
             Zeskanuj w aplikacji banku — poszukaj opcji „Skanuj i płać”
             albo „Zapłać kodem QR”.
-          </p>
-        </div>
+          </figcaption>
+        </figure>
 
-        <div className="transfer-details">
-          <div className="muted" style={{ fontSize: 12 }}>Odbiorca</div>
-          <div style={{ marginBottom: 10 }}>{info.recipient}</div>
+        <dl className="transfer-details">
+          <dt>Odbiorca</dt>
+          <dd>{info.recipient}</dd>
 
-          <div className="muted" style={{ fontSize: 12 }}>Numer rachunku</div>
-          <div style={{ marginBottom: 4, fontVariantNumeric: "tabular-nums" }}>
-            {info.account}
-          </div>
-          <button className="ghost" onClick={() => copy(info.account.replace(/\s/g, ""), "konto")}>
-            {copied === "konto" ? "Skopiowano" : "Kopiuj numer"}
-          </button>
+          <dt>Numer rachunku</dt>
+          <dd>
+            <span className="transfer-value num">{info.account}</span>
+            <button onClick={() => copy(info.account.replace(/\s/g, ""), "konto")}>
+              {copied === "konto" ? "Skopiowano ✓" : "Kopiuj"}
+            </button>
+          </dd>
 
-          <div className="muted" style={{ fontSize: 12, marginTop: 12 }}>Tytuł przelewu</div>
-          <div style={{ marginBottom: 4 }}>{info.title}</div>
-          <button className="ghost" onClick={() => copy(info.title, "tytul")}>
-            {copied === "tytul" ? "Skopiowano" : "Kopiuj tytuł"}
-          </button>
-
-          <p className="muted" style={{ fontSize: 12, marginTop: 14, marginBottom: 0 }}>
-            Zachowaj tytuł bez zmian — po nim rozpoznajemy, czyja to wpłata.
-            Zaksięgowanie zajmuje zwykle jeden dzień roboczy.
-          </p>
-        </div>
+          <dt>Tytuł przelewu</dt>
+          <dd>
+            <span className="transfer-value">{info.title}</span>
+            <button onClick={() => copy(info.title, "tytul")}>
+              {copied === "tytul" ? "Skopiowano ✓" : "Kopiuj"}
+            </button>
+          </dd>
+        </dl>
       </div>
+
+      <p className="muted transfer-note">
+        Zachowaj tytuł bez zmian — po nim rozpoznajemy, czyja to wpłata.
+        Zaksięgowanie zajmuje zwykle jeden dzień roboczy.
+      </p>
     </div>
   );
 }
