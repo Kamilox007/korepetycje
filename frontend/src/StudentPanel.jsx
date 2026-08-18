@@ -17,7 +17,12 @@ export default function StudentPanel() {
   const [err, setErr] = useState("");
   const [mode, setMode] = usePersistentState("student_lessons_mode", "calendar");
   const [anchor, setAnchor] = useState(new Date());
-  const [view, setView] = usePersistentState("student_cal_view", "week");
+  const [view, setView] = usePersistentState(
+    "student_cal_view",
+    // A week of columns is unreadable on a phone, so start on the day view.
+    // First run only; the user's later choice is stored and wins.
+    typeof window !== "undefined" && window.innerWidth < 820 ? "day" : "week"
+  );
 
   async function loadAll() {
     try {

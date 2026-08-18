@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   DAYS_SHORT, MONTHS_PL, startOfWeek, addDays, toISODate, parseISO,
-  sameDay, fmtTime, monthGrid,
+  sameDay, fmtTime, fmtMoney, monthGrid, DAYS_PL, MONTHS_PL as _M,
 } from "./dates";
 
 /**
@@ -13,6 +13,11 @@ import {
  *
  * The CSS classes are the same, so both calendars look identical.
  */
+// Same grid as the staff calendar, so both look and scroll alike.
+const DAY_START_HOUR = 7;
+const DAY_END_HOUR = 22;
+const HOUR_PX = 56;
+
 export default function LessonCalendar({
   lessons,
   anchor,
@@ -39,13 +44,15 @@ export default function LessonCalendar({
     if (view === "month") {
       setAnchor(new Date(anchor.getFullYear(), anchor.getMonth() + dir, 1));
     } else {
-      setAnchor(addDays(anchor, dir * 7));
+      setAnchor(addDays(anchor, view === "day" ? dir : dir * 7));
     }
   }
 
   const weekStart = startOfWeek(anchor);
   const rangeLabel =
-    view === "month"
+    view === "day"
+      ? `${DAYS_PL[(anchor.getDay() + 6) % 7]}, ${anchor.getDate()} ${_M[anchor.getMonth()]}`
+      : view === "month"
       ? `${MONTHS_PL[anchor.getMonth()]} ${anchor.getFullYear()}`.replace(/^./, (c) => c.toUpperCase())
       : `${weekStart.getDate()}–${addDays(weekStart, 6).getDate()} ${MONTHS_PL[addDays(weekStart, 6).getMonth()]}`;
 
@@ -58,6 +65,12 @@ export default function LessonCalendar({
         <span className="range">{rangeLabel}</span>
         <div className="spacer" />
         <div className="view-switch">
+          <button
+            className={view === "day" ? "primary" : ""}
+            onClick={() => setView("day")}
+          >
+            Dzień
+          </button>
           <button
             className={view === "week" ? "primary" : ""}
             onClick={() => setView("week")}
@@ -73,7 +86,9 @@ export default function LessonCalendar({
         </div>
       </div>
 
-      {view === "month" ? (
+      {view === "day" ? (
+        <DayView day={anchor} lessons={lessonsFor(anchor)} onPick={onPick} label={label} />
+      ) : view === "month" ? (
         <MonthView anchor={anchor} today={today} lessonsFor={lessonsFor}
                    onPick={onPick} label={label} onMove={onMove} />
       ) : (
@@ -189,6 +204,65 @@ function WeekView({ weekStart, today, lessonsFor, onPick, label, onMove }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** Hour grid for a single day. Read-only: rescheduling by time belongs in the
+ *  edit dialog, where the tutor can also see the price and the subject. */
+function DayView({ day, lessons, onPick, label }) {
+  const hours = [];
+  for (let h = DAY_START_HOUR; h <= DAY_END_HOUR; h++) hours.push(h);
+
+  function topFor(timeStr) {
+    const [h, m] = String(timeStr).split(":").map(Number);
+    return (h - DAY_START_HOUR) * HOUR_PX + (m / 60) * HOUR_PX;
+  }
+  function heightFor(min) {
+    return Math.max(22, ((min || 60) / 60) * HOUR_PX);
+  }
+
+  return (
+    <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+      <div className="day-grid">
+        <div className="hours-col">
+          {hours.map((h) => (
+            <div key={h} className="hour-row" style={{ height: HOUR_PX }}>
+              <span className="hour-label">{String(h).padStart(2, "0")}:00</span>
+            </div>
+          ))}
+        </div>
+        <div
+          className="events-col"
+          style={{ height: (DAY_END_HOUR - DAY_START_HOUR + 1) * HOUR_PX }}
+        >
+          {hours.map((h) => (
+            <div key={h} className="hour-line" style={{ top: (h - DAY_START_HOUR) * HOUR_PX }} />
+          ))}
+          {lessons.map((l) => (
+            <div
+              key={l.id}
+              className={`event${l.completed ? " done" : ""}${l.cancelled ? " cancelled" : ""}`}
+              style={{
+                top: topFor(fmtTime(l.start_time)),
+                height: heightFor(l.duration_min),
+                left: 8,
+                width: "calc(100% - 16px)",
+              }}
+              onClick={(e) => { e.stopPropagation(); onPick && onPick(l); }}
+            >
+              <span className="t">{fmtTime(l.start_time)} {l.rescheduled ? "↻" : ""}</span>
+              <span className="n">{label(l)}</span>
+              {l.subject_name && (
+                <span className="subj">
+                  {l.subject_name}{l.level ? ` · ${l.level === "rozszerzenie" ? "R" : "P"}` : ""}
+                </span>
+              )}
+              {!l.cancelled && l.price != null && <span className="p">{fmtMoney(l.price)}</span>}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

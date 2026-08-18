@@ -13,7 +13,7 @@ test("staff can still reach the calendar", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Dziś" })).toBeVisible();
 });
 
-test("the panel calendar switches between week and month", async ({ page }) => {
+test("the panel calendar switches between day, week and month", async ({ page }) => {
   await page.goto("/");
   await tab(page, "Kalendarz").click();
 
@@ -22,6 +22,11 @@ test("the panel calendar switches between week and month", async ({ page }) => {
 
   await page.getByRole("button", { name: "Tydzień" }).click();
   await expect(page.locator(".week")).toBeVisible();
+
+  await page.getByRole("button", { name: "Dzień", exact: true }).click();
+  await expect(page.locator(".day-grid")).toBeVisible();
+  // The hour column is what makes the day view readable at a glance.
+  await expect(page.locator(".hour-label").first()).toBeVisible();
 });
 
 test("navigating months keeps loading lessons", async ({ page }) => {

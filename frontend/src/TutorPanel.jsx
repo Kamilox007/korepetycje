@@ -17,7 +17,12 @@ export default function TutorPanel() {
   const [err, setErr] = useState("");
   const [mode, setMode] = usePersistentState("tutor_lessons_mode", "calendar");
   const [anchor, setAnchor] = useState(new Date());
-  const [view, setView] = usePersistentState("tutor_cal_view", "week");
+  const [view, setView] = usePersistentState(
+    "tutor_cal_view",
+    // A week of columns is unreadable on a phone, so start on the day view.
+    // First run only; the user's later choice is stored and wins.
+    typeof window !== "undefined" && window.innerWidth < 820 ? "day" : "week"
+  );
 
   async function load() {
     try {
