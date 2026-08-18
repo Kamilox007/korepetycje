@@ -104,6 +104,20 @@ class SeriesCreate(SeriesBase):
     pass
 
 
+class SeriesUpdate(BaseModel):
+    """Every field optional: only what is sent gets changed."""
+    title: str | None = None
+    weekday: int | None = None
+    start_time: time_t | None = None
+    duration_min: int | None = None
+    price: float | None = None
+    end_date: date_t | None = None
+    assigned_tutor_id: int | None = None
+    subject_id: int | None = None
+    level: str | None = None
+    active: bool | None = None
+
+
 class SeriesOut(SeriesBase):
     model_config = ConfigDict(from_attributes=True)
     id: int

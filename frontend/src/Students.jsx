@@ -12,6 +12,7 @@ export default function Students({ students, reload }) {
   const [accountFor, setAccountFor] = useState(null);
   const [archived, setArchived] = useState([]);
   const [showArchive, setShowArchive] = useState(false);
+  const [editSeries, setEditSeries] = useState(null);
 
   async function loadArchive() {
     setArchived(await api.listStudents(true));
@@ -171,6 +172,7 @@ export default function Students({ students, reload }) {
                   <td className="num">{fmtMoney(s.price)}</td>
                   <td className="muted">{s.start_date}</td>
                   <td className="num">
+                    <button className="ghost" onClick={() => setEditSeries(s)}>Edytuj</button>
                     <button className="ghost danger" onClick={() => removeSeries(s)}>Zakończ</button>
                   </td>
                 </tr>
@@ -186,6 +188,14 @@ export default function Students({ students, reload }) {
           onSaved={() => { setShowStudent(false); reload(); }}
         />
       )}
+      {editSeries && (
+        <SeriesEditForm
+          series={editSeries}
+          onClose={() => setEditSeries(null)}
+          onSaved={() => { setEditSeries(null); reload(); }}
+        />
+      )}
+
       {showSeries && (
         <SeriesForm
           students={students}
@@ -426,6 +436,124 @@ function SeriesForm({ students, onClose, onSaved }) {
       <p className="muted" style={{ fontSize: 12, margin: 0 }}>
         Zajęcia wygenerują się automatycznie w kalendarzu. Każde z nich możesz potem indywidualnie przesunąć lub odwołać.
       </p>
+    </Modal>
+  );
+}
+
+function SeriesEditForm({ series, onClose, onSaved }) {
+  const uid = useId();
+  const [weekday, setWeekday] = useState(series.weekday);
+  const [time, setTime] = useState(fmtTime(series.start_time));
+  const [price, setPrice] = useState(series.price);
+  const [endDate, setEndDate] = useState(series.end_date || "");
+  const [subjectId, setSubjectId] = useState(series.subject_id || "");
+  const [level, setLevel] = useState(series.level || "");
+  const [tutorId, setTutorId] = useState(series.assigned_tutor_id || "");
+  const [subjects, setSubjects] = useState([]);
+  const [tutors, setTutors] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    api.listSubjects().then(setSubjects).catch(() => {});
+    api.listTutors().then(setTutors).catch(() => {});
+  }, []);
+
+  const timeChanged = time !== fmtTime(series.start_time) || weekday !== series.weekday;
+
+  async function save() {
+    setBusy(true);
+    try {
+      await api.updateSeries(series.id, {
+        weekday: Number(weekday),
+        start_time: time.length === 5 ? `${time}:00` : time,
+        price: Number(price),
+        end_date: endDate || null,
+        subject_id: subjectId ? Number(subjectId) : null,
+        level: level || null,
+        assigned_tutor_id: tutorId ? Number(tutorId) : null,
+      });
+      onSaved();
+    } catch (e) {
+      setErr(e.message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal
+      title="Edycja serii"
+      onClose={onClose}
+      footer={<>
+        <button onClick={onClose}>Anuluj</button>
+        <button className="primary" onClick={save} disabled={busy}>Zapisz</button>
+      </>}
+    >
+      {err && <div className="err">{err}</div>}
+
+      <div className="field-row">
+        <div>
+          <label htmlFor={`${uid}-weekday`}>Dzień tygodnia</label>
+          <select id={`${uid}-weekday`} value={weekday} onChange={(e) => setWeekday(e.target.value)}>
+            {DAYS_PL.map((d, i) => <option key={i} value={i}>{d}</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor={`${uid}-time`}>Godzina</label>
+          <input id={`${uid}-time`} type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="field-row">
+        <div>
+          <label htmlFor={`${uid}-subject`}>Przedmiot</label>
+          <select id={`${uid}-subject`} value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
+            <option value="">—</option>
+            {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor={`${uid}-level`}>Poziom</label>
+          <select id={`${uid}-level`} value={level} onChange={(e) => setLevel(e.target.value)}>
+            <option value="">—</option>
+            <option value="podstawa">Podstawa</option>
+            <option value="rozszerzenie">Rozszerzenie</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="field-row">
+        <div>
+          <label htmlFor={`${uid}-price`}>Cena (PLN)</label>
+          <input id={`${uid}-price`} type="number" step="0.01" value={price}
+                 onChange={(e) => setPrice(e.target.value)} />
+        </div>
+        <div>
+          <label htmlFor={`${uid}-end`}>Koniec serii (opcjonalnie)</label>
+          <input id={`${uid}-end`} type="date" value={endDate}
+                 onChange={(e) => setEndDate(e.target.value)} />
+        </div>
+      </div>
+
+      <div>
+        <label htmlFor={`${uid}-tutor`}>Prowadzący</label>
+        <select id={`${uid}-tutor`} value={tutorId} onChange={(e) => setTutorId(e.target.value)}>
+          <option value="">— nieprzypisany —</option>
+          {tutors.map((t) => <option key={t.id} value={t.id}>{t.display_name || t.username}</option>)}
+        </select>
+      </div>
+
+      <p className="muted" style={{ marginTop: 14, fontSize: 12 }}>
+        Przedmiot, poziom, prowadzący i cena trafią na wszystkie przyszłe zajęcia
+        z tej serii. Zajęcia już odbyte zostają bez zmian — zachowują cenę
+        z momentu, w którym się odbyły.
+      </p>
+      {timeChanged && (
+        <p className="muted" style={{ fontSize: 12 }}>
+          Zmiana terminu pominie zajęcia, którym wcześniej ręcznie zmieniono datę
+          lub godzinę — te zostaną tam, gdzie je przesunięto.
+        </p>
+      )}
     </Modal>
   );
 }

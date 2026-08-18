@@ -80,6 +80,10 @@ export const api = {
   // ----- series -----
   listSeries: () => req("/series"),
   createSeries: (data) => req("/series", { method: "POST", body: JSON.stringify(data) }),
+  // Zmiany metadanych trafiają na przyszłe zajęcia, godziny — tylko na te,
+  // których nikt ręcznie nie przesunął. Szczegóły w docstringu endpointu.
+  updateSeries: (id, data) =>
+    req(`/series/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteSeries: (id) => req(`/series/${id}`, { method: "DELETE" }),
 
   // ----- lessons -----

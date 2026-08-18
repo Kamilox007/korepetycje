@@ -582,6 +582,98 @@ def create_series(
     return series
 
 
+@app.patch("/api/series/{series_id}", response_model=schemas.SeriesOut)
+def update_series(
+    series_id: int,
+    payload: schemas.SeriesUpdate,
+    user: models.User = Depends(auth.require_staff),
+    db: Session = Depends(get_db),
+):
+    """Edit a series and carry the change onto its future occurrences.
+
+    What propagates depends on the kind of field, because the two kinds mean
+    different things:
+
+    * Metadata (subject, level, tutor, title) describes what the lesson IS, so it
+      lands on every future occurrence — including ones already moved to another
+      date. A lesson shifted to Thursday still has the wrong level.
+    * Timing (weekday, start_time, duration) describes WHEN the slot falls, so it
+      skips occurrences whose date was changed by hand. Those were moved
+      deliberately and resetting them would undo somebody's decision.
+    * Price lands on future occurrences only. Completed lessons keep the rate
+      frozen at the moment they happened.
+
+    Nothing here touches completed or past lessons: they are the settlement
+    record, not a schedule.
+    """
+    series = db.get(models.LessonSeries, series_id)
+    if not series:
+        raise HTTPException(404, "Seria nie znaleziona")
+
+    data = payload.model_dump(exclude_unset=True)
+    if not data:
+        return series
+
+    old_weekday = series.weekday
+    for k, v in data.items():
+        setattr(series, k, v)
+
+    today = date.today()
+    future = db.query(models.Lesson).filter(
+        models.Lesson.series_id == series_id,
+        models.Lesson.date >= today,
+        models.Lesson.completed.is_(False),
+        models.Lesson.cancelled.is_(False),
+    )
+
+    # --- metadata: applies to every future occurrence ---
+    meta = {k: data[k] for k in ("subject_id", "level", "assigned_tutor_id", "title")
+            if k in data}
+    if meta:
+        future.update(meta, synchronize_session=False)
+
+    if "price" in data:
+        future.update({models.Lesson.price_grosze: series.price_grosze},
+                      synchronize_session=False)
+
+    # --- timing: only occurrences nobody has moved by hand ---
+    untouched = future.filter(models.Lesson.rescheduled.is_(False))
+
+    if "start_time" in data:
+        untouched.update({models.Lesson.start_time: series.start_time},
+                         synchronize_session=False)
+    if "duration_min" in data:
+        untouched.update({models.Lesson.duration_min: series.duration_min},
+                         synchronize_session=False)
+
+    if "weekday" in data and data["weekday"] != old_weekday:
+        # Shift by the weekday delta rather than deleting and regenerating:
+        # origin_date moves with the lesson, so the (series_id, origin_date)
+        # constraint holds and the generator lines up with the new slots.
+        delta = timedelta(days=data["weekday"] - old_weekday)
+        for lesson in untouched.all():
+            lesson.date = lesson.date + delta
+            if lesson.origin_date:
+                lesson.origin_date = lesson.origin_date + delta
+
+    # An end date pulled earlier drops occurrences past it.
+    if data.get("end_date"):
+        db.query(models.Lesson).filter(
+            models.Lesson.series_id == series_id,
+            models.Lesson.date > data["end_date"],
+            models.Lesson.completed.is_(False),
+        ).delete(synchronize_session=False)
+
+    db.commit()
+
+    # Top up any slots the change opened up (a moved weekday, a later end date).
+    if series.active:
+        services.generate_lessons_for_series(db, series, services.clamp_horizon(None))
+
+    db.refresh(series)
+    return series
+
+
 @app.delete("/api/series/{series_id}")
 def delete_series(
     series_id: int,
