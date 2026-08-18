@@ -16,25 +16,50 @@ import { fmtMoney } from "./dates";
  */
 export default function TransferQR() {
   const [info, setInfo] = useState(null);
-  const [copied, setCopied] = useState("");
-  const canvasRef = useRef(null);
 
   useEffect(() => {
     api.myTransferInfo().then(setInfo).catch(() => setInfo({ configured: false }));
   }, []);
 
+  if (!info || !info.configured || !info.targets.length) return null;
+
+  return (
+    <div className="card" style={{ marginBottom: 24 }}>
+      <h3 style={{ marginTop: 0 }}>Zapłać przelewem</h3>
+      {info.targets.length > 1 && (
+        <p className="muted" style={{ marginTop: 0 }}>
+          Masz zajęcia u {info.targets.length} korepetytorów — każdy ma własny
+          rachunek, więc płatności są osobne.
+        </p>
+      )}
+      {info.targets.map((t) => (
+        <TransferTarget key={t.tutor_id ?? "brak"} target={t}
+                        showRecipient={info.targets.length > 1} />
+      ))}
+      <p className="muted transfer-note">
+        Zachowaj tytuł bez zmian — po nim rozpoznajemy, czyja to wpłata.
+        Zaksięgowanie zajmuje zwykle jeden dzień roboczy.
+      </p>
+    </div>
+  );
+}
+
+function TransferTarget({ target, showRecipient }) {
+  const [copied, setCopied] = useState("");
+  const canvasRef = useRef(null);
+
   useEffect(() => {
-    if (!info?.qr_payload || !canvasRef.current) return;
+    if (!target.qr_payload || !canvasRef.current) return;
     // Error correction L and a 4-module quiet zone are what the recommendation
     // specifies; a denser correction level makes the code harder to scan from
     // a phone screen without buying anything in return.
-    QRCode.toCanvas(canvasRef.current, info.qr_payload, {
+    QRCode.toCanvas(canvasRef.current, target.qr_payload, {
       width: 220,
       margin: 4,
       errorCorrectionLevel: "L",
       color: { dark: "#16181c", light: "#ffffff" },
     }).catch(() => {});
-  }, [info]);
+  }, [target]);
 
   async function copy(text, label) {
     try {
@@ -44,20 +69,18 @@ export default function TransferQR() {
     } catch { /* clipboard blocked, the value is visible anyway */ }
   }
 
-  if (!info || !info.configured) return null;
-
   return (
-    <div className="card" style={{ marginBottom: 24 }}>
-      <h3 style={{ marginTop: 0 }}>Zapłać przelewem</h3>
+    <section className="transfer-target">
+      {showRecipient && <h4 className="transfer-heading">{target.recipient}</h4>}
 
-      {info.amount ? (
+      {target.amount ? (
         <p className="muted" style={{ marginTop: 0 }}>
-          Do zapłaty: <strong style={{ color: "var(--due)" }}>{fmtMoney(info.amount)}</strong>
+          Do zapłaty: <strong style={{ color: "var(--due)" }}>{fmtMoney(target.amount)}</strong>
         </p>
       ) : (
         <p className="muted" style={{ marginTop: 0 }}>
-          Nie masz zaległości. Kod poniżej pozwala wpłacić dowolną kwotę —
-          aplikacja banku poprosi o jej podanie.
+          Brak zaległości. Kod pozwala wpłacić dowolną kwotę — aplikacja banku
+          poprosi o jej podanie.
         </p>
       )}
 
@@ -72,30 +95,25 @@ export default function TransferQR() {
 
         <dl className="transfer-details">
           <dt>Odbiorca</dt>
-          <dd>{info.recipient}</dd>
+          <dd>{target.recipient}</dd>
 
           <dt>Numer rachunku</dt>
           <dd>
-            <span className="transfer-value num">{info.account}</span>
-            <button onClick={() => copy(info.account.replace(/\s/g, ""), "konto")}>
+            <span className="transfer-value num">{target.account}</span>
+            <button onClick={() => copy(target.account.replace(/\s/g, ""), "konto")}>
               {copied === "konto" ? "Skopiowano ✓" : "Kopiuj"}
             </button>
           </dd>
 
           <dt>Tytuł przelewu</dt>
           <dd>
-            <span className="transfer-value">{info.title}</span>
-            <button onClick={() => copy(info.title, "tytul")}>
+            <span className="transfer-value">{target.title}</span>
+            <button onClick={() => copy(target.title, "tytul")}>
               {copied === "tytul" ? "Skopiowano ✓" : "Kopiuj"}
             </button>
           </dd>
         </dl>
       </div>
-
-      <p className="muted transfer-note">
-        Zachowaj tytuł bez zmian — po nim rozpoznajemy, czyja to wpłata.
-        Zaksięgowanie zajmuje zwykle jeden dzień roboczy.
-      </p>
-    </div>
+    </section>
   );
 }

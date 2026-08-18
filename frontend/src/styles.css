@@ -333,6 +333,14 @@ tbody tr:hover { background: var(--surface-2); }
 
 .transfer-note { font-size: 12px; margin: 16px 0 0; max-width: 620px; }
 
+/* One block per tutor, separated only when there is more than one. */
+.transfer-target + .transfer-target {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.transfer-heading { margin: 0 0 6px; font-size: 15px; }
+
 /* Okno potwierdzenia otwarte na tle innego modala (np. edycji zajęć)
    musi leżeć wyżej, inaczej zniknie pod spodem. */
 .overlay.overlay-confirm { z-index: 100; }

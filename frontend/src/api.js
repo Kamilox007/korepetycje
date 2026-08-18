@@ -128,6 +128,7 @@ export const api = {
     req(`/lessons/${lessonId}/assign${tutorId ? `?tutor_id=${tutorId}` : ""}`, { method: "POST" }),
 
   // ----- korepetytor -----
+  tutorSummary: () => req("/tutor/summary"),
   tutorLessons: ({ start, end } = {}) => {
     const p = new URLSearchParams();
     if (start) p.set("start", start);

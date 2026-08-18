@@ -35,6 +35,10 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(20), nullable=False)  # tutor | student
     display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     color: Mapped[str | None] = mapped_column(String(20), nullable=True)  # kolor korepetytora w kalendarzu
+    # Where this tutor's students send their transfers. Admin-only to edit:
+    # swapping the number silently redirects payments, which is the real risk
+    # here — not the number being seen, since it goes on every invoice anyway.
+    bank_account: Mapped[str | None] = mapped_column(String(26), nullable=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
     # failed login counter and the moment until which the account stays locked (naive UTC)
     failed_logins: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -171,11 +175,21 @@ class Lesson(Base):
 
 
 class Payment(Base):
-    """A payment recorded against a student."""
+    """A payment recorded against a student, credited to one tutor.
+
+    With more than one tutor a bare "the student paid 200" is ambiguous: it has
+    to say whose balance it settles, or the two accounts cannot be told apart.
+    """
     __tablename__ = "payments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # Author of the record. Kept separate from the tutor it is credited to:
+    # a secretary may enter a payment for someone else's lesson.
     tutor_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    # Whose balance this settles. Same name and meaning as on Lesson.
+    assigned_tutor_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), nullable=False, index=True)
     amount_grosze: Mapped[int] = mapped_column(Integer, nullable=False)
     date: Mapped[date] = mapped_column(Date, default=date.today)

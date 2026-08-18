@@ -41,6 +41,9 @@ class LessonBase(BaseModel):
     note: str | None = None
     subject_id: int | None = None
     level: str | None = None
+    # Settable at creation: a one-off lesson otherwise starts unassigned and,
+    # with two tutors, there is nothing to guess from later.
+    assigned_tutor_id: int | None = None
 
 
 class LessonCreate(LessonBase):
@@ -132,25 +135,39 @@ class PaymentBase(BaseModel):
     date: date_t | None = None
     payer: str | None = None
     note: str | None = None
+    # Which tutor's balance this settles. Optional on input: with one tutor the
+    # server fills it in, so nothing has to change for a single-tutor setup.
+    assigned_tutor_id: int | None = None
 
 
 class PaymentCreate(PaymentBase):
     pass
 
 
+class TransferTarget(BaseModel):
+    """Bank details for one recipient, with the amount owed to them."""
+    tutor_id: int | None = None
+    recipient: str
+    account: str                        # formatted for reading
+    title: str
+    amount: float | None = None         # what is owed, zloty; None means "any"
+    qr_payload: str                     # ZBP 2D string, rendered client-side
+
+
 class TransferInfo(BaseModel):
-    """Everything needed to pay by bank transfer, including the 2D payload."""
+    """One entry per tutor the student owes money to.
+
+    A student taking two subjects from two tutors pays two different accounts,
+    so the panel shows a code for each rather than one combined figure.
+    """
     configured: bool
-    account: str | None = None          # formatted for reading
-    recipient: str | None = None
-    title: str | None = None
-    amount: float | None = None         # outstanding balance, zloty
-    qr_payload: str | None = None       # ZBP 2D string, rendered client-side
+    targets: list[TransferTarget] = []
 
 
 class PaymentUpdate(BaseModel):
     """Every field optional: only what is sent gets changed."""
     amount: float | None = None
+    assigned_tutor_id: int | None = None
     date: date_t | None = None
     payer: str | None = None
     note: str | None = None
@@ -169,6 +186,15 @@ class PaymentOut(BaseModel):
 
 
 # ---------- Summary ----------
+class TutorBalance(BaseModel):
+    """One student's account with one tutor."""
+    tutor_id: int | None = None
+    tutor_name: str | None = None
+    amount_due: float
+    amount_paid: float
+    balance: float
+
+
 class StudentSummary(BaseModel):
     student_id: int
     student_name: str
@@ -177,6 +203,10 @@ class StudentSummary(BaseModel):
     amount_due: float       # total for completed lessons
     amount_paid: float      # total payments
     balance: float          # paid - due (negative = owes money)
+    # The same figures split by tutor. With one tutor this holds a single entry
+    # equal to the totals above; the flat fields stay so nothing that reads the
+    # overall balance has to care how many tutors there are.
+    by_tutor: list[TutorBalance] = []
 
 
 class SummaryOut(BaseModel):

@@ -214,7 +214,15 @@ def list_users(user: models.User = Depends(auth.require_staff), db: Session = De
 
 @app.get("/api/tutors", response_model=list[schemas.TutorOption])
 def list_tutors(user: models.User = Depends(auth.require_staff), db: Session = Depends(get_db)):
-    rows = db.query(models.User).filter(models.User.role == "tutor").order_by(models.User.display_name).all()
+    # Admins are included: in a one- or two-person practice the owner teaches,
+    # and leaving them off this list makes their own lessons unassignable.
+    # Secretaries are not — they administer, they do not run lessons.
+    rows = (
+        db.query(models.User)
+        .filter(models.User.role.in_(("tutor", "admin")))
+        .order_by(models.User.display_name)
+        .all()
+    )
     return [schemas.TutorOption(id=t.id, display_name=t.display_name or t.username, color=t.color) for t in rows]
 
 
@@ -789,6 +797,23 @@ def update_lesson(
         lesson.rescheduled = True
     for k, v in data.items():
         setattr(lesson, k, v)
+
+    # A completed lesson has to say who taught it: it is what the charge is
+    # credited against, and without it the amount lands on nobody's account.
+    # Rather than refuse outright, fill in the obvious answer first — the series
+    # it came from, or the person marking it done if they teach.
+    if lesson.completed and not lesson.assigned_tutor_id:
+        if lesson.series_id:
+            series = db.get(models.LessonSeries, lesson.series_id)
+            if series and series.assigned_tutor_id:
+                lesson.assigned_tutor_id = series.assigned_tutor_id
+        if not lesson.assigned_tutor_id and user.role in ("tutor", "admin"):
+            lesson.assigned_tutor_id = user.id
+        if not lesson.assigned_tutor_id:
+            raise HTTPException(
+                400, "Przypisz korepetytora, zanim oznaczysz zajęcia jako odbyte"
+            )
+
     db.commit()
     db.refresh(lesson)
     return _lesson_out(lesson, db)
@@ -869,6 +894,8 @@ def create_payment(
     data = payload.model_dump()
     if not data.get("date"):
         data["date"] = date.today()
+    if not data.get("assigned_tutor_id"):
+        data["assigned_tutor_id"] = _default_payment_tutor(db, student)
     payment = models.Payment(tutor_id=user.id, **data)
     db.add(payment)
     db.commit()
@@ -921,14 +948,69 @@ def delete_payment(
 
 
 # ===================== SUMMARY (staff) =====================
-def _summary_for_students(students):
+def _default_payment_tutor(db: Session, student: models.Student) -> int | None:
+    """Which tutor a payment belongs to when the form did not say.
+
+    Unambiguous only when the student has lessons with exactly one tutor, which
+    is the single-tutor case and the common one. With two, guessing would put
+    money on the wrong account, so the caller has to choose.
+    """
+    ids = {
+        row[0] for row in db.query(models.Lesson.assigned_tutor_id)
+        .filter(models.Lesson.student_id == student.id,
+                models.Lesson.assigned_tutor_id.isnot(None))
+        .distinct()
+    }
+    return ids.pop() if len(ids) == 1 else None
+
+
+def _summary_for_students(students, db=None, only_tutor_id: int | None = None):
+    """Balances per student, and within a student per tutor.
+
+    `only_tutor_id` narrows everything to one tutor's lessons and payments, which
+    is what a tutor sees: their own accounts, not their colleague's.
+    """
     rows = []
     total_due = total_paid = 0  # in grosze: summing floats accumulated error
     for s in students:
         lessons = [l for l in s.lessons if not l.cancelled]
+        payments = list(s.payments)
+        if only_tutor_id is not None:
+            lessons = [l for l in lessons if l.assigned_tutor_id == only_tutor_id]
+            payments = [p for p in payments if p.assigned_tutor_id == only_tutor_id]
+
         completed = [l for l in lessons if l.completed]
         due = sum(l.price_grosze for l in completed)
-        paid = sum(p.amount_grosze for p in s.payments)
+        paid = sum(p.amount_grosze for p in payments)
+
+        # Group by tutor. Lessons and payments are gathered separately because a
+        # student may have paid a tutor in advance, or owe one nothing yet.
+        per_tutor: dict[int | None, dict[str, int]] = {}
+        for l in completed:
+            per_tutor.setdefault(l.assigned_tutor_id, {"due": 0, "paid": 0})["due"] += l.price_grosze
+        for pay in payments:
+            per_tutor.setdefault(pay.assigned_tutor_id, {"due": 0, "paid": 0})["paid"] += pay.amount_grosze
+
+        names = {}
+        if db is not None:
+            for tid in per_tutor:
+                if tid is None:
+                    continue
+                u = db.get(models.User, tid)
+                if u:
+                    names[tid] = u.display_name or u.username
+
+        by_tutor = [
+            schemas.TutorBalance(
+                tutor_id=tid,
+                tutor_name=names.get(tid) if tid else None,
+                amount_due=money.to_zlote(v["due"]),
+                amount_paid=money.to_zlote(v["paid"]),
+                balance=money.to_zlote(v["paid"] - v["due"]),
+            )
+            for tid, v in sorted(per_tutor.items(), key=lambda kv: (kv[0] is None, kv[0] or 0))
+        ]
+
         rows.append(
             schemas.StudentSummary(
                 student_id=s.id,
@@ -938,6 +1020,7 @@ def _summary_for_students(students):
                 amount_due=money.to_zlote(due),
                 amount_paid=money.to_zlote(paid),
                 balance=money.to_zlote(paid - due),
+                by_tutor=by_tutor,
             )
         )
         total_due += due
@@ -958,7 +1041,7 @@ def get_summary(user: models.User = Depends(auth.require_staff), db: Session = D
         .order_by(models.Student.name)
         .all()
     )
-    return _summary_for_students(students)
+    return _summary_for_students(students, db)
 
 
 # ===================== RESCHEDULE (staff) =====================
@@ -1093,6 +1176,31 @@ def tutor_reject_reschedule(
 
 
 
+@app.get("/api/tutor/summary", response_model=schemas.SummaryOut)
+def tutor_summary(
+    user: models.User = Depends(auth.require_tutor), db: Session = Depends(get_db)
+):
+    """Balances for this tutor's own students only.
+
+    Filtered rather than merely presented differently: a tutor has no business
+    seeing what a student owes somebody else.
+    """
+    ids = {
+        row[0] for row in db.query(models.Lesson.student_id)
+        .filter(models.Lesson.assigned_tutor_id == user.id).distinct()
+    }
+    if not ids:
+        return schemas.SummaryOut(students=[], total_due=0, total_paid=0, total_balance=0)
+
+    students = (
+        db.query(models.Student)
+        .filter(models.Student.id.in_(ids), models.Student.archived_at.is_(None))
+        .order_by(models.Student.name)
+        .all()
+    )
+    return _summary_for_students(students, db, only_tutor_id=user.id)
+
+
 @app.get("/api/tutor/lessons", response_model=list[schemas.LessonOut])
 def tutor_lessons(
     start: date | None = None,
@@ -1124,6 +1232,23 @@ def tutor_update_lesson(
         lesson.rescheduled = True
     for k, v in data.items():
         setattr(lesson, k, v)
+
+    # A completed lesson has to say who taught it: it is what the charge is
+    # credited against, and without it the amount lands on nobody's account.
+    # Rather than refuse outright, fill in the obvious answer first — the series
+    # it came from, or the person marking it done if they teach.
+    if lesson.completed and not lesson.assigned_tutor_id:
+        if lesson.series_id:
+            series = db.get(models.LessonSeries, lesson.series_id)
+            if series and series.assigned_tutor_id:
+                lesson.assigned_tutor_id = series.assigned_tutor_id
+        if not lesson.assigned_tutor_id and user.role in ("tutor", "admin"):
+            lesson.assigned_tutor_id = user.id
+        if not lesson.assigned_tutor_id:
+            raise HTTPException(
+                400, "Przypisz korepetytora, zanim oznaczysz zajęcia jako odbyte"
+            )
+
     db.commit()
     db.refresh(lesson)
     return _lesson_out(lesson, db)
@@ -1200,48 +1325,62 @@ def my_summary(
     user: models.User = Depends(auth.require_student), db: Session = Depends(get_db)
 ):
     student = _student_for_user(db, user)
-    return _summary_for_students([student]).students[0]
+    return _summary_for_students([student], db).students[0]
 
 
 @app.get("/api/me/transfer", response_model=schemas.TransferInfo)
 def my_transfer_info(
     user: models.User = Depends(auth.require_student), db: Session = Depends(get_db)
 ):
-    """Bank details and a scannable 2D payload for the amount currently owed.
+    """Bank details and a scannable 2D payload per tutor the student owes.
 
-    This is not a payment gateway: nothing is charged, the payer confirms in
-    their own banking app. It exists to remove the retyping, which is where
-    wrong transfer titles come from.
+    Not a payment gateway: nothing is charged, the payer confirms in their own
+    banking app. It removes the retyping, which is where wrong transfer titles
+    come from — and with two tutors, where money sent to the wrong account
+    comes from.
     """
-    cfg = transfer_code.configured()
-    if not cfg:
-        return schemas.TransferInfo(configured=False)
-
     student = _student_for_user(db, user)
-    summary = _summary_for_students([student]).students[0]
+    summary = _summary_for_students([student], db).students[0]
+    fallback = transfer_code.configured()
 
-    # balance is paid - due, so anything owed shows up as a negative number.
-    owed_grosze = max(0, -money.to_grosze(summary.balance))
-    title = f"Korepetycje {student.name}"
+    targets = []
+    for row in summary.by_tutor:
+        owed_grosze = max(0, -money.to_grosze(row.balance))
 
-    try:
-        payload = transfer_code.build(
-            account=cfg["account"], recipient=cfg["recipient"],
-            title=title, amount_grosze=owed_grosze, nip=cfg["nip"],
-        )
-    except ValueError:
-        # Misconfigured account: better to show nothing than a code that sends
-        # money into the void.
-        return schemas.TransferInfo(configured=False)
+        account = recipient = None
+        if row.tutor_id:
+            tutor = db.get(models.User, row.tutor_id)
+            if tutor and tutor.bank_account:
+                account = tutor.bank_account
+                recipient = tutor.display_name or tutor.username
+        if not account and fallback:
+            # Lessons with no tutor, or a tutor who has not set an account yet.
+            account, recipient = fallback["account"], fallback["recipient"]
+        if not account:
+            continue
 
-    return schemas.TransferInfo(
-        configured=True,
-        account=transfer_code.format_account(cfg["account"]),
-        recipient=cfg["recipient"],
-        title=title,
-        amount=money.to_zlote(owed_grosze) if owed_grosze else None,
-        qr_payload=payload,
-    )
+        title = f"Korepetycje {student.name}"
+        try:
+            payload = transfer_code.build(
+                account=account, recipient=recipient, title=title,
+                amount_grosze=owed_grosze,
+                nip=(fallback or {}).get("nip", ""),
+            )
+        except ValueError:
+            # A misconfigured account: skip it rather than show a code that
+            # sends money into the void.
+            continue
+
+        targets.append(schemas.TransferTarget(
+            tutor_id=row.tutor_id,
+            recipient=recipient,
+            account=transfer_code.format_account(account),
+            title=title,
+            amount=money.to_zlote(owed_grosze) if owed_grosze else None,
+            qr_payload=payload,
+        ))
+
+    return schemas.TransferInfo(configured=bool(targets), targets=targets)
 
 
 @app.get("/api/me/payments", response_model=list[schemas.PaymentOut])
