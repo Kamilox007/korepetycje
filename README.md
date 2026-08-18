@@ -49,6 +49,7 @@ rozpatrywanie próśb swoich uczniów.
 
 ### Uczeń
 - Kalendarz własnych zajęć (dzień, tydzień, miesiąc) i saldo — tylko do odczytu
+- Kod QR przelewu z kwotą do zapłaty i tytułem (standard 2D ZBP)
 - Prośby o przesunięcie — termin zmienia się dopiero po akceptacji
 - Podpowiadane wolne terminy na podstawie dostępności korepetytora
 
@@ -126,6 +127,7 @@ Zmienne środowiskowe (`.env`, wzór w `.env.example`):
 | `CORS_ORIGINS` | dozwolone originy, rozdzielone przecinkiem. `*` jest odrzucane |
 | `DATABASE_URL` | domyślnie SQLite; Postgres przez `postgresql+psycopg://…` |
 | `B2_KEY_ID`, `B2_APP_KEY` | poświadczenia Backblaze B2 dla Litestream |
+| `BANK_ACCOUNT`, `BANK_RECIPIENT` | opcjonalne: włączają kod QR przelewu w panelu ucznia |
 
 `APP_ENV` steruje też flagą `Secure` na ciasteczku sesyjnym — w `dev` jest
 wyłączona, bo po HTTP przeglądarka odrzuciłaby takie ciasteczko.
@@ -209,6 +211,7 @@ python test_soft_delete.py        # archiwizacja ucznia, przywracanie, usunięci
 python test_password_reset.py     # reset hasła konta personelu
 python test_series_update.py      # edycja serii i reguły propagacji na zajęcia
 python test_payment_edit.py       # korekta wpłaty
+python test_transfer_code.py      # kod QR przelewu (standard 2D ZBP)
 ```
 
 Każdy zestaw pracuje na własnej bazie w katalogu tymczasowym i nie dotyka bazy
@@ -309,6 +312,14 @@ kolejkowanie odświeżeń po stronie przeglądarki.
 `click` wypada na wspólnym przodku wciśnięcia i puszczenia, więc zaznaczenie
 tekstu w polu i puszczenie poza oknem rejestrowało się jako kliknięcie w tło
 i kasowało wypełniony formularz.
+
+**Płatności przez przelew, nie przez bramkę.** Kod 2D ZBP pozwala zeskanować
+przelew w aplikacji banku: kwota i tytuł są wypełnione, więc wpłaty da się
+przypisać do ucznia bez zgadywania. Bramka wymagałaby zarejestrowanej
+działalności, regulaminu i prowizji od transakcji, a przy kilku uczniach
+minimalna prowizja umowna przewyższyłaby wartość usługi. Kod QR daje większość
+tej wygody za zero kosztów — kosztem ręcznego oznaczenia wpłaty, co i tak
+trzeba robić.
 
 ## Model danych
 

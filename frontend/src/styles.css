@@ -299,6 +299,11 @@ tbody tr:hover { background: var(--surface-2); }
   padding: 9px 12px; border-radius: var(--radius-sm); font-size: 13px;
 }
 
+/* Transfer details sit beside the QR code on a wide screen and stack under it
+   on a phone, where the code is the thing you actually use. */
+.transfer-row { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+.transfer-details { flex: 1 1 240px; min-width: 240px; }
+
 /* Okno potwierdzenia otwarte na tle innego modala (np. edycji zajęć)
    musi leżeć wyżej, inaczej zniknie pod spodem. */
 .overlay.overlay-confirm { z-index: 100; }

@@ -11,7 +11,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
-from . import models, schemas, services, auth, money
+from . import models, schemas, services, auth, money, transfer_code
 from .database import get_db, SessionLocal
 
 
@@ -1201,6 +1201,47 @@ def my_summary(
 ):
     student = _student_for_user(db, user)
     return _summary_for_students([student]).students[0]
+
+
+@app.get("/api/me/transfer", response_model=schemas.TransferInfo)
+def my_transfer_info(
+    user: models.User = Depends(auth.require_student), db: Session = Depends(get_db)
+):
+    """Bank details and a scannable 2D payload for the amount currently owed.
+
+    This is not a payment gateway: nothing is charged, the payer confirms in
+    their own banking app. It exists to remove the retyping, which is where
+    wrong transfer titles come from.
+    """
+    cfg = transfer_code.configured()
+    if not cfg:
+        return schemas.TransferInfo(configured=False)
+
+    student = _student_for_user(db, user)
+    summary = _summary_for_students([student]).students[0]
+
+    # balance is paid - due, so anything owed shows up as a negative number.
+    owed_grosze = max(0, -money.to_grosze(summary.balance))
+    title = f"Korepetycje {student.name}"
+
+    try:
+        payload = transfer_code.build(
+            account=cfg["account"], recipient=cfg["recipient"],
+            title=title, amount_grosze=owed_grosze, nip=cfg["nip"],
+        )
+    except ValueError:
+        # Misconfigured account: better to show nothing than a code that sends
+        # money into the void.
+        return schemas.TransferInfo(configured=False)
+
+    return schemas.TransferInfo(
+        configured=True,
+        account=transfer_code.format_account(cfg["account"]),
+        recipient=cfg["recipient"],
+        title=title,
+        amount=money.to_zlote(owed_grosze) if owed_grosze else None,
+        qr_payload=payload,
+    )
 
 
 @app.get("/api/me/payments", response_model=list[schemas.PaymentOut])

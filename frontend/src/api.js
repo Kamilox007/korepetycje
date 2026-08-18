@@ -159,6 +159,7 @@ export const api = {
     return req(`/me/lessons?${p.toString()}`);
   },
   mySummary: () => req("/me/summary"),
+  myTransferInfo: () => req("/me/transfer"),
   myPayments: () => req("/me/payments"),
   myReschedule: () => req("/me/reschedule-requests"),
   myLessonSlots: (lessonId) => req(`/me/lessons/${lessonId}/available-slots`),

@@ -138,6 +138,16 @@ class PaymentCreate(PaymentBase):
     pass
 
 
+class TransferInfo(BaseModel):
+    """Everything needed to pay by bank transfer, including the 2D payload."""
+    configured: bool
+    account: str | None = None          # formatted for reading
+    recipient: str | None = None
+    title: str | None = None
+    amount: float | None = None         # outstanding balance, zloty
+    qr_payload: str | None = None       # ZBP 2D string, rendered client-side
+
+
 class PaymentUpdate(BaseModel):
     """Every field optional: only what is sent gets changed."""
     amount: float | None = None

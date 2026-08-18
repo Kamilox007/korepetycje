@@ -2,6 +2,7 @@ import { useState, useEffect, useId } from "react";
 import { usePersistentState } from "./usePersistentState";
 import { api } from "./api";
 import LessonCalendar from "./LessonCalendar";
+import TransferQR from "./TransferQR";
 import Modal from "./Modal";
 import {
   DAYS_PL, MONTHS_PL, parseISO, pyWeekday, fmtMoney, fmtTime, toISODate, addDays,
@@ -131,6 +132,8 @@ export default function StudentPanel({ section = "lessons" }) {
           )}
         </div>
       )}
+
+      {tab === "payments" && <TransferQR />}
 
       {tab === "payments" && (
         <div className="card">
