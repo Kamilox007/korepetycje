@@ -19,8 +19,10 @@ export async function login(page, username = "admin", password = PASSWORD) {
   await page.getByRole("button", { name: "Zaloguj się" }).click();
 }
 
+/** Sidebar navigation. These are links now, not buttons: the app uses real
+ *  routes so the back button and bookmarks work. */
 export function tab(page, name) {
-  return page.getByRole("button", { name, exact: true });
+  return page.getByRole("link", { name, exact: true });
 }
 
 /** The confirmation dialog we added in place of the native confirm(). */

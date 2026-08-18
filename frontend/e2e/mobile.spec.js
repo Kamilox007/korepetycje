@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { confirmDialog, addStudent } from "./helpers";
+import { tab, confirmDialog, addStudent } from "./helpers";
 
 /**
  * Runs under phone emulation (the "mobile" project in the config). Covers what
@@ -8,7 +8,7 @@ import { confirmDialog, addStudent } from "./helpers";
  */
 test("navigation fits the screen and scrolls horizontally", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Kalendarz" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Kalendarz" })).toBeVisible();
 
   // The page itself must not scroll horizontally. That is the right criterion:
   // individual elements MAY extend past the viewport when they sit in a container
@@ -62,7 +62,7 @@ test("the confirmation dialog stays usable with the keyboard open", async ({ pag
 
 test("tables scroll horizontally instead of stretching the page", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Płatności" }).click();
+  await tab(page, "Płatności").click();
 
   const pageWidth = await page.evaluate(() => document.body.scrollWidth);
   const viewportWidth = await page.evaluate(() => window.innerWidth);

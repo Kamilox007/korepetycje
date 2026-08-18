@@ -17,7 +17,7 @@ Wersja produkcyjna: <https://panel.kamilkrzywon.pl>
 | Baza | SQLite |
 | Uwierzytelnianie | JWT (HS256) w ciasteczku httpOnly, hasła haszowane bcryptem |
 | Ochrona logowania | slowapi (limit per IP) + blokada konta w bazie |
-| Frontend | React 18, Vite 6, CSS bez frameworka |
+| Frontend | React 18, React Router 7, Vite 6, CSS bez frameworka |
 | Testy | skrypty regresji (backend) + Playwright (end-to-end) |
 | Wdrożenie | Docker Compose: `api` + `web` (Caddy) + `litestream` |
 | TLS | Let's Encrypt przez Caddy, odnawiany automatycznie |

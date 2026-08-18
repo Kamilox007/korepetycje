@@ -92,6 +92,10 @@ label { font-size: 12px; color: var(--ink-soft); display: block; margin-bottom: 
   text-align: left;
   border: none;
   background: transparent;
+  /* The sidebar entries are <a> now (NavLink), so the anchor defaults have to
+     be cleared; buttons in the same list stay unaffected. */
+  text-decoration: none;
+  cursor: pointer;
   padding: 9px 12px;
   border-radius: var(--radius-sm);
   color: var(--ink-soft);

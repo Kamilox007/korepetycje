@@ -7,8 +7,9 @@ import {
   DAYS_PL, MONTHS_PL, parseISO, pyWeekday, fmtTime, toISODate, addDays,
 } from "./dates";
 
-export default function TutorPanel() {
-  const [tab, setTab] = usePersistentState("tutor_tab", "lessons");
+export default function TutorPanel({ section = "lessons" }) {
+  // Which section is shown comes from the URL now; the sidebar links switch it.
+  const tab = section;
   const [lessons, setLessons] = useState([]);
   const [avail, setAvail] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -77,17 +78,7 @@ export default function TutorPanel() {
     <div>
       <div className="page-head">
         <h1>Moje zajęcia</h1>
-        <div className="view-switch">
-          {[
-            { id: "lessons", label: "Zajęcia" },
-            { id: "requests", label: pendingCount > 0 ? `Prośby (${pendingCount})` : "Prośby" },
-            { id: "availability", label: "Dyspozycyjność" },
-          ].map((t) => (
-            <button key={t.id} className={`seg${tab === t.id ? " active" : ""}`} onClick={() => setTab(t.id)}>
-              {t.label}
-            </button>
-          ))}
-        </div>
+
       </div>
 
       {err && <div className="err">{err}</div>}

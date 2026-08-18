@@ -26,7 +26,7 @@ setup("login and forced password change", async ({ page }) => {
   await page.getByRole("button", { name: "Zapisz hasło" }).click();
 
   // Once the password is changed the app mounts the real panel.
-  await expect(page.getByRole("button", { name: "Kalendarz" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Kalendarz" })).toBeVisible();
 
   await page.context().storageState({ path: SESSION_FILE });
 });

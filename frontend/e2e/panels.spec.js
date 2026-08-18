@@ -30,6 +30,7 @@ test("the panel calendar switches between day, week and month", async ({ page })
 });
 
 test("navigating months keeps loading lessons", async ({ page }) => {
+  await page.goto("/");
   const name = "Cal Student";
   await addStudent(page, name);
 

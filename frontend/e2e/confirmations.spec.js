@@ -1,12 +1,14 @@
 import { test, expect } from "@playwright/test";
-import { tab, confirmDialog, addStudent } from "./helpers";
+import { tab, confirmDialog, addStudent, login } from "./helpers";
 
-test.beforeEach(async ({ page }) => {
+/** Every block but the logout one starts from the shared signed-in session. */
+async function openApp(page) {
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Kalendarz" })).toBeVisible();
-});
+  await expect(page.getByRole("link", { name: "Kalendarz" })).toBeVisible();
+}
 
 test.describe("deletion confirmations", () => {
+  test.beforeEach(async ({ page }) => openApp(page));
   test("archiving a student keeps their history and can be undone", async ({ page }) => {
     const name = "Anna Test";
     await addStudent(page, name);
@@ -160,6 +162,7 @@ test.describe("deletion confirmations", () => {
 });
 
 test.describe("nested dialogs", () => {
+  test.beforeEach(async ({ page }) => openApp(page));
   test("the lesson delete confirmation sits ABOVE the editor dialog", async ({ page }) => {
     const name = "Greg Lesson";
     await addStudent(page, name);
@@ -195,19 +198,8 @@ test.describe("nested dialogs", () => {
   });
 });
 
-test.describe("logout", () => {
-  test("clears the session server-side", async ({ page }) => {
-    await page.getByRole("button", { name: "Wyloguj" }).click();
-    await expect(page.getByRole("button", { name: "Zaloguj się" })).toBeVisible();
-
-    // A reload does not restore the session: the cookie was cleared by the
-    // backend, not merely dropped from browser memory.
-    await page.reload();
-    await expect(page.getByRole("button", { name: "Zaloguj się" })).toBeVisible();
-  });
-});
-
 test.describe("dialog dismissal", () => {
+  test.beforeEach(async ({ page }) => openApp(page));
   test("selecting text and releasing outside does not close the dialog", async ({ page }) => {
     // A click fires on the common ancestor of press and release, so dragging a
     // selection out of a field used to register as a backdrop click and throw
@@ -247,5 +239,25 @@ test.describe("dialog dismissal", () => {
 
     await page.keyboard.press("Escape");
     await expect(page.locator(".modal")).toHaveCount(0);
+  });
+});
+
+test.describe("logout", () => {
+  // Starts signed out on purpose. Logging out revokes the session row in the
+  // database, so reusing the shared storageState here would kill it for every
+  // test that runs afterwards.
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test("clears the session server-side", async ({ page }) => {
+    await login(page);
+    await expect(page.getByRole("link", { name: "Kalendarz" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Wyloguj" }).click();
+    await expect(page.getByRole("button", { name: "Zaloguj się" })).toBeVisible();
+
+    // A reload does not restore the session: the cookie was cleared by the
+    // backend, not merely dropped from browser memory.
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Zaloguj się" })).toBeVisible();
   });
 });

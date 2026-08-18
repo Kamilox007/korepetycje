@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { usePersistentState } from "./usePersistentState";
 import { api, setUnauthorizedHandler } from "./api";
 import Login from "./Login";
@@ -15,14 +16,29 @@ import StudentPanel from "./StudentPanel";
 
 // Staff tabs (admin + secretary). Users is visible to both, but a secretary
 // will not see staff accounts there; the backend filters them out.
+//
+// Paths are in Polish to match the labels: an address a parent might be sent
+// should read the same as the tab it opens.
 const STAFF_TABS = [
-  { id: "calendar", label: "Kalendarz" },
-  { id: "students", label: "Uczniowie" },
-  { id: "payments", label: "Płatności" },
-  { id: "summary", label: "Podsumowanie" },
-  { id: "requests", label: "Prośby" },
-  { id: "subjects", label: "Przedmioty" },
-  { id: "users", label: "Użytkownicy" },
+  { path: "/kalendarz", label: "Kalendarz" },
+  { path: "/uczniowie", label: "Uczniowie" },
+  { path: "/platnosci", label: "Płatności" },
+  { path: "/podsumowanie", label: "Podsumowanie" },
+  { path: "/prosby", label: "Prośby" },
+  { path: "/przedmioty", label: "Przedmioty" },
+  { path: "/uzytkownicy", label: "Użytkownicy" },
+];
+
+const TUTOR_TABS = [
+  { path: "/zajecia", label: "Zajęcia" },
+  { path: "/prosby", label: "Prośby" },
+  { path: "/dyspozycyjnosc", label: "Dyspozycyjność" },
+];
+
+const STUDENT_TABS = [
+  { path: "/zajecia", label: "Zajęcia" },
+  { path: "/platnosci", label: "Płatności" },
+  { path: "/prosby", label: "Prośby" },
 ];
 
 export default function App() {
@@ -30,6 +46,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [forcePw, setForcePw] = useState(false);
   const [showPw, setShowPw] = useState(false);
+  // Pending reschedule requests, shown as a badge next to the tutor's Prośby tab.
+  const [pending, setPending] = useState(0);
 
   useEffect(() => {
     setUnauthorizedHandler(() => setAuth(null));
@@ -62,6 +80,13 @@ export default function App() {
     setAuth(null);
   }
 
+  useEffect(() => {
+    if (auth?.role !== "tutor") return;
+    api.tutorReschedule()
+      .then((rs) => setPending(rs.filter((r) => r.status === "pending").length))
+      .catch(() => {});
+  }, [auth]);
+
   if (loading) return <div className="empty" style={{ marginTop: 80 }}>Ładowanie…</div>;
   if (!auth) return <Login onLogin={handleLogin} />;
 
@@ -76,14 +101,34 @@ export default function App() {
   return (
     <>
       {isStaff && <StaffShell auth={auth} onLogout={logout} onChangePassword={() => setShowPw(true)} />}
-      {auth.role === "tutor" && <RoleShell auth={auth} onLogout={logout} onChangePassword={() => setShowPw(true)} subtitle="panel korepetytora"><TutorPanel /></RoleShell>}
-      {auth.role === "student" && <RoleShell auth={auth} onLogout={logout} onChangePassword={() => setShowPw(true)} subtitle="panel ucznia"><StudentPanel /></RoleShell>}
+      {auth.role === "tutor" && (
+        <RoleShell auth={auth} onLogout={logout} onChangePassword={() => setShowPw(true)}
+                   subtitle="panel korepetytora" tabs={TUTOR_TABS} badge={pending}>
+          <Routes>
+            <Route path="/zajecia" element={<TutorPanel section="lessons" />} />
+            <Route path="/prosby" element={<TutorPanel section="requests" />} />
+            <Route path="/dyspozycyjnosc" element={<TutorPanel section="availability" />} />
+            <Route path="*" element={<Navigate to="/zajecia" replace />} />
+          </Routes>
+        </RoleShell>
+      )}
+      {auth.role === "student" && (
+        <RoleShell auth={auth} onLogout={logout} onChangePassword={() => setShowPw(true)}
+                   subtitle="panel ucznia" tabs={STUDENT_TABS}>
+          <Routes>
+            <Route path="/zajecia" element={<StudentPanel section="lessons" />} />
+            <Route path="/platnosci" element={<StudentPanel section="payments" />} />
+            <Route path="/prosby" element={<StudentPanel section="requests" />} />
+            <Route path="*" element={<Navigate to="/zajecia" replace />} />
+          </Routes>
+        </RoleShell>
+      )}
       {showPw && <ChangePassword onClose={() => setShowPw(false)} onDone={() => setShowPw(false)} />}
     </>
   );
 }
 
-function Sidebar({ auth, subtitle, onLogout, onChangePassword, tabs, activeTab, setTab, badge }) {
+function Sidebar({ auth, subtitle, onLogout, onChangePassword, tabs, badge }) {
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -91,10 +136,16 @@ function Sidebar({ auth, subtitle, onLogout, onChangePassword, tabs, activeTab, 
         <small>{subtitle}</small>
       </div>
       {tabs.map((t) => (
-        <button key={t.id} className={`nav-item${activeTab === t.id ? " active" : ""}`} onClick={() => setTab(t.id)}>
+        // NavLink renders an <a>, so the browser back button, bookmarks and
+        // middle-click all work the way people expect them to.
+        <NavLink
+          key={t.path}
+          to={t.path}
+          className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
+        >
           <span>{t.label}</span>
-          {t.id === "requests" && badge > 0 && <span className="nav-badge">{badge}</span>}
-        </button>
+          {t.path === "/prosby" && badge > 0 && <span className="nav-badge">{badge}</span>}
+        </NavLink>
       ))}
       <div className="spacer" />
       <div className="sidebar-user">
@@ -107,17 +158,18 @@ function Sidebar({ auth, subtitle, onLogout, onChangePassword, tabs, activeTab, 
 }
 
 // Simple shell for roles without tabs (tutor, student)
-function RoleShell({ auth, subtitle, onLogout, onChangePassword, children }) {
+function RoleShell({ auth, subtitle, onLogout, onChangePassword, tabs = [], badge = 0, children }) {
   return (
     <div className="app">
-      <Sidebar auth={auth} subtitle={subtitle} onLogout={onLogout} onChangePassword={onChangePassword} onChangePassword={onChangePassword} tabs={[]} activeTab="" setTab={() => {}} badge={0} />
+      <Sidebar auth={auth} subtitle={subtitle} onLogout={onLogout}
+               onChangePassword={onChangePassword} tabs={tabs} badge={badge} />
       <main className="main">{children}</main>
     </div>
   );
 }
 
 function StaffShell({ auth, onLogout, onChangePassword }) {
-  const [tab, setTab] = usePersistentState("staff_tab", "calendar");
+  const location = useLocation();
   const [students, setStudents] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [pending, setPending] = useState(0);
@@ -130,22 +182,26 @@ function StaffShell({ auth, onLogout, onChangePassword }) {
   useEffect(() => { loadStudents(); }, [loadStudents]);
   useEffect(() => {
     api.listReschedule().then((rs) => setPending(rs.filter((r) => r.status === "pending").length)).catch(() => {});
-  }, [refreshKey, tab]);
+  }, [refreshKey, location.pathname]);
 
   const subtitle = auth.role === "admin" ? "panel administratora" : "panel sekretariatu";
 
   return (
     <div className="app">
-      <Sidebar auth={auth} subtitle={subtitle} onLogout={onLogout} onChangePassword={onChangePassword}
-        tabs={STAFF_TABS} activeTab={tab} setTab={setTab} badge={pending} />
+      <Sidebar auth={auth} subtitle={subtitle} onLogout={onLogout}
+               onChangePassword={onChangePassword} tabs={STAFF_TABS} badge={pending} />
       <main className="main">
-        {tab === "calendar" && <Calendar students={students} onChanged={refresh} />}
-        {tab === "students" && <Students students={students} reload={refresh} />}
-        {tab === "payments" && <Payments students={students} reload={refresh} />}
-        {tab === "summary" && <Summary refreshKey={refreshKey} />}
-        {tab === "requests" && <Requests reload={refresh} />}
-        {tab === "subjects" && <Subjects />}
-        {tab === "users" && <Users myRole={auth.role} />}
+        <Routes>
+          <Route path="/kalendarz" element={<Calendar students={students} onChanged={refresh} />} />
+          <Route path="/uczniowie" element={<Students students={students} reload={refresh} />} />
+          <Route path="/platnosci" element={<Payments students={students} reload={refresh} />} />
+          <Route path="/podsumowanie" element={<Summary refreshKey={refreshKey} />} />
+          <Route path="/prosby" element={<Requests reload={refresh} />} />
+          <Route path="/przedmioty" element={<Subjects />} />
+          <Route path="/uzytkownicy" element={<Users myRole={auth.role} />} />
+          {/* Anything else, including "/", lands on the calendar. */}
+          <Route path="*" element={<Navigate to="/kalendarz" replace />} />
+        </Routes>
       </main>
     </div>
   );
