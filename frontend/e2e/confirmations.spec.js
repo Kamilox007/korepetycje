@@ -206,3 +206,46 @@ test.describe("logout", () => {
     await expect(page.getByRole("button", { name: "Zaloguj się" })).toBeVisible();
   });
 });
+
+test.describe("dialog dismissal", () => {
+  test("selecting text and releasing outside does not close the dialog", async ({ page }) => {
+    // A click fires on the common ancestor of press and release, so dragging a
+    // selection out of a field used to register as a backdrop click and throw
+    // away everything typed.
+    await page.goto("/");
+    await tab(page, "Uczniowie").click();
+    await page.getByRole("button", { name: "+ Uczeń" }).click();
+
+    const field = page.getByLabel("Imię i nazwisko");
+    await field.fill("Drag Select");
+
+    const box = await field.boundingBox();
+    await page.mouse.move(box.x + box.width - 5, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x - 400, box.y + box.height / 2, { steps: 10 });
+    await page.mouse.up();
+
+    await expect(page.locator(".modal")).toBeVisible();
+    await expect(field).toHaveValue("Drag Select");
+  });
+
+  test("a genuine backdrop click still closes it", async ({ page }) => {
+    await page.goto("/");
+    await tab(page, "Uczniowie").click();
+    await page.getByRole("button", { name: "+ Uczeń" }).click();
+    await expect(page.locator(".modal")).toBeVisible();
+
+    await page.locator(".overlay").click({ position: { x: 5, y: 5 } });
+    await expect(page.locator(".modal")).toHaveCount(0);
+  });
+
+  test("Escape closes it", async ({ page }) => {
+    await page.goto("/");
+    await tab(page, "Uczniowie").click();
+    await page.getByRole("button", { name: "+ Uczeń" }).click();
+    await expect(page.locator(".modal")).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".modal")).toHaveCount(0);
+  });
+});
