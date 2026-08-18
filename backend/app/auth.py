@@ -1,4 +1,5 @@
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -31,6 +32,10 @@ PASSWORD_RESET_EXPIRE_MINUTES = 30
 MAX_FAILED_LOGINS = 5
 LOCKOUT_MINUTES = 15
 
+# How often last_seen_at may be rewritten. Sorting a device list does not need
+# second-level accuracy, and every write locks the SQLite file.
+LAST_SEEN_THROTTLE_SECONDS = 300
+
 # Hash compared when the login does not exist, to even out response time.
 # Without it a missing user answers instantly while an existing one answers
 # after ~100 ms of bcrypt, which lets an attacker enumerate valid logins.
@@ -50,16 +55,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login", auto_error=False
 COOKIE_NAME = "korepetycje_session"
 
 
-def set_session_cookie(response: Response, user: models.User) -> None:
-    """Issue the token in a cookie that JavaScript cannot reach."""
-    minutes = (
-        PASSWORD_RESET_EXPIRE_MINUTES
-        if user.must_change_password
-        else TOKEN_EXPIRE_MINUTES
-    )
+def set_session_cookie(
+    response: Response, user: models.User, token: str, minutes: int
+) -> None:
+    """Put an already-issued token into a cookie JavaScript cannot reach."""
     response.set_cookie(
         key=COOKIE_NAME,
-        value=create_access_token(user),
+        value=token,
         max_age=minutes * 60,
         httponly=True,
         # Without HTTPS the browser would reject a Secure cookie; dev runs on HTTP.
@@ -91,20 +93,80 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
-def create_access_token(user: models.User) -> str:
-    minutes = (
+def token_lifetime(user: models.User) -> int:
+    """Minutes a token issued to this user should live."""
+    return (
         PASSWORD_RESET_EXPIRE_MINUTES
         if user.must_change_password
         else TOKEN_EXPIRE_MINUTES
     )
-    expire = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+
+
+def create_access_token(user: models.User, jti: str | None = None) -> str:
+    """Issue a signed token. `jti` ties it to a row in `sessions`.
+
+    Tokens without a jti are rejected by get_current_user: a session that cannot
+    be revoked is exactly what this mechanism exists to remove.
+    """
+    expire = datetime.now(timezone.utc) + timedelta(minutes=token_lifetime(user))
     payload = {
         "sub": str(user.id),
         "role": user.role,
         "username": user.username,
+        "jti": jti or secrets.token_urlsafe(16),
         "exp": expire,
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def open_session(db: Session, user: models.User, request: Request | None = None) -> str:
+    """Record a new session and return the token bound to it."""
+    jti = secrets.token_urlsafe(16)
+    now = utcnow()
+    db.add(models.Session(
+        jti=jti,
+        user_id=user.id,
+        created_at=now,
+        last_seen_at=now,
+        expires_at=now + timedelta(minutes=token_lifetime(user)),
+        user_agent=(request.headers.get("user-agent") or "")[:300] if request else None,
+        ip=(request.client.host if request and request.client else None),
+    ))
+    db.commit()
+    return create_access_token(user, jti=jti)
+
+
+def revoke_session(db: Session, jti: str) -> None:
+    row = db.get(models.Session, jti)
+    if row and row.revoked_at is None:
+        row.revoked_at = utcnow()
+        db.commit()
+
+
+def revoke_user_sessions(db: Session, user_id: int, keep_jti: str | None = None) -> int:
+    """Revoke every session of a user, optionally sparing the current one.
+
+    Called on password change: the point is that someone who learned the password
+    loses access immediately, rather than in up to seven days.
+    """
+    q = db.query(models.Session).filter(
+        models.Session.user_id == user_id,
+        models.Session.revoked_at.is_(None),
+    )
+    if keep_jti:
+        q = q.filter(models.Session.jti != keep_jti)
+    n = q.update({models.Session.revoked_at: utcnow()}, synchronize_session=False)
+    db.commit()
+    return n
+
+
+def purge_expired_sessions(db: Session) -> int:
+    """Drop rows for tokens that expired anyway. Called from the cron endpoint."""
+    n = db.query(models.Session).filter(
+        models.Session.expires_at < utcnow()
+    ).delete(synchronize_session=False)
+    db.commit()
+    return n
 
 
 def get_current_user(
@@ -128,14 +190,30 @@ def get_current_user(
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
-        if user_id is None:
+        jti = payload.get("jti")
+        if user_id is None or jti is None:
             raise cred_exc
     except JWTError:
+        raise cred_exc
+
+    # A valid signature is no longer enough: the session must still be open.
+    # This is what makes a password change end sessions on other devices.
+    sess = db.get(models.Session, jti)
+    if sess is None or sess.revoked_at is not None:
         raise cred_exc
 
     user = db.get(models.User, int(user_id))
     if user is None:
         raise cred_exc
+
+    # Throttled write: precision to the minute is enough and SQLite locks the
+    # file on every write.
+    now = utcnow()
+    if (now - sess.last_seen_at).total_seconds() > LAST_SEEN_THROTTLE_SECONDS:
+        sess.last_seen_at = now
+        db.commit()
+
+    request.state.jti = jti
     return user
 
 

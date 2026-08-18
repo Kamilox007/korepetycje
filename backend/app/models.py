@@ -236,3 +236,27 @@ class Subject(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     color: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
+
+class Session(Base):
+    """A record of an issued token, so that sessions can be revoked.
+
+    JWTs are stateless: without this table a token stays valid until it expires,
+    which means changing a password does not end sessions open elsewhere. Every
+    request checks that its `jti` is still here and not revoked.
+    """
+    __tablename__ = "sessions"
+
+    jti: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    # Throttled: rewritten at most once every few minutes, not on every request.
+    # SQLite locks the file on write and the WAL stream would grow for nothing.
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    user_agent: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # NULL means active. Set on logout and on password change.
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

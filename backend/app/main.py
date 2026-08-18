@@ -128,10 +128,11 @@ def login(
     db: Session = Depends(get_db),
 ):
     user = auth.authenticate(db, form.username, form.password)
-    auth.set_session_cookie(response, user)
+    # One token per login, recorded in `sessions` so it can be revoked later.
     # The token also comes back in the body, for /docs, curl and cron jobs.
     # Browsers ignore it and use the cookie instead.
-    token = auth.create_access_token(user)
+    token = auth.open_session(db, user, request)
+    auth.set_session_cookie(response, user, token, auth.token_lifetime(user))
     return schemas.LoginOut(
         access_token=token,
         role=user.role,
@@ -165,15 +166,32 @@ def change_password(
     user.must_change_password = False
     db.commit()
     db.refresh(user)
-    # the account held a short-lived token: issue a full one so the user stays in
-    auth.set_session_cookie(response, user)
-    return {"ok": True, "access_token": auth.create_access_token(user)}
+    # Everything else this account had open dies now. Someone who learned the old
+    # password loses access immediately instead of in up to seven days.
+    auth.revoke_user_sessions(db, user.id)
+
+    # The account held a short-lived token; issue a full one so the user stays in.
+    token = auth.open_session(db, user, request)
+    auth.set_session_cookie(response, user, token, auth.token_lifetime(user))
+    return {"ok": True, "access_token": token}
 
 
 @app.post("/api/auth/logout")
-def logout(response: Response):
-    """Clear the session cookie. Without this, logging out in the browser would be
-    cosmetic: an httponly cookie cannot be removed from JavaScript."""
+def logout(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(auth.get_current_user),
+):
+    """Revoke this session and clear the cookie.
+
+    Clearing the cookie alone would be cosmetic in two ways: an httponly cookie
+    cannot be removed from JavaScript, and the token itself would stay valid
+    until it expired. Revoking the session closes both.
+    """
+    jti = getattr(request.state, "jti", None)
+    if jti:
+        auth.revoke_session(db, jti)
     auth.clear_session_cookie(response)
     return {"ok": True}
 
@@ -503,9 +521,18 @@ def health():
 def generate_lessons(
     user: models.User = Depends(auth.require_staff), db: Session = Depends(get_db)
 ):
-    """Top up missing series occurrences. Meant to be called from cron once a day."""
+    """Top up missing series occurrences. Meant to be called from cron once a day.
+
+    Also drops session rows whose tokens have expired anyway; piggybacking on the
+    existing daily job avoids a second scheduled task.
+    """
     created = services.regenerate_all(db)
-    return {"created": created, "horizon": services.clamp_horizon(None)}
+    purged = auth.purge_expired_sessions(db)
+    return {
+        "created": created,
+        "horizon": services.clamp_horizon(None),
+        "sessions_purged": purged,
+    }
 
 
 @app.get("/api/lessons", response_model=list[schemas.LessonOut])
