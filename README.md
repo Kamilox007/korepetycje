@@ -33,15 +33,22 @@ Wersja produkcyjna: <https://panel.kamilkrzywon.pl>
 | `student` | własne zajęcia, saldo, historia wpłat, prośby o przesunięcie |
 
 ### Korepetytor i sekretariat
-- Kalendarz: widok dzienny, tygodniowy i miesięczny
+- Kalendarz: widok dzienny, tygodniowy i miesięczny, z przenoszeniem zajęć
 - Uczniowie, przedmioty, stawki, zajęcia cykliczne
+- Edycja serii z kontrolowaną propagacją zmian na istniejące zajęcia
 - Oznaczanie odbycia i odwołania zajęć
-- Wpłaty i podsumowanie salda per uczeń
-- Zakładanie kont uczniom (login + hasło startowe)
+- Wpłaty z korektą kwoty, daty, wpłacającego i notatki
+- Podsumowanie salda per uczeń
+- Zakładanie kont uczniom i reset hasła kont personelu
+- Archiwizacja uczniów z zachowaniem historii rozliczeń
 - Akceptacja próśb o przesunięcie zajęć
 
+Korepetytor widzi wyłącznie zajęcia przypisane do siebie: własny kalendarz
+z tymi samymi trzema widokami, przenoszenie zajęć na inny dzień i godzinę oraz
+rozpatrywanie próśb swoich uczniów.
+
 ### Uczeń
-- Terminarz własnych zajęć i saldo (tylko do odczytu)
+- Kalendarz własnych zajęć (dzień, tydzień, miesiąc) i saldo — tylko do odczytu
 - Prośby o przesunięcie — termin zmienia się dopiero po akceptacji
 - Podpowiadane wolne terminy na podstawie dostępności korepetytora
 
@@ -96,10 +103,6 @@ Wygenerowaną rewizję **zawsze przejrzyj przed uruchomieniem**. Autogenerate ni
 wykrywa zmian nazw (widzi je jako drop + add, czyli utratę danych) i bywa zbyt
 gorliwy przy typach.
 
-Istniejąca baza sprzed wprowadzenia Alembica: uruchom raz
-`python bootstrap_alembic.py` — skrypt uzupełnia braki, oznacza bazę jako `0001`
-i dociąga resztę, po drodze robiąc kopię.
-
 ### Historia rewizji
 
 | Rewizja | Zawartość |
@@ -108,6 +111,8 @@ i dociąga resztę, po drodze robiąc kopię.
 | `0002` | indeksy na kolumnach faktycznie filtrowanych |
 | `0003` | unikalność slotu serii (`series_id`, `origin_date`) |
 | `0004` | kwoty jako liczby całkowite w groszach |
+| `0005` | rejestr sesji (unieważnianie tokenów) |
+| `0006` | miękkie usuwanie uczniów (`archived_at`) |
 
 ## Konfiguracja
 
@@ -199,6 +204,11 @@ python test_migrations.py         # cykl migracji, blokada startu na starym sche
 python test_series_generator.py   # unikalność slotu, klamra horyzontu, GET bez zapisu
 python test_money.py              # arytmetyka w groszach, zamrożona stawka
 python test_cookie_session.py     # sesja w ciasteczku httpOnly, wylogowanie
+python test_sessions.py           # rejestr sesji, unieważnianie przy zmianie hasła
+python test_soft_delete.py        # archiwizacja ucznia, przywracanie, usunięcie trwałe
+python test_password_reset.py     # reset hasła konta personelu
+python test_series_update.py      # edycja serii i reguły propagacji na zajęcia
+python test_payment_edit.py       # korekta wpłaty
 ```
 
 Każdy zestaw pracuje na własnej bazie w katalogu tymczasowym i nie dotyka bazy
@@ -276,12 +286,36 @@ generuje `useId()`, bo część formularzy bywa otwarta jednocześnie i statyczn
 przeznaczenie pola, kliknięcie w etykietę ustawia w nim kursor, a testy
 chwytają pola po widocznym tekście zamiast po strukturze HTML.
 
+**Edycja serii propaguje się zależnie od rodzaju pola.** Metadane (przedmiot,
+poziom, prowadzący) trafiają na wszystkie przyszłe zajęcia, także te ręcznie
+przesunięte — opisują, czym zajęcia są, niezależnie od terminu. Zmiana terminu
+pomija zajęcia z ręcznie zmienioną datą, bo cofnęłaby czyjąś decyzję. Cena idzie
+na przyszłe; odbyte zachowują stawkę zamrożoną w momencie odbycia.
+
+**Usunięcie ucznia archiwizuje, nie kasuje.** `cascade delete` na wpłatach
+oznaczał, że jedno kliknięcie niszczyło historię rozliczeń. Archiwizacja ukrywa
+ucznia i kasuje jego konto oraz przyszłe nieodbyte zajęcia, ale zostawia zajęcia
+odbyte i wpłaty. Trwałe usunięcie jest osobnym endpointem — tylko admin, tylko
+dla zarchiwizowanego ucznia — bo art. 17 RODO wymaga, żeby dało się je wykonać.
+
+**Sesje są rejestrowane w bazie.** JWT są bezstanowe, więc bez tabeli `sessions`
+zmiana hasła nie kończyłaby sesji otwartych gdzie indziej. Każde żądanie
+sprawdza, czy `jti` z tokenu nadal ma otwartą sesję. Koszt to jedno zapytanie na
+żądanie — przy tej skali nieodczuwalny, a alternatywa (krótkie tokeny dostępowe
+z refresh tokenem) opóźniałaby unieważnienie o kilkanaście minut i dokładała
+kolejkowanie odświeżeń po stronie przeglądarki.
+
+**Okno modalne zamyka się tylko przy prawdziwym kliknięciu w tło.** Zdarzenie
+`click` wypada na wspólnym przodku wciśnięcia i puszczenia, więc zaznaczenie
+tekstu w polu i puszczenie poza oknem rejestrowało się jako kliknięcie w tło
+i kasowało wypełniony formularz.
+
 ## Model danych
 
 | Tabela | Zawartość |
 |---|---|
 | `users` | konta logowania, rola, licznik nieudanych prób, blokada |
-| `students` | uczniowie, stawka domyślna, powiązanie z kontem |
+| `students` | uczniowie, stawka domyślna, powiązanie z kontem, `archived_at` |
 | `subjects` | przedmioty |
 | `lesson_series` | definicje zajęć cyklicznych |
 | `lessons` | pojedyncze wystąpienia, cena zamrożona, status |
@@ -289,6 +323,7 @@ chwytają pola po widocznym tekście zamiast po strukturze HTML.
 | `payments` | wpłaty |
 | `reschedule_requests` | prośby o przesunięcie |
 | `availability` | dostępność korepetytora |
+| `sessions` | wydane tokeny, do unieważniania sesji |
 
 ## Backup
 
@@ -306,18 +341,3 @@ docker run --rm -v ./restore:/out \
 
 Ostatni argument to ścieżka bazy, po której Litestream odnajduje wpis
 w konfiguracji — nie adres repliki. Podanie obu naraz kończy się błędem.
-
-## Znany dług techniczny
-
-- Kolumny `tutor_id` na `students`/`lessons`/`payments` nie są używane do
-  filtrowania — trzymają autora rekordu, nie właściciela
-- `cascade="all, delete-orphan"` na `Student.payments` kasuje historię wpłat
-  razem z uczniem; docelowo miękkie usuwanie
-- Zmiana hasła nie unieważnia sesji otwartych na innych urządzeniach — JWT są
-  bezstanowe, brak rejestru aktywnych sesji i wylogowania zdalnego
-- `_summary_for_students` ładuje relacje do Pythona zamiast liczyć `GROUP BY`
-- Frontend bez routera (nawigacja w stanie) i bez TypeScriptu; `Calendar.jsx`
-  wymaga rozbicia
-- Wybór koloru (`ColorPicker`, kafelki w Przedmiotach) to klikalne `<span>` —
-  niedostępne z klawiatury i bez semantyki grupy wyboru
-- Brak `PATCH /api/series` — zmiana ceny cyklu wymaga skasowania i odtworzenia
