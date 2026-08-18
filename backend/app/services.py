@@ -5,15 +5,15 @@ from sqlalchemy.orm import Session
 
 from . import models
 
-# Do jak dawna w przód materializujemy wystąpienia serii.
+# How far ahead we materialise series occurrences.
 DEFAULT_HORIZON_DAYS = 120
-# Twardy limit — bez niego klient mógłby poprosić o ?end=2099-01-01
-# i kazać wygenerować tysiące wierszy na serię.
+# Hard ceiling: without it a client could ask for ?end=2099-01-01 and have us
+# generate thousands of rows per series.
 MAX_HORIZON_DAYS = 400
 
 
 def clamp_horizon(end: date | None) -> date:
-    """Horyzont generowania, ograniczony niezależnie od tego, o co poprosi klient."""
+    """Generation horizon, clamped regardless of what the client asks for."""
     today = date.today()
     requested = end or (today + timedelta(days=DEFAULT_HORIZON_DAYS))
     return min(requested, today + timedelta(days=MAX_HORIZON_DAYS))
@@ -24,25 +24,25 @@ def generate_lessons_for_series(
     series: models.LessonSeries,
     until: date,
 ) -> int:
-    """Tworzy pojedyncze wystąpienia (Lesson) dla serii aż do daty `until`.
+    """Create individual occurrences (Lesson) for a series up to `until`.
 
-    Każde wystąpienie ma `origin_date` = pierwotną datę slotu w serii, która
-    NIE zmienia się przy przesunięciu zajęć. Dzięki temu generator pomija sloty,
-    które już raz utworzył — nawet jeśli potem przesunięto im datę lub je usunięto.
-    Sloty zapisane w SeriesSkip (usunięte przez użytkownika) nie są odtwarzane.
-    Zwraca liczbę nowo utworzonych zajęć.
+    Every occurrence carries `origin_date`, the original slot date in the series,
+    which does NOT change when the lesson is rescheduled. That lets the generator
+    skip slots it already created, even if their date was later moved or the
+    lesson deleted. Slots recorded in SeriesSkip (removed by the user) are not
+    recreated. Returns the number of lessons created.
     """
     end = series.end_date or until
     horizon = min(end, until)
     if horizon < series.start_date:
         return 0
 
-    # pierwszy dzień >= start_date o właściwym dniu tygodnia
+    # first day >= start_date landing on the right weekday
     current = series.start_date
     days_ahead = (series.weekday - current.weekday()) % 7
     current = current + timedelta(days=days_ahead)
 
-    # pierwotne daty slotów, które już istnieją jako wystąpienia tej serii
+    # original slot dates that already exist as occurrences of this series
     existing_origins = {
         l.origin_date
         for l in db.query(models.Lesson)
@@ -51,7 +51,7 @@ def generate_lessons_for_series(
         if l.origin_date is not None
     }
 
-    # sloty skreślone (usunięte) — nie odtwarzać
+    # slots struck out (deleted): do not recreate
     skipped = {
         s.skip_date
         for s in db.query(models.SeriesSkip)
@@ -80,9 +80,9 @@ def generate_lessons_for_series(
             pending.append(lesson)
         current += timedelta(days=7)
 
-    # Zapis pojedynczo: jeśli równoległe żądanie zdążyło utworzyć ten sam slot,
-    # unique constraint go odrzuci, a my po prostu idziemy dalej zamiast
-    # wywracać całą operację.
+    # Insert one at a time: if a concurrent request already created the same
+    # slot, the unique constraint rejects it and we simply move on instead of
+    # failing the whole operation.
     for lesson in pending:
         try:
             with db.begin_nested():
@@ -96,10 +96,10 @@ def generate_lessons_for_series(
 
 
 def regenerate_all(db: Session, until: date | None = None, tutor_id: int | None = None) -> int:
-    """Generuje brakujące zajęcia dla aktywnych serii (opcjonalnie jednego korepetytora).
+    """Generate missing lessons for active series (optionally for one tutor).
 
-    Operacja zapisująca — NIE wołać z handlerów GET. Uruchamiana przy starcie
-    aplikacji, po zmianie serii oraz z endpointu konserwacyjnego (cron).
+    A write operation: do NOT call it from GET handlers. Runs at application
+    start, after a series changes, and from the maintenance endpoint (cron).
     """
     until = clamp_horizon(until)
     total = 0
@@ -114,7 +114,7 @@ def regenerate_all(db: Session, until: date | None = None, tutor_id: int | None 
 
 
 def _to_min(t) -> int:
-    """time -> minuty od północy."""
+    """time -> minutes since midnight."""
     return t.hour * 60 + t.minute
 
 
@@ -123,35 +123,35 @@ def _fmt(m: int) -> str:
 
 
 def subtract_busy(window_start: int, window_end: int, busy: list[tuple[int, int]]) -> list[tuple[int, int]]:
-    """Odejmuje zajęte przedziały (w minutach) od okna [start,end].
-    Zwraca listę wolnych podprzedziałów."""
+    """Subtract busy intervals (in minutes) from the window [start, end].
+    Returns the list of free sub-intervals."""
     free = [(window_start, window_end)]
     for bs, be in busy:
         new_free = []
         for fs, fe in free:
-            # brak nakładania
+            # no overlap
             if be <= fs or bs >= fe:
                 new_free.append((fs, fe))
                 continue
-            # przycięcie
+            # trim
             if bs > fs:
                 new_free.append((fs, min(bs, fe)))
             if be < fe:
                 new_free.append((max(be, fs), fe))
         free = new_free
-    # usuń puste/za krótkie (<1 min)
+    # drop empty or too-short intervals (<1 min)
     return [(s, e) for s, e in free if e - s >= 1]
 
 
 def free_windows_for_tutor(db, tutor_id: int, start_date, days_ahead: int = 14,
                            duration_min: int = 60, exclude_lesson_id: int | None = None,
                            step_min: int = 30):
-    """Dla każdego dnia w zakresie zwraca:
-    - windows: wolne okna dyspozycyjności (okna minus zajęcia korepetytora),
-    - slots: dozwolone godziny startu dla zajęć o długości `duration_min`
-      (start + czas trwania musi zmieścić się w wolnym przedziale).
-    `exclude_lesson_id` pomija konkretne zajęcia przy liczeniu zajętości
-    (te, które właśnie przesuwamy)."""
+    """For every day in the range returns:
+    - windows: free availability windows (windows minus the tutor's lessons),
+    - slots: allowed start times for a lesson lasting `duration_min`
+      (start + duration must fit inside a free interval).
+    `exclude_lesson_id` skips one specific lesson when computing busy time
+    (the one currently being rescheduled)."""
     from datetime import timedelta
     from . import models
 
@@ -194,7 +194,7 @@ def free_windows_for_tutor(db, tutor_id: int, start_date, days_ahead: int = 14,
                 free.append((fs, fe))
         if not free:
             continue
-        # godziny startu: start + duration musi zmieścić się w wolnym przedziale
+        # start times: start + duration must fit inside the free interval
         slots = []
         for fs, fe in sorted(free):
             cur = fs

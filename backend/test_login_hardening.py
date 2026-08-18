@@ -1,5 +1,5 @@
 """Regresja dla punktu 2: hardening logowania.
-Blokada konta, wyrównanie czasu odpowiedzi, CORS, wymuszony JWT_SECRET."""
+Account lockout, evened-out response time, CORS, enforced JWT_SECRET."""
 import os, sys, time, pathlib, importlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -24,57 +24,57 @@ def login(c, u, p):
 
 
 with TestClient(app) as c:
-    limiter.enabled = False  # limit IP testujemy osobno, niżej
+    limiter.enabled = False  # the IP limit is tested separately, below
 
-    # --- blokada konta po serii nieudanych prób ---
+    # --- account lockout after a run of failed attempts ---
     for i in range(auth.MAX_FAILED_LOGINS):
         r = login(c, "admin", f"zle{i}")
-        check(f"próba {i + 1}/{auth.MAX_FAILED_LOGINS} -> 401", r.status_code == 401)
+        check(f"attempt {i + 1}/{auth.MAX_FAILED_LOGINS} -> 401", r.status_code == 401)
 
     r = login(c, "admin", "zle-znowu")
-    check("po przekroczeniu limitu -> 429", r.status_code == 429)
-    check("odpowiedź zawiera Retry-After", "retry-after" in {k.lower() for k in r.headers})
+    check("over the limit -> 429", r.status_code == 429)
+    check("response carries Retry-After", "retry-after" in {k.lower() for k in r.headers})
 
     r = login(c, "admin", "admin")
-    check("poprawne hasło w trakcie blokady też -> 429", r.status_code == 429)
+    check("correct password during lockout also -> 429", r.status_code == 429)
 
-    # --- odblokowanie po upływie czasu ---
+    # --- unlocking once the time passes ---
     from app.database import SessionLocal
     from app import models
     db = SessionLocal()
     u = db.query(models.User).filter(models.User.username == "admin").first()
-    u.locked_until = auth.utcnow()  # symulacja wygaśnięcia blokady
+    u.locked_until = auth.utcnow()  # simulate the lockout expiring
     db.commit()
     db.close()
 
     r = login(c, "admin", "admin")
-    check("po wygaśnięciu blokady logowanie działa", r.status_code == 200)
+    check("login works once the lockout expires", r.status_code == 200)
 
-    # --- licznik zeruje się po sukcesie ---
+    # --- the counter resets after a success ---
     db = SessionLocal()
     u = db.query(models.User).filter(models.User.username == "admin").first()
-    check("failed_logins wyzerowane po sukcesie", u.failed_logins == 0)
-    check("locked_until wyczyszczone", u.locked_until is None)
+    check("failed_logins reset after success", u.failed_logins == 0)
+    check("locked_until cleared", u.locked_until is None)
     db.close()
 
-    # --- brak enumeracji loginów: ten sam komunikat i podobny czas ---
+    # --- no login enumeration: same message, comparable timing ---
     r_no = login(c, "nie-ma-takiego-loginu", "cokolwiek")
     r_bad = login(c, "admin", "zle-haslo")
-    check("nieistniejący login -> 401", r_no.status_code == 401)
-    check("identyczny komunikat dla obu przypadków",
+    check("unknown login -> 401", r_no.status_code == 401)
+    check("identical message in both cases",
           r_no.json()["detail"] == r_bad.json()["detail"])
 
     t0 = time.perf_counter(); login(c, "nie-ma-takiego-loginu", "x"); t_no = time.perf_counter() - t0
     t0 = time.perf_counter(); login(c, "admin", "x"); t_bad = time.perf_counter() - t0
     ratio = max(t_no, t_bad) / max(min(t_no, t_bad), 1e-6)
-    check(f"czasy odpowiedzi porównywalne (x{ratio:.1f}, {t_no*1000:.0f}ms vs {t_bad*1000:.0f}ms)",
+    check(f"response times comparable (x{ratio:.1f}, {t_no*1000:.0f}ms vs {t_bad*1000:.0f}ms)",
           ratio < 3)
 
     # --- rate limit po IP ---
     limiter.enabled = True
     limiter.reset()
     codes = [login(c, "ktokolwiek", "x").status_code for _ in range(12)]
-    check(f"limit IP odcina po ~10 próbach (kody: {codes.count(429)} x 429)", 429 in codes)
+    check(f"IP limit cuts in after ~10 attempts ({codes.count(429)} x 429)", 429 in codes)
     limiter.enabled = False
 
     # --- CORS ---
@@ -82,14 +82,14 @@ with TestClient(app) as c:
         "Origin": "https://zlosliwy.example.com",
         "Access-Control-Request-Method": "POST",
     })
-    check("obcy origin nie dostaje nagłówka CORS",
+    check("a foreign origin gets no CORS header",
           "access-control-allow-origin" not in {k.lower() for k in r.headers})
 
     r = c.options("/api/auth/login", headers={
         "Origin": "https://korepetycje.example.com",
         "Access-Control-Request-Method": "POST",
     })
-    check("skonfigurowany origin przechodzi",
+    check("the configured origin passes",
           r.headers.get("access-control-allow-origin") == "https://korepetycje.example.com")
 
 # --- JWT_SECRET wymagany poza dev ---
@@ -99,10 +99,10 @@ for m in [m for m in list(sys.modules) if m.startswith("app")]:
     del sys.modules[m]
 try:
     importlib.import_module("app.auth")
-    check("brak JWT_SECRET przy APP_ENV=prod zatrzymuje start", False)
+    check("missing JWT_SECRET under APP_ENV=prod stops startup", False)
 except RuntimeError as e:
-    check("brak JWT_SECRET przy APP_ENV=prod zatrzymuje start", "JWT_SECRET" in str(e))
+    check("missing JWT_SECRET under APP_ENV=prod stops startup", "JWT_SECRET" in str(e))
 
 print()
-print("NIEPOWODZENIA:", FAILS if FAILS else "brak")
+print("FAILURES:", FAILS if FAILS else "none")
 sys.exit(1 if FAILS else 0)

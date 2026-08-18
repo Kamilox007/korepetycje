@@ -1,4 +1,4 @@
-"""indeksy na kolumnach filtrowanych
+"""indexes on filtered columns
 
 Revision ID: 0002
 Revises: 0001

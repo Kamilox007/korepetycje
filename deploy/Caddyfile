@@ -1,17 +1,17 @@
-# DOMAIN pochodzi z .env. Caddy sam pobiera i odnawia certyfikat Let's Encrypt.
-# Jeśli DNS jeszcze nie wskazuje na serwer, podmień na :80 — wtedy działa po HTTP
-# bez certyfikatu, ale NIE zostawiaj tego na dłużej: token leci wtedy otwartym tekstem.
+# DOMAIN comes from .env. Caddy obtains and renews the Let's Encrypt certificate.
+# If DNS does not point here yet, swap this for :80 to serve plain HTTP without a
+# certificate. Do NOT leave it that way: the session token travels in the clear.
 {$DOMAIN} {
 	encode zstd gzip
 
-	# API — wszystko pod /api trafia do backendu
+	# API: everything under /api goes to the backend
 	handle /api/* {
 		reverse_proxy api:8000
 	}
 
-	# Frontend — reszta to pliki statyczne.
-	# try_files z fallbackiem na index.html jest konieczne dla SPA: bez tego
-	# odświeżenie strony na dowolnym adresie innym niż / zwróci 404.
+	# Frontend: everything else is a static file.
+	# try_files falling back to index.html is required for the SPA; without it,
+	# refreshing on any path other than / returns 404.
 	handle {
 		root * /srv
 		try_files {path} /index.html
@@ -19,8 +19,8 @@
 	}
 
 	header {
-		# HSTS — przeglądarka odmówi połączenia po HTTP przez rok.
-		# Włącz DOPIERO gdy HTTPS działa, bo cofnięcie jest bolesne.
+		# HSTS: the browser will refuse plain HTTP for a year.
+		# Enable this ONLY once HTTPS works; backing it out is painful.
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"

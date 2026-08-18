@@ -1,10 +1,10 @@
-# npm install odtwarza zależności w kontenerze
+# npm install rebuilds dependencies inside the container
 node_modules
 
-# Wynik poprzedniego builda — powstaje na nowo w warstwie budującej
+# Output of a previous build; regenerated in the build stage
 dist
 
-# Testy end-to-end nie biorą udziału w budowaniu
+# End-to-end tests take no part in the build
 e2e
 playwright.config.js
 test-results

@@ -1,22 +1,23 @@
-# Bazy danych — obraz nie może ich zawierać. DATABASE_URL wskazuje na /data,
-# ale COPY . . wciągnąłby plik do warstwy obrazu razem z danymi.
+# Databases must never end up in the image. DATABASE_URL points at /data, but
+# COPY . . would pull the file into an image layer along with its data.
+# The wildcard is *.db* on purpose: a name like korepetycje.db.old carries the
+# extension in the middle, which plain *.db would miss.
 *.db*
 *.backup-*.db
 
-# Środowiska i cache — pip odtwarza je w kontenerze od zera
+# Environments and caches: pip rebuilds them inside the container
 .venv
 venv
 __pycache__
 *.pyc
 .pytest_cache
 
-# Testy nie są uruchamiane w obrazie produkcyjnym
+# Tests are not run from the production image
 test_*.py
 testing_utils.py
 requirements-dev.txt
 
-# Skrypty deweloperskie
+# Development scripts
 run.sh
-bootstrap_alembic.py
 
 .env

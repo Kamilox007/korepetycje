@@ -1,14 +1,14 @@
-# Replikacja bazy SQLite. Litestream zapisuje strumień WAL do bucketa,
-# więc utrata serwera oznacza utratę sekund danych, nie doby.
+# SQLite replication. Litestream streams the WAL to a bucket, so losing the
+# server means losing seconds of data rather than a day.
 dbs:
   - path: /data/korepetycje.db
     replicas:
       - type: s3
-        # Backblaze B2 z S3-compatible API. Podmień bucket i region.
+        # Backblaze B2 via the S3-compatible API. Swap in your bucket and region.
         bucket: korepetycje-backup
         path: db
         endpoint: s3.eu-central-003.backblazeb2.com
         region: eu-central-003
-        # Ile historii trzymać. 720h = 30 dni.
+        # How much history to keep. 720h = 30 days.
         retention: 720h
         snapshot-interval: 24h

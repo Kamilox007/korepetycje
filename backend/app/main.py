@@ -15,9 +15,9 @@ from .database import get_db, SessionLocal
 
 
 def seed_admin():
-    """Zapewnia konto administratora i przypisuje osierocone rekordy do organizacji.
+    """Ensure the admin account exists and adopt orphaned records.
 
-    Schemat bazy jest w gestii Alembica — tu tylko dane.
+    The database schema is Alembic's business; this only touches data.
     """
     db = SessionLocal()
     try:
@@ -28,7 +28,7 @@ def seed_admin():
                 legacy.role = "admin"
                 if not legacy.display_name or legacy.display_name == "Korepetytor":
                     legacy.display_name = "Administrator"
-                # konto z wciąż domyślnym hasłem musi je zmienić przy najbliższym logowaniu
+                # an account still on the default password must change it at next login
                 if auth.verify_password("admin", legacy.password_hash):
                     legacy.must_change_password = True
                 admin = legacy
@@ -55,15 +55,15 @@ def seed_admin():
 
 
 def _require_migrated_db():
-    """Nie startuj na bazie, która nie jest na najnowszej migracji."""
+    """Refuse to start against a database that is not on the latest migration."""
     from alembic.config import Config
     from alembic.script import ScriptDirectory
     from alembic.runtime.migration import MigrationContext
     from .database import engine
 
     cfg = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
-    # script_location w ini jest względne wobec CWD — uniezależniamy się od tego,
-    # bo uvicorn bywa uruchamiany z dowolnego katalogu
+    # script_location in the ini file is relative to CWD; resolve it ourselves
+    # because uvicorn may be started from any directory
     cfg.set_main_option(
         "script_location", str(Path(__file__).resolve().parents[1] / "alembic")
     )
@@ -78,7 +78,7 @@ def _require_migrated_db():
 
 
 def _generate_upcoming() -> int:
-    """Materializuje wystąpienia serii na najbliższe miesiące."""
+    """Materialise series occurrences for the coming months."""
     db = SessionLocal()
     try:
         return services.regenerate_all(db)
@@ -100,8 +100,8 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Origins frontendu, np. CORS_ORIGINS="https://korepetycje.example.com"
-# W dev domyślnie serwer Vite. Gwiazdka jest świadomie niedozwolona.
+# Frontend origins, e.g. CORS_ORIGINS="https://panel.example.com"
+# Defaults to the Vite dev server. A wildcard is deliberately rejected.
 _origins = [
     o.strip()
     for o in os.environ.get(
@@ -129,8 +129,8 @@ def login(
 ):
     user = auth.authenticate(db, form.username, form.password)
     auth.set_session_cookie(response, user)
-    # Token wraca też w treści — dla /docs, curl i zadań crona.
-    # Przeglądarka go ignoruje i korzysta z ciasteczka.
+    # The token also comes back in the body, for /docs, curl and cron jobs.
+    # Browsers ignore it and use the cookie instead.
     token = auth.create_access_token(user)
     return schemas.LoginOut(
         access_token=token,
@@ -165,25 +165,25 @@ def change_password(
     user.must_change_password = False
     db.commit()
     db.refresh(user)
-    # konto miało token krótkoterminowy — wydaj pełny, żeby nie wylogowywać użytkownika
+    # the account held a short-lived token: issue a full one so the user stays in
     auth.set_session_cookie(response, user)
     return {"ok": True, "access_token": auth.create_access_token(user)}
 
 
 @app.post("/api/auth/logout")
 def logout(response: Response):
-    """Kasuje ciasteczko sesyjne. Bez tego wylogowanie po stronie przeglądarki
-    byłoby pozorne — ciasteczko httponly jest nieusuwalne z JavaScriptu."""
+    """Clear the session cookie. Without this, logging out in the browser would be
+    cosmetic: an httponly cookie cannot be removed from JavaScript."""
     auth.clear_session_cookie(response)
     return {"ok": True}
 
 
-# ===================== ZARZĄDZANIE UŻYTKOWNIKAMI =====================
-# Sekretariat może tworzyć korepetytorów. Admin może tworzyć korepetytorów
-# i sekretariat. Nikt poza adminem nie tworzy/edytuje kont admin/sekretariat.
+# ===================== USER MANAGEMENT =====================
+# A secretary may create tutors. An admin may create tutors and secretaries.
+# Nobody but an admin creates or edits admin/secretary accounts.
 @app.get("/api/users", response_model=list[schemas.UserOut])
 def list_users(user: models.User = Depends(auth.require_staff), db: Session = Depends(get_db)):
-    # sekretariat widzi korepetytorów i uczniów; admin widzi wszystkich
+    # a secretary sees tutors and students; an admin sees everyone
     q = db.query(models.User)
     if user.role == "secretary":
         q = q.filter(models.User.role.in_(["tutor", "student"]))
@@ -205,7 +205,7 @@ def create_user(
     role = payload.role
     if role not in ("tutor", "secretary", "admin"):
         raise HTTPException(400, "Nieprawidłowa rola")
-    # tylko admin może tworzyć sekretariat/admina
+    # only an admin may create secretary/admin accounts
     if role in ("secretary", "admin") and user.role != "admin":
         raise HTTPException(403, "Tylko administrator może tworzyć konta administracji")
     if db.query(models.User).filter(models.User.username == payload.username).first():
@@ -237,7 +237,7 @@ def update_user(
     target = db.get(models.User, user_id)
     if not target:
         raise HTTPException(404, "Użytkownik nie znaleziony")
-    # sekretariat nie edytuje kont administracji
+    # a secretary does not edit staff accounts
     if target.role in ("admin", "secretary") and user.role != "admin":
         raise HTTPException(403, "Brak uprawnień do edycji tego konta")
     data = payload.model_dump(exclude_unset=True)
@@ -259,10 +259,10 @@ def delete_user(
         raise HTTPException(404, "Użytkownik nie znaleziony")
     if target.id == user.id:
         raise HTTPException(400, "Nie można usunąć własnego konta")
-    # sekretariat nie rusza kont admin/sekretariat
+    # a secretary does not touch admin/secretary accounts
     if target.role in ("admin", "secretary") and user.role != "admin":
         raise HTTPException(403, "Brak uprawnień do usunięcia tego konta")
-    # odłącz przypisania korepetytora od zajęć/serii
+    # detach the tutor assignment from lessons and series
     if target.role == "tutor":
         for l in db.query(models.Lesson).filter(models.Lesson.assigned_tutor_id == target.id).all():
             l.assigned_tutor_id = None
@@ -273,10 +273,10 @@ def delete_user(
     return {"ok": True}
 
 
-# ===================== SUBJECTS (administracja) =====================
+# ===================== SUBJECTS (staff) =====================
 @app.get("/api/subjects", response_model=list[schemas.SubjectOut])
 def list_subjects(user: models.User = Depends(auth.require_active_user), db: Session = Depends(get_db)):
-    # czytać przedmioty mogą wszyscy zalogowani (do wyświetlania nazw)
+    # any signed-in user may read subjects (needed to display names)
     return db.query(models.Subject).order_by(models.Subject.name).all()
 
 
@@ -304,7 +304,7 @@ def delete_subject(
     subj = db.get(models.Subject, subject_id)
     if not subj:
         raise HTTPException(404, "Przedmiot nie znaleziony")
-    # odłącz od zajęć/serii (nie kasujemy zajęć)
+    # detach from lessons and series; the lessons themselves stay
     for l in db.query(models.Lesson).filter(models.Lesson.subject_id == subject_id).all():
         l.subject_id = None
     for s in db.query(models.LessonSeries).filter(models.LessonSeries.subject_id == subject_id).all():
@@ -314,7 +314,7 @@ def delete_subject(
     return {"ok": True}
 
 
-# ===================== STUDENTS (administracja) =====================
+# ===================== STUDENTS (staff) =====================
 def _student_out(s: models.Student) -> schemas.StudentOut:
     item = schemas.StudentOut.model_validate(s)
     item.has_account = s.user_id is not None
@@ -424,7 +424,7 @@ def delete_student_account(
     return {"ok": True}
 
 
-# ===================== SERIES (administracja) =====================
+# ===================== SERIES (staff) =====================
 @app.get("/api/series", response_model=list[schemas.SeriesOut])
 def list_series(user: models.User = Depends(auth.require_staff), db: Session = Depends(get_db)):
     rows = db.query(models.LessonSeries).all()
@@ -449,7 +449,7 @@ def create_series(
     db.add(series)
     db.commit()
     db.refresh(series)
-    # generator przenosi assigned_tutor_id, subject_id i level na wystąpienia
+    # the generator carries assigned_tutor_id, subject_id and level onto occurrences
     services.generate_lessons_for_series(db, series, services.clamp_horizon(None))
     return series
 
@@ -494,8 +494,8 @@ def _lesson_out(l: models.Lesson, db: Session) -> schemas.LessonOut:
 
 @app.get("/api/health")
 def health():
-    """Sonda dla healthchecka Dockera. Bez autoryzacji i bez dotykania bazy —
-    ma odpowiadać na pytanie "czy proces żyje", nic więcej."""
+    """Probe for the Docker healthcheck. No auth, no database access: it answers
+    "is the process alive", nothing more."""
     return {"status": "ok"}
 
 
@@ -503,7 +503,7 @@ def health():
 def generate_lessons(
     user: models.User = Depends(auth.require_staff), db: Session = Depends(get_db)
 ):
-    """Dosypuje brakujące wystąpienia serii. Do wywołania z crona raz na dobę."""
+    """Top up missing series occurrences. Meant to be called from cron once a day."""
     created = services.regenerate_all(db)
     return {"created": created, "horizon": services.clamp_horizon(None)}
 
@@ -536,7 +536,7 @@ def create_lesson(
     student = _get_student(db, payload.student_id)
     data = payload.model_dump()
     if data.get("price") is None:
-        # `not data["price"]` nadpisywało też świadome 0 (lekcja próbna)
+        # `not data["price"]` also overwrote a deliberate 0 (trial lesson)
         data["price"] = student.default_price
     lesson = models.Lesson(tutor_id=user.id, **data)
     db.add(lesson)
@@ -590,7 +590,7 @@ def delete_lesson(
     return {"ok": True}
 
 
-# ----- przypisywanie korepetytora -----
+# ----- tutor assignment -----
 @app.post("/api/lessons/{lesson_id}/assign", response_model=schemas.LessonOut)
 def assign_tutor_to_lesson(
     lesson_id: int,
@@ -611,7 +611,7 @@ def assign_tutor_to_lesson(
     return _lesson_out(lesson, db)
 
 
-# ===================== PAYMENTS (administracja) =====================
+# ===================== PAYMENTS (staff) =====================
 @app.get("/api/payments", response_model=list[schemas.PaymentOut])
 def list_payments(
     student_id: int | None = None,
@@ -663,10 +663,10 @@ def delete_payment(
     return {"ok": True}
 
 
-# ===================== SUMMARY (administracja) =====================
+# ===================== SUMMARY (staff) =====================
 def _summary_for_students(students):
     rows = []
-    total_due = total_paid = 0  # w groszach — sumowanie float kumulowało błąd
+    total_due = total_paid = 0  # in grosze: summing floats accumulated error
     for s in students:
         lessons = [l for l in s.lessons if not l.cancelled]
         completed = [l for l in lessons if l.completed]
@@ -699,7 +699,7 @@ def get_summary(user: models.User = Depends(auth.require_staff), db: Session = D
     return _summary_for_students(students)
 
 
-# ===================== RESCHEDULE (administracja) =====================
+# ===================== RESCHEDULE (staff) =====================
 def _resched_out(r: models.RescheduleRequest) -> schemas.RescheduleOut:
     item = schemas.RescheduleOut.model_validate(r)
     item.student_name = r.student.name if r.student else None
@@ -776,9 +776,9 @@ def reject_reschedule(
     return {"ok": True}
 
 
-# ===================== KOREPETYTOR (widok ograniczony) =====================
+# ===================== TUTOR (restricted view) =====================
 def _tutor_owns_request(r: models.RescheduleRequest, user, db) -> bool:
-    """Czy prośba dotyczy zajęcia przypisanego do tego korepetytora."""
+    """Whether the request concerns a lesson assigned to this tutor."""
     lesson = db.get(models.Lesson, r.lesson_id)
     return bool(lesson and lesson.assigned_tutor_id == user.id)
 
@@ -787,7 +787,7 @@ def _tutor_owns_request(r: models.RescheduleRequest, user, db) -> bool:
 def tutor_reschedule_requests(
     user: models.User = Depends(auth.require_tutor), db: Session = Depends(get_db)
 ):
-    # prośby dotyczące zajęć przypisanych do tego korepetytora
+    # requests for lessons assigned to this tutor
     rows = (
         db.query(models.RescheduleRequest)
         .join(models.Lesson, models.Lesson.id == models.RescheduleRequest.lesson_id)
@@ -867,7 +867,7 @@ def tutor_update_lesson(
     return _lesson_out(lesson, db)
 
 
-# dyspozycyjność korepetytora — szkielet (rozbudowa w kolejnym etapie)
+# tutor availability: skeleton, to be extended later
 @app.get("/api/tutor/availability", response_model=list[schemas.AvailabilityOut])
 def tutor_get_availability(
     user: models.User = Depends(auth.require_tutor), db: Session = Depends(get_db)
@@ -908,7 +908,7 @@ def tutor_delete_availability(
     return {"ok": True}
 
 
-# ===================== PANEL UCZNIA =====================
+# ===================== STUDENT PANEL =====================
 def _student_for_user(db, user) -> models.Student:
     s = db.query(models.Student).filter(models.Student.user_id == user.id).first()
     if not s:
@@ -1005,7 +1005,7 @@ def my_lesson_available_slots(
     user: models.User = Depends(auth.require_student),
     db: Session = Depends(get_db),
 ):
-    """Wolne okna przypisanego korepetytora na najbliższe 14 dni — do prośby o zmianę."""
+    """Free windows of the assigned tutor for the next 14 days, for reschedule requests."""
     student = _student_for_user(db, user)
     lesson = db.get(models.Lesson, lesson_id)
     if not lesson or lesson.student_id != student.id:
@@ -1018,7 +1018,7 @@ def my_lesson_available_slots(
         duration_min=lesson.duration_min or 60, exclude_lesson_id=lesson.id,
     )
     if not days:
-        # korepetytor jest, ale nie ma ustawionej dyspozycyjności
+        # a tutor is assigned but has no availability configured
         return schemas.AvailableSlotsOut(
             has_tutor=False,
             tutor_name=(tutor.display_name or tutor.username) if tutor else None,

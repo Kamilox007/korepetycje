@@ -1,5 +1,5 @@
 """Regresja dla punktu 4: generator serii.
-Unikalność slotu, klamra na horyzont, GET bez efektów ubocznych."""
+Slot uniqueness, horizon clamp, GET without side effects."""
 import sys, pathlib
 from datetime import date, time, timedelta
 
@@ -44,26 +44,26 @@ with TestClient(app) as c:
         "student_id": s["id"], "weekday": 1, "start_time": "17:00",
         "duration_min": 60, "price": 80, "start_date": str(date.today()),
     })
-    check("utworzenie serii -> 200", r.status_code == 200)
+    check("series creation -> 200", r.status_code == 200)
     n_after_create = count_lessons()
-    check(f"seria zmaterializowana przy tworzeniu ({n_after_create} zajęć)",
+    check(f"series materialised on creation ({n_after_create} lessons)",
           n_after_create > 10)
 
     # --- GET nie zapisuje ---
     before = count_lessons()
     for _ in range(3):
         c.get("/api/lessons", headers=tok)
-    check("GET /api/lessons nic nie tworzy", count_lessons() == before)
+    check("GET /api/lessons creates nothing", count_lessons() == before)
 
     # --- klamra na horyzont sterowany przez klienta ---
     r = c.get("/api/lessons?end=2099-01-01", headers=tok)
-    check("GET z end=2099 -> 200", r.status_code == 200)
-    check("GET z end=2099 nie generuje tysięcy wierszy", count_lessons() == before)
+    check("GET with end=2099 -> 200", r.status_code == 200)
+    check("GET with end=2099 does not generate thousands of rows", count_lessons() == before)
 
     horizon = services.clamp_horizon(date(2099, 1, 1))
     check(f"clamp_horizon obcina do {horizon}",
           horizon <= date.today() + timedelta(days=services.MAX_HORIZON_DAYS))
-    check("clamp_horizon(None) daje wartość domyślną",
+    check("clamp_horizon(None) yields the default",
           services.clamp_horizon(None) == date.today() + timedelta(days=services.DEFAULT_HORIZON_DAYS))
 
     # --- unique constraint na poziomie bazy ---
@@ -78,12 +78,12 @@ with TestClient(app) as c:
     from sqlalchemy.exc import IntegrityError
     try:
         db.commit()
-        check("duplikat slotu odrzucony przez bazę", False)
+        check("duplicate slot rejected by the database", False)
     except IntegrityError:
-        check("duplikat slotu odrzucony przez bazę", True)
+        check("duplicate slot rejected by the database", True)
         db.rollback()
 
-    # zajęcia jednorazowe (series_id NULL) mogą się powtarzać
+    # one-off lessons (series_id NULL) may repeat
     for _ in range(2):
         db.add(models.Lesson(
             tutor_id=victim.tutor_id, student_id=victim.student_id,
@@ -91,21 +91,21 @@ with TestClient(app) as c:
             start_time=time(9, 0), duration_min=60, price=80))
     try:
         db.commit()
-        check("zajęcia jednorazowe nie kolidują ze sobą", True)
+        check("one-off lessons do not collide with each other", True)
     except IntegrityError:
-        check("zajęcia jednorazowe nie kolidują ze sobą", False)
+        check("one-off lessons do not collide with each other", False)
         db.rollback()
     db.close()
 
     # --- endpoint konserwacyjny ---
     r = c.post("/api/maintenance/generate-lessons", headers=tok)
-    check("endpoint konserwacyjny -> 200", r.status_code == 200)
-    check("zwraca liczbę utworzonych i horyzont",
+    check("maintenance endpoint -> 200", r.status_code == 200)
+    check("returns the created count and the horizon",
           {"created", "horizon"} <= set(r.json()))
-    check("drugie wywołanie jest idempotentne",
+    check("the second call is idempotent",
           c.post("/api/maintenance/generate-lessons", headers=tok).json()["created"] == 0)
 
-    # --- generator odporny na istniejący duplikat w locie ---
+    # --- the generator tolerates a duplicate appearing mid-flight ---
     db = SessionLocal()
     series = db.query(models.LessonSeries).first()
     created = services.generate_lessons_for_series(db, series, services.clamp_horizon(None))
@@ -113,5 +113,5 @@ with TestClient(app) as c:
     db.close()
 
 print()
-print("NIEPOWODZENIA:", FAILS if FAILS else "brak")
+print("FAILURES:", FAILS if FAILS else "none")
 sys.exit(1 if FAILS else 0)

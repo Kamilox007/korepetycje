@@ -88,7 +88,7 @@ class LessonOut(BaseModel):
 class SeriesBase(BaseModel):
     student_id: int
     title: str | None = None
-    weekday: int  # 0=pon ... 6=niedz
+    weekday: int  # 0=Mon ... 6=Sun
     start_time: time_t
     duration_min: int = 60
     price: float = 0.0
@@ -141,9 +141,9 @@ class StudentSummary(BaseModel):
     student_name: str
     lessons_total: int
     lessons_completed: int
-    amount_due: float       # suma za odbyte zajęcia
-    amount_paid: float      # suma wpłat
-    balance: float          # paid - due (ujemne = zalega)
+    amount_due: float       # total for completed lessons
+    amount_paid: float      # total payments
+    balance: float          # paid - due (negative = owes money)
 
 
 class SummaryOut(BaseModel):
@@ -177,7 +177,7 @@ class ChangePasswordIn(BaseModel):
     new_password: str
 
 
-# konto ucznia zakładane przez korepetytora
+# student account created by staff
 class StudentAccountCreate(BaseModel):
     username: str
     password: str
@@ -186,7 +186,7 @@ class StudentAccountCreate(BaseModel):
 class StudentAccountOut(BaseModel):
     student_id: int
     username: str
-    # hasło zwracane tylko raz, przy utworzeniu, by korepetytor mógł je przekazać
+    # password returned only once, on creation, so staff can pass it on
     password: str | None = None
 
 
@@ -214,12 +214,12 @@ class RescheduleOut(BaseModel):
     response: str | None = None
 
 
-# ---------- Zarządzanie użytkownikami (admin / sekretariat) ----------
+# ---------- User management (admin / secretary) ----------
 class StaffUserCreate(BaseModel):
     username: str
     password: str
     display_name: str | None = None
-    role: str  # 'tutor' lub 'secretary' (secretary tylko dla admina)
+    role: str  # 'tutor' or 'secretary' (secretary is admin-only)
     color: str | None = None
 
 
@@ -242,22 +242,22 @@ class UserCreatedOut(BaseModel):
     username: str
     role: str
     display_name: str | None = None
-    password: str | None = None  # zwracane raz, przy utworzeniu
+    password: str | None = None  # returned once, on creation
 
 
-# lekka pozycja na listę korepetytorów do przypisania
+# lightweight entry for the assignable-tutor list
 class TutorOption(BaseModel):
     id: int
     display_name: str
     color: str | None = None
 
 
-# decyzja administracji o prośbie (z opcjonalnym feedbackiem)
+# staff decision on a request (with optional feedback)
 class RescheduleDecision(BaseModel):
     response: str | None = None
 
 
-# korepetytor może zmienić tylko termin i oznaczyć odbycie
+# a tutor may only change the time and mark attendance
 class TutorLessonUpdate(BaseModel):
     date: date_t | None = None
     start_time: time_t | None = None
@@ -265,9 +265,9 @@ class TutorLessonUpdate(BaseModel):
     note: str | None = None
 
 
-# dyspozycyjność
+# availability
 class AvailabilityCreate(BaseModel):
-    weekday: int  # 0=pon ... 6=niedz
+    weekday: int  # 0=Mon ... 6=Sun
     start_time: time_t
     end_time: time_t
 
@@ -307,6 +307,6 @@ class FreeDay(BaseModel):
 
 
 class AvailableSlotsOut(BaseModel):
-    has_tutor: bool                 # czy zajęcia mają przypisanego korepetytora z dyspozycyjnością
+    has_tutor: bool                 # whether the lesson has a tutor with declared availability
     tutor_name: str | None = None
     days: list[FreeDay] = []

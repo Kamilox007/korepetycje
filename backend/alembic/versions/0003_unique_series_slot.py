@@ -1,4 +1,4 @@
-"""unikalny slot serii
+"""unique series slot
 
 Revision ID: 0003
 Revises: 0002
@@ -15,10 +15,10 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Wyścig sprzed tej migracji mógł zostawić duplikaty (ten sam slot serii
-    # utworzony dwa razy przez równoległe żądania). Bez ich usunięcia
-    # constraint się nie założy. Zostawiamy wystąpienie o najniższym id —
-    # jest najstarsze, więc to na nie wskazują ewentualne prośby o przełożenie.
+    # A race predating this migration may have left duplicates (the same series
+    # slot created twice by concurrent requests). The constraint cannot be added
+    # until they are gone. Keep the occurrence with the lowest id: it is the
+    # oldest, so any reschedule requests point at that one.
     op.execute(
         """
         DELETE FROM lessons

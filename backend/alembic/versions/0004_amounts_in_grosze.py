@@ -1,10 +1,10 @@
-"""kwoty w groszach
+"""amounts in grosze
 
 Revision ID: 0004
 Revises: 0003
 
-Autogenerate proponował tu drop + add, co skasowałoby wszystkie kwoty.
-Ta wersja przepisuje dane: dokłada kolumnę, przelicza, dopiero potem usuwa starą.
+Autogenerate suggested drop + add here, which would have wiped every amount.
+This version rewrites the data: add the column, convert, only then drop the old one.
 """
 from alembic import op
 import sqlalchemy as sa
@@ -25,17 +25,17 @@ COLUMNS = [
 
 def upgrade() -> None:
     for table, old, new in COLUMNS:
-        # 1. nowa kolumna, na razie nullable — istniejące wiersze jej nie mają
+        # 1. new column, nullable for now: existing rows do not have it yet
         with op.batch_alter_table(table) as b:
             b.add_column(sa.Column(new, sa.Integer(), nullable=True))
 
         # 2. przeliczenie. ROUND przed CAST jest konieczne: w SQLite
-        #    CAST(80.1 * 100 AS INTEGER) daje 8009, bo CAST obcina w dół.
+        #    CAST(80.1 * 100 AS INTEGER) yields 8009, because CAST truncates.
         op.execute(
             f"UPDATE {table} SET {new} = CAST(ROUND(COALESCE({old}, 0) * 100) AS INTEGER)"
         )
 
-        # 3. dopiero teraz kolumna może być NOT NULL, a stara znika
+        # 3. only now can the column become NOT NULL and the old one go
         with op.batch_alter_table(table) as b:
             b.alter_column(new, existing_type=sa.Integer(), nullable=False)
             b.drop_column(old)

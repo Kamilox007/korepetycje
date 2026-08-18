@@ -1,4 +1,4 @@
-"""Wspólny start dla testów: świeży katalog + baza doprowadzona do head."""
+"""Shared test bootstrap: a fresh directory plus a database migrated to head."""
 import os
 import sys
 import tempfile
@@ -8,7 +8,7 @@ BACKEND_DIR = Path(__file__).resolve().parent
 
 
 def bootstrap(**env):
-    """Przełącza się na tymczasowy katalog i wykonuje `alembic upgrade head`."""
+    """Switch to a temporary directory and run `alembic upgrade head`."""
     os.environ.setdefault("JWT_SECRET", "test-secret")
     os.environ.update(env)
     os.chdir(tempfile.mkdtemp())

@@ -7,7 +7,7 @@ services:
       - db-data:/data
     expose:
       - "8000"
-    # Bez portu na hoście — do backendu wchodzi się wyłącznie przez Caddy.
+    # No host port: the backend is reachable only through Caddy.
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 30s
@@ -32,12 +32,12 @@ services:
       - "443:443/udp"   # HTTP/3
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data       # certyfikaty — MUSI przetrwać restart,
-      - caddy-config:/config   # inaczej Let's Encrypt zablokuje za nadmiar żądań
+      - caddy-data:/data       # certificates: MUST survive a restart, otherwise
+      - caddy-config:/config   # Let's Encrypt will rate-limit the reissue requests
       - caddy-logs:/var/log/caddy
 
-  # Ciągła replikacja SQLite do Backblaze B2 / S3.
-  # Odtworzenie do dowolnego punktu w czasie, nie tylko do ostatniego snapshotu.
+  # Continuous SQLite replication to Backblaze B2 / S3.
+  # Restores to any point in time, not just to the latest snapshot.
   litestream:
     image: litestream/litestream:0.3
     restart: unless-stopped

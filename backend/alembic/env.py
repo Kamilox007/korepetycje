@@ -14,7 +14,7 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Ten sam adres bazy, którego używa aplikacja.
+# The same database URL the application uses.
 config.set_main_option(
     "sqlalchemy.url",
     os.environ.get("DATABASE_URL", "sqlite:///./korepetycje.db"),
@@ -27,8 +27,8 @@ def _configure(**kwargs):
     context.configure(
         target_metadata=target_metadata,
         compare_type=True,
-        # SQLite nie potrafi ALTER TABLE dla constraintów — batch mode
-        # odtwarza tabelę pod spodem. Bez tego migracje 04 i 05 nie przejdą.
+        # SQLite cannot ALTER TABLE for constraints; batch mode rebuilds the
+        # table underneath. Without it migrations 0003 and 0004 will not apply.
         render_as_batch=True,
         **kwargs,
     )

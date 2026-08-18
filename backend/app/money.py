@@ -1,18 +1,18 @@
-"""Kwoty trzymamy w bazie jako liczby całkowite groszy.
+"""Amounts are stored in the database as whole grosze (integer minor units).
 
-Float nie potrafi dokładnie zapisać 0.1, więc sumowanie cen zajęć kumuluje błąd —
-przy rozliczeniach z rodzicami kończy się to saldem różniącym się o grosz.
-Konwersja odbywa się wyłącznie na granicy API: wewnątrz zawsze int.
+Float cannot represent 0.1 exactly, so summing lesson prices accumulates error,
+and settling up with parents ends with a balance off by a grosz. Conversion
+happens only at the API boundary: internally it is always int.
 """
 from decimal import Decimal, ROUND_HALF_UP
 
 
 def to_grosze(value) -> int:
-    """Złote (float/str/Decimal/int) -> grosze.
+    """Zloty (float/str/Decimal/int) -> grosze.
 
-    Przez str(), bo Decimal(80.1) to 80.09999999999999431..., a Decimal("80.1")
-    to dokładnie 80.1. Zaokrąglenie handlowe (0.5 w górę), nie bankierskie —
-    wbudowane round() w Pythonie dałoby round(2.675, 2) == 2.67.
+    Goes through str(), because Decimal(80.1) is 80.09999999999999431... while
+    Decimal("80.1") is exactly 80.1. Half-up rounding, not banker's: Python's
+    built-in round() would give round(2.675, 2) == 2.67.
     """
     if value is None:
         return 0
@@ -23,7 +23,7 @@ def to_grosze(value) -> int:
 
 
 def to_zlote(grosze: int | None) -> float:
-    """Grosze -> złote. Wywoływane raz, przy wyjściu z API."""
+    """Grosze -> zloty. Called once, on the way out of the API."""
     if grosze is None:
         return 0.0
     return int(grosze) / 100

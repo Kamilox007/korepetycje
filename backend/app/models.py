@@ -9,8 +9,8 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from .money import to_grosze, to_zlote
 
 
-# Bez tego SQLAlchemy tworzy constrainty bez nazw, a Alembic w batch mode
-# (jedyny tryb działający na SQLite) odmawia wtedy pracy:
+# Without this SQLAlchemy creates unnamed constraints, and Alembic in batch
+# mode (the only mode that works on SQLite) then refuses to run with
 # "ValueError: Constraint must have a name".
 NAMING_CONVENTION = {
     "ix": "ix_%(table_name)s_%(column_0_N_name)s",
@@ -26,7 +26,7 @@ class Base(DeclarativeBase):
 
 
 class User(Base):
-    """Konto logowania. Rola: 'tutor' (korepetytor) lub 'student' (uczeń)."""
+    """Login account. Role: 'tutor' or 'student'."""
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -36,12 +36,12 @@ class User(Base):
     display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     color: Mapped[str | None] = mapped_column(String(20), nullable=True)  # kolor korepetytora w kalendarzu
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
-    # licznik nieudanych logowań i moment, do którego konto jest zablokowane (UTC, naiwny)
+    # failed login counter and the moment until which the account stays locked (naive UTC)
     failed_logins: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    # jeśli rola == student, to konto wskazuje na rekord ucznia
+    # when role == student, the account points at the student record
     student_profile: Mapped["Student"] = relationship(
         back_populates="user", foreign_keys="Student.user_id", uselist=False
     )
@@ -51,9 +51,9 @@ class Student(Base):
     __tablename__ = "students"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    # właściciel-korepetytor
+    # owning tutor
     tutor_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    # opcjonalne konto logowania ucznia
+    # optional login account for the student
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     contact: Mapped[str | None] = mapped_column(String(200), nullable=True)
@@ -76,7 +76,7 @@ class Student(Base):
 
     @property
     def default_price(self) -> float:
-        """Złote — tylko do (de)serializacji. Arytmetyka wyłącznie na default_price_grosze."""
+        """Zloty, for (de)serialization only. Arithmetic runs on default_price_grosze."""
         return to_zlote(self.default_price_grosze)
 
     @default_price.setter
@@ -85,16 +85,16 @@ class Student(Base):
 
 
 class LessonSeries(Base):
-    """Definicja zajęć cyklicznych. Generuje pojedyncze wystąpienia (Lesson)."""
+    """A recurring lesson definition. Generates individual occurrences (Lesson)."""
     __tablename__ = "lesson_series"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     tutor_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    # przypisany prowadzący (może być pusty, dopóki administracja nie przypisze)
+    # assigned tutor (may stay empty until staff assigns one)
     assigned_tutor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), nullable=False)
     subject_id: Mapped[int | None] = mapped_column(ForeignKey("subjects.id"), nullable=True)
-    level: Mapped[str | None] = mapped_column(String(20), nullable=True)  # podstawa | rozszerzenie
+    level: Mapped[str | None] = mapped_column(String(20), nullable=True)  # basic | extended
     title: Mapped[str | None] = mapped_column(String(200), nullable=True)
     weekday: Mapped[int] = mapped_column(Integer, nullable=False)
     start_time: Mapped[time] = mapped_column(Time, nullable=False)
@@ -111,7 +111,7 @@ class LessonSeries(Base):
 
     @property
     def price(self) -> float:
-        """Złote — tylko do (de)serializacji. Arytmetyka wyłącznie na price_grosze."""
+        """Zloty, for (de)serialization only. Arithmetic runs on price_grosze."""
         return to_zlote(self.price_grosze)
 
     @price.setter
@@ -120,29 +120,29 @@ class LessonSeries(Base):
 
 
 class Lesson(Base):
-    """Pojedyncze wystąpienie zajęć. Może pochodzić z serii lub być jednorazowe."""
+    """A single lesson occurrence, either from a series or one-off."""
     __tablename__ = "lessons"
     __table_args__ = (
-        # Jeden slot serii = najwyżej jedno wystąpienie. Deduplikacja w Pythonie
-        # (existing_origins w services) jest podatna na wyścig przy równoległych
-        # żądaniach — to jest gwarancja na poziomie bazy. NULL-e w SQL nie kolidują,
-        # więc zajęcia jednorazowe (series_id IS NULL) pozostają nietknięte.
+        # One series slot = at most one occurrence. Deduplicating in Python
+        # (existing_origins in services) races under concurrent requests, so this
+        # is the database-level guarantee. NULLs do not collide in SQL, so one-off
+        # lessons (series_id IS NULL) are left alone.
         UniqueConstraint("series_id", "origin_date", name="uq_lessons_series_origin"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     tutor_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    # przypisany prowadzący (może być pusty)
+    # assigned tutor (may be empty)
     assigned_tutor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), nullable=False, index=True)
     series_id: Mapped[int | None] = mapped_column(
         ForeignKey("lesson_series.id"), nullable=True
     )
     subject_id: Mapped[int | None] = mapped_column(ForeignKey("subjects.id"), nullable=True)
-    level: Mapped[str | None] = mapped_column(String(20), nullable=True)  # podstawa | rozszerzenie
+    level: Mapped[str | None] = mapped_column(String(20), nullable=True)  # basic | extended
     title: Mapped[str | None] = mapped_column(String(200), nullable=True)
     date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
-    # pierwotna data slotu z serii (niezmienna mimo przesunięć) — None dla zajęć jednorazowych
+    # original series slot date, unchanged by reschedules; None for one-off lessons
     origin_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     start_time: Mapped[time] = mapped_column(Time, nullable=False)
     duration_min: Mapped[int] = mapped_column(Integer, default=60)
@@ -157,7 +157,7 @@ class Lesson(Base):
 
     @property
     def price(self) -> float:
-        """Złote — tylko do (de)serializacji. Arytmetyka wyłącznie na price_grosze."""
+        """Zloty, for (de)serialization only. Arithmetic runs on price_grosze."""
         return to_zlote(self.price_grosze)
 
     @price.setter
@@ -166,7 +166,7 @@ class Lesson(Base):
 
 
 class Payment(Base):
-    """Wpłata przypisana do ucznia."""
+    """A payment recorded against a student."""
     __tablename__ = "payments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -182,7 +182,7 @@ class Payment(Base):
 
     @property
     def amount(self) -> float:
-        """Złote — tylko do (de)serializacji. Arytmetyka wyłącznie na amount_grosze."""
+        """Zloty, for (de)serialization only. Arithmetic runs on amount_grosze."""
         return to_zlote(self.amount_grosze)
 
     @amount.setter
@@ -191,7 +191,7 @@ class Payment(Base):
 
 
 class RescheduleRequest(Base):
-    """Prośba ucznia o przesunięcie zajęć. Korepetytor akceptuje lub odrzuca."""
+    """A student's request to move a lesson. Staff approves or rejects it."""
     __tablename__ = "reschedule_requests"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -202,7 +202,7 @@ class RescheduleRequest(Base):
     proposed_time: Mapped[time | None] = mapped_column(Time, nullable=True)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="pending")  # pending|approved|rejected
-    response: Mapped[str | None] = mapped_column(Text, nullable=True)  # komentarz administracji
+    response: Mapped[str | None] = mapped_column(Text, nullable=True)  # staff comment
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     lesson: Mapped["Lesson"] = relationship()
@@ -210,7 +210,7 @@ class RescheduleRequest(Base):
 
 
 class SeriesSkip(Base):
-    """Pierwotna data slotu serii, która została usunięta i nie ma być odtwarzana."""
+    """An original series slot date that was deleted and must not be regenerated."""
     __tablename__ = "series_skips"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -219,18 +219,18 @@ class SeriesSkip(Base):
 
 
 class Availability(Base):
-    """Okno dyspozycyjności korepetytora w danym dniu tygodnia."""
+    """A tutor's availability window on a given weekday."""
     __tablename__ = "availability"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     tutor_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    weekday: Mapped[int] = mapped_column(Integer, nullable=False)  # 0=pon ... 6=niedz
+    weekday: Mapped[int] = mapped_column(Integer, nullable=False)  # 0=Mon ... 6=Sun
     start_time: Mapped[time] = mapped_column(Time, nullable=False)
     end_time: Mapped[time] = mapped_column(Time, nullable=False)
 
 
 class Subject(Base):
-    """Przedmiot zdefiniowany przez organizację (np. matematyka, fizyka)."""
+    """A subject defined by the organisation (e.g. maths, physics)."""
     __tablename__ = "subjects"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
