@@ -1,4 +1,4 @@
-import { useState, useEffect, useId } from "react";
+import { useState, useEffect, useCallback, useId } from "react";
 import { api } from "./api";
 import Modal from "./Modal";
 import { fmtMoney } from "./dates";
@@ -10,10 +10,14 @@ export default function Payments({ students, reload }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
 
-  async function load() {
+  // Single entry point, same reason as in Students: two loaders invite the bug
+  // where a mutation refreshes one of them and silently leaves the other stale.
+  const refresh = useCallback(async () => {
     setPayments(await api.listPayments());
-  }
-  useEffect(() => { load(); }, []);
+    reload();          // students and the summary live in the parent
+  }, [reload]);
+
+  useEffect(() => { refresh(); }, [refresh]);
 
   async function remove(p) {
     const ok = await confirm({
@@ -24,8 +28,7 @@ export default function Payments({ students, reload }) {
     });
     if (!ok) return;
     await api.deletePayment(p.id);
-    load();
-    reload();
+    refresh();
   }
 
   return (
@@ -70,7 +73,7 @@ export default function Payments({ students, reload }) {
           payment={editing}
           studentName={students.find((s) => s.id === editing.student_id)?.name}
           onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); load(); reload(); }}
+          onSaved={() => { setEditing(null); refresh(); }}
         />
       )}
 
@@ -78,7 +81,7 @@ export default function Payments({ students, reload }) {
         <PaymentForm
           students={students}
           onClose={() => setShowForm(false)}
-          onSaved={() => { setShowForm(false); load(); reload(); }}
+          onSaved={() => { setShowForm(false); refresh(); }}
         />
       )}
     </div>

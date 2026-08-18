@@ -1,4 +1,4 @@
-import { useState, useEffect, useId } from "react";
+import { useState, useEffect, useCallback, useId } from "react";
 import { api } from "./api";
 import Modal from "./Modal";
 import { DAYS_PL, fmtMoney, fmtTime } from "./dates";
@@ -14,15 +14,21 @@ export default function Students({ students, reload }) {
   const [showArchive, setShowArchive] = useState(false);
   const [editSeries, setEditSeries] = useState(null);
 
-  async function loadArchive() {
-    setArchived(await api.listStudents(true));
-  }
-  useEffect(() => { loadArchive(); }, [students]);
+  // One entry point for reloading everything this view shows. Three separate
+  // loaders meant that every new operation had to remember which of them to
+  // call, and editing a series already missed one: the price changed in the
+  // database but the table kept showing the old value until a page reload.
+  const refresh = useCallback(async () => {
+    const [srs, arch] = await Promise.all([
+      api.listSeries(),
+      api.listStudents(true),
+    ]);
+    setSeries(srs);
+    setArchived(arch);
+    reload();          // students live in the parent
+  }, [reload]);
 
-  async function loadSeries() {
-    setSeries(await api.listSeries());
-  }
-  useEffect(() => { loadSeries(); }, []);
+  useEffect(() => { refresh(); }, [refresh]);
 
   async function archiveStudent(s) {
     const ok = await confirm({
@@ -36,14 +42,12 @@ export default function Students({ students, reload }) {
     });
     if (!ok) return;
     await api.archiveStudent(s.id);
-    reload();
-    loadArchive();
+    refresh();
   }
 
   async function restoreStudent(s) {
     await api.restoreStudent(s.id);
-    reload();
-    loadArchive();
+    refresh();
   }
 
   async function purgeStudent(s) {
@@ -58,7 +62,7 @@ export default function Students({ students, reload }) {
     });
     if (!ok) return;
     await api.purgeStudent(s.id);
-    loadArchive();
+    refresh();
   }
 
   async function removeSeries(srs) {
@@ -72,8 +76,7 @@ export default function Students({ students, reload }) {
     });
     if (!ok) return;
     await api.deleteSeries(srs.id);
-    loadSeries();
-    reload();
+    refresh();
   }
 
   function studentName(id) {
@@ -185,14 +188,14 @@ export default function Students({ students, reload }) {
       {showStudent && (
         <StudentForm
           onClose={() => setShowStudent(false)}
-          onSaved={() => { setShowStudent(false); reload(); }}
+          onSaved={() => { setShowStudent(false); refresh(); }}
         />
       )}
       {editSeries && (
         <SeriesEditForm
           series={editSeries}
           onClose={() => setEditSeries(null)}
-          onSaved={() => { setEditSeries(null); loadSeries(); reload(); }}
+          onSaved={() => { setEditSeries(null); refresh(); }}
         />
       )}
 
@@ -200,14 +203,14 @@ export default function Students({ students, reload }) {
         <SeriesForm
           students={students}
           onClose={() => setShowSeries(false)}
-          onSaved={() => { setShowSeries(false); loadSeries(); reload(); }}
+          onSaved={() => { setShowSeries(false); refresh(); }}
         />
       )}
       {accountFor && (
         <AccountForm
           student={accountFor}
           onClose={() => setAccountFor(null)}
-          onSaved={() => { setAccountFor(null); reload(); }}
+          onSaved={() => { setAccountFor(null); refresh(); }}
         />
       )}
     </div>

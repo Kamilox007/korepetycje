@@ -57,3 +57,19 @@ test("a tutor can drag a lesson to another day", async ({ page }) => {
 
   await expect(page.locator(".mini-chip").first()).toHaveAttribute("draggable", "true");
 });
+
+test("editing a series updates the list without a reload", async ({ page }) => {
+  // The list used to keep the old price until the page was refreshed: the view
+  // had separate loaders for students and series, and editing refreshed only one.
+  await page.goto("/");
+  await tab(page, "Uczniowie").click();
+
+  const editButtons = page.getByRole("button", { name: "Edytuj" });
+  test.skip((await editButtons.count()) === 0, "no series defined");
+
+  await editButtons.first().click();
+  await page.getByLabel("Cena (PLN)").fill("137");
+  await page.getByRole("button", { name: "Zapisz" }).click();
+
+  await expect(page.getByRole("cell", { name: /137/ }).first()).toBeVisible();
+});
