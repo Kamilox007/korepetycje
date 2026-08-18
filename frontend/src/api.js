@@ -101,6 +101,8 @@ export const api = {
   // ----- payments -----
   listPayments: (studentId) => req(`/payments${studentId ? `?student_id=${studentId}` : ""}`),
   createPayment: (data) => req("/payments", { method: "POST", body: JSON.stringify(data) }),
+  updatePayment: (id, data) =>
+    req(`/payments/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deletePayment: (id) => req(`/payments/${id}`, { method: "DELETE" }),
 
   // ----- summary -----

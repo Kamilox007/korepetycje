@@ -42,6 +42,18 @@ export default function TutorPanel() {
   }
   useEffect(() => { load(); }, [anchor]);
 
+  async function moveLessonTime(lesson, time) {
+    const value = `${time}:00`;
+    setLessons((prev) => prev.map((l) => (l.id === lesson.id ? { ...l, start_time: value } : l)));
+    try {
+      await api.tutorUpdateLesson(lesson.id, { start_time: value });
+      await load();
+    } catch {
+      setErr("Nie udało się zmienić godziny zajęć.");
+      await load();
+    }
+  }
+
   async function moveLesson(lesson, isoDate) {
     // Optimistic: the tile follows the cursor immediately, otherwise dragging
     // feels broken while the request is in flight.
@@ -101,6 +113,7 @@ export default function TutorPanel() {
           onPick={(l) => { if (!l.completed && !l.cancelled) setEditing(l); }}
           label={(l) => l.student_name}
           onMove={moveLesson}
+          onMoveTime={moveLessonTime}
         />
       )}
 

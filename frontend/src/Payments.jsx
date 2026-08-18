@@ -8,6 +8,7 @@ export default function Payments({ students, reload }) {
   const confirm = useConfirm();
   const [payments, setPayments] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState(null);
 
   async function load() {
     setPayments(await api.listPayments());
@@ -53,13 +54,25 @@ export default function Payments({ students, reload }) {
                   <td>{p.payer || "—"}</td>
                   <td className="muted">{p.note || ""}</td>
                   <td className="num" style={{ fontWeight: 600, color: "var(--done)" }}>{fmtMoney(p.amount)}</td>
-                  <td className="num"><button className="ghost danger" onClick={() => remove(p)}>Usuń</button></td>
+                  <td className="num">
+                    <button className="ghost" onClick={() => setEditing(p)}>Edytuj</button>
+                    <button className="ghost danger" onClick={() => remove(p)}>Usuń</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
       </div>
+
+      {editing && (
+        <PaymentEditForm
+          payment={editing}
+          studentName={students.find((s) => s.id === editing.student_id)?.name}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); load(); reload(); }}
+        />
+      )}
 
       {showForm && (
         <PaymentForm
@@ -139,6 +152,81 @@ function PaymentForm({ students, onClose, onSaved }) {
           Zapis: {payer} zapłaciła {amount ? fmtMoney(Number(amount)) : "—"} za {sName}. Wejdzie do podsumowania.
         </p>
       )}
+    </Modal>
+  );
+}
+
+function PaymentEditForm({ payment, studentName, onClose, onSaved }) {
+  const uid = useId();
+  const [amount, setAmount] = useState(payment.amount);
+  const [date, setDate] = useState(payment.date);
+  const [payer, setPayer] = useState(payment.payer || "");
+  const [note, setNote] = useState(payment.note || "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function save() {
+    if (!amount) return;
+    setBusy(true);
+    try {
+      await api.updatePayment(payment.id, {
+        amount: Number(amount),
+        date,
+        payer: payer || null,
+        note: note || null,
+      });
+      onSaved();
+    } catch (e) {
+      setErr(e.message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal
+      title="Edycja wpłaty"
+      onClose={onClose}
+      footer={<>
+        <button onClick={onClose}>Anuluj</button>
+        <button className="primary" onClick={save} disabled={busy || !amount}>Zapisz</button>
+      </>}
+    >
+      {err && <div className="err">{err}</div>}
+
+      <p className="muted" style={{ marginTop: 0 }}>
+        Wpłata ucznia <strong>{studentName || "—"}</strong>.
+      </p>
+
+      <div className="field-row">
+        <div>
+          <label htmlFor={`${uid}-amount`}>Kwota (PLN)</label>
+          <input id={`${uid}-amount`} type="number" step="0.01" value={amount}
+                 onChange={(e) => setAmount(e.target.value)} />
+        </div>
+        <div>
+          <label htmlFor={`${uid}-date`}>Data</label>
+          <input id={`${uid}-date`} type="date" value={date}
+                 onChange={(e) => setDate(e.target.value)} />
+        </div>
+      </div>
+
+      <div>
+        <label htmlFor={`${uid}-payer`}>Od kogo</label>
+        <input id={`${uid}-payer`} value={payer} onChange={(e) => setPayer(e.target.value)}
+               placeholder="np. mama Kasi, przelew" />
+      </div>
+
+      <div>
+        <label htmlFor={`${uid}-note`}>Notatka</label>
+        <textarea id={`${uid}-note`} rows={2} value={note}
+                  onChange={(e) => setNote(e.target.value)} />
+      </div>
+
+      <p className="muted" style={{ fontSize: 12, marginTop: 12 }}>
+        Ucznia nie da się tu zmienić — przeniesienie wpłaty między uczniami
+        zmienia dwa salda naraz, więc usuń ją i wprowadź na nowo, żeby zostało
+        to widoczne w historii.
+      </p>
     </Modal>
   );
 }

@@ -30,6 +30,9 @@ export default function LessonCalendar({
   // called with (lesson, isoDate). Left out for the student panel, where moving
   // a lesson needs the tutor's approval rather than a drag.
   onMove,
+  // Optional, day view only: called with (lesson, "HH:MM") when a lesson is
+  // dragged to another hour. Separate from onMove, which changes the date.
+  onMoveTime,
 }) {
   const today = new Date();
 
@@ -87,7 +90,8 @@ export default function LessonCalendar({
       </div>
 
       {view === "day" ? (
-        <DayView day={anchor} lessons={lessonsFor(anchor)} onPick={onPick} label={label} />
+        <DayView day={anchor} lessons={lessonsFor(anchor)} onPick={onPick}
+                 label={label} onMoveTime={onMoveTime} />
       ) : view === "month" ? (
         <MonthView anchor={anchor} today={today} lessonsFor={lessonsFor}
                    onPick={onPick} label={label} onMove={onMove} />
@@ -210,9 +214,11 @@ function WeekView({ weekStart, today, lessonsFor, onPick, label, onMove }) {
 
 /** Hour grid for a single day. Read-only: rescheduling by time belongs in the
  *  edit dialog, where the tutor can also see the price and the subject. */
-function DayView({ day, lessons, onPick, label }) {
+function DayView({ day, lessons, onPick, label, onMoveTime }) {
   const hours = [];
   for (let h = DAY_START_HOUR; h <= DAY_END_HOUR; h++) hours.push(h);
+
+  const [drag, setDrag] = useState(null); // { lesson, previewTop, previewTime }
 
   function topFor(timeStr) {
     const [h, m] = String(timeStr).split(":").map(Number);
@@ -220,6 +226,15 @@ function DayView({ day, lessons, onPick, label }) {
   }
   function heightFor(min) {
     return Math.max(22, ((min || 60) / 60) * HOUR_PX);
+  }
+  // Y position -> time rounded to 15 minutes, clamped to the day
+  function timeFromY(y, durationMin) {
+    let total = (y / HOUR_PX) * 60 + DAY_START_HOUR * 60;
+    total = Math.round(total / 15) * 15;
+    const dayStart = DAY_START_HOUR * 60;
+    const dayEnd = (DAY_END_HOUR + 1) * 60;
+    total = Math.max(dayStart, Math.min(total, dayEnd - (durationMin || 60)));
+    return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
   }
 
   return (
@@ -235,20 +250,55 @@ function DayView({ day, lessons, onPick, label }) {
         <div
           className="events-col"
           style={{ height: (DAY_END_HOUR - DAY_START_HOUR + 1) * HOUR_PX }}
+          onDragOver={(e) => {
+            if (!drag) return;
+            e.preventDefault();
+            const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
+            const t = timeFromY(y, drag.lesson.duration_min);
+            setDrag((d) => (d ? { ...d, previewTime: t, previewTop: topFor(t) } : d));
+          }}
+          onDragLeave={(e) => {
+            if (e.target === e.currentTarget) setDrag((d) => (d ? { ...d, previewTime: null } : d));
+          }}
+          onDrop={(e) => {
+            if (!drag) return;
+            e.preventDefault();
+            const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
+            const t = timeFromY(y, drag.lesson.duration_min);
+            const lesson = drag.lesson;
+            setDrag(null);
+            if (t && t !== fmtTime(lesson.start_time)) onMoveTime(lesson, t);
+          }}
         >
           {hours.map((h) => (
             <div key={h} className="hour-line" style={{ top: (h - DAY_START_HOUR) * HOUR_PX }} />
           ))}
-          {lessons.map((l) => (
+          {/* preview of where the lesson would land */}
+          {drag && drag.previewTime && (
+            <div className="drop-shadow"
+                 style={{ top: drag.previewTop, height: heightFor(drag.lesson.duration_min) }}>
+              {drag.previewTime}
+            </div>
+          )}
+          {lessons.map((l) => {
+            const movable = Boolean(onMoveTime) && !l.completed && !l.cancelled;
+            return (
             <div
               key={l.id}
-              className={`event${l.completed ? " done" : ""}${l.cancelled ? " cancelled" : ""}`}
+              className={`event${l.completed ? " done" : ""}${l.cancelled ? " cancelled" : ""}${drag && drag.lesson.id === l.id ? " dragging" : ""}`}
               style={{
                 top: topFor(fmtTime(l.start_time)),
                 height: heightFor(l.duration_min),
                 left: 8,
                 width: "calc(100% - 16px)",
               }}
+              draggable={movable}
+              onDragStart={() => setDrag({
+                lesson: l,
+                previewTime: fmtTime(l.start_time),
+                previewTop: topFor(fmtTime(l.start_time)),
+              })}
+              onDragEnd={() => setDrag(null)}
               onClick={(e) => { e.stopPropagation(); onPick && onPick(l); }}
             >
               <span className="t">{fmtTime(l.start_time)} {l.rescheduled ? "↻" : ""}</span>
@@ -260,7 +310,8 @@ function DayView({ day, lessons, onPick, label }) {
               )}
               {!l.cancelled && l.price != null && <span className="p">{fmtMoney(l.price)}</span>}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

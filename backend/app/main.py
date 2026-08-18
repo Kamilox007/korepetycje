@@ -878,6 +878,34 @@ def create_payment(
     return item
 
 
+@app.patch("/api/payments/{payment_id}", response_model=schemas.PaymentOut)
+def update_payment(
+    payment_id: int,
+    payload: schemas.PaymentUpdate,
+    user: models.User = Depends(auth.require_staff),
+    db: Session = Depends(get_db),
+):
+    """Correct a recorded payment: who paid, when, how much, any note.
+
+    The student is deliberately not editable. Moving a payment between students
+    changes two balances at once, which is a transfer rather than a correction;
+    deleting and re-entering makes that visible in the history.
+    """
+    payment = db.get(models.Payment, payment_id)
+    if not payment:
+        raise HTTPException(404, "Wpłata nie znaleziona")
+
+    data = payload.model_dump(exclude_unset=True)
+    if "amount" in data:
+        payment.amount = data.pop("amount")
+    for k, v in data.items():
+        setattr(payment, k, v)
+
+    db.commit()
+    db.refresh(payment)
+    return payment
+
+
 @app.delete("/api/payments/{payment_id}")
 def delete_payment(
     payment_id: int,

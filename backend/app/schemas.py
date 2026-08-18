@@ -138,6 +138,14 @@ class PaymentCreate(PaymentBase):
     pass
 
 
+class PaymentUpdate(BaseModel):
+    """Every field optional: only what is sent gets changed."""
+    amount: float | None = None
+    date: date_t | None = None
+    payer: str | None = None
+    note: str | None = None
+
+
 class PaymentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
