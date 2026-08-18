@@ -10,25 +10,54 @@ export default function Students({ students, reload }) {
   const [showStudent, setShowStudent] = useState(false);
   const [showSeries, setShowSeries] = useState(false);
   const [accountFor, setAccountFor] = useState(null);
+  const [archived, setArchived] = useState([]);
+  const [showArchive, setShowArchive] = useState(false);
+
+  async function loadArchive() {
+    setArchived(await api.listStudents(true));
+  }
+  useEffect(() => { loadArchive(); }, [students]);
 
   async function loadSeries() {
     setSeries(await api.listSeries());
   }
   useEffect(() => { loadSeries(); }, []);
 
-  async function removeStudent(s) {
+  async function archiveStudent(s) {
     const ok = await confirm({
-      title: "Usunąć ucznia?",
-      message: `Konto i cała historia ucznia ${s.name} zostaną usunięte.`,
+      title: "Zarchiwizować ucznia?",
+      message: `${s.name} zniknie z list, terminarza i podsumowania.`,
       consequence:
-        "Razem z uczniem znikną wszystkie jego zajęcia, wpłaty i saldo. " +
-        "Tej operacji nie da się cofnąć.",
-      requireText: s.name,
-      confirmLabel: "Usuń ucznia",
+        "Historia zajęć i wpłat zostaje zachowana — ucznia można przywrócić. " +
+        "Konto logowania zostanie usunięte, a przyszłe nieodbyte zajęcia skasowane.",
+      confirmLabel: "Archiwizuj",
+      danger: false,
     });
     if (!ok) return;
-    await api.deleteStudent(s.id);
+    await api.archiveStudent(s.id);
     reload();
+    loadArchive();
+  }
+
+  async function restoreStudent(s) {
+    await api.restoreStudent(s.id);
+    reload();
+    loadArchive();
+  }
+
+  async function purgeStudent(s) {
+    const ok = await confirm({
+      title: "Usunąć dane trwale?",
+      message: `Wszystkie dane ucznia ${s.name} zostaną nieodwracalnie usunięte.`,
+      consequence:
+        "Znikną zajęcia, wpłaty i cała historia rozliczeń. Tej operacji nie da " +
+        "się cofnąć — służy do realizacji żądania usunięcia danych (RODO).",
+      requireText: s.name,
+      confirmLabel: "Usuń trwale",
+    });
+    if (!ok) return;
+    await api.purgeStudent(s.id);
+    loadArchive();
   }
 
   async function removeSeries(srs) {
@@ -62,6 +91,36 @@ export default function Students({ students, reload }) {
         </div>
       </div>
 
+      {archived.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <button className="ghost" onClick={() => setShowArchive((v) => !v)}>
+            {showArchive ? "Ukryj archiwum" : `Archiwum (${archived.length})`}
+          </button>
+        </div>
+      )}
+
+      {showArchive && archived.length > 0 && (
+        <div className="card" style={{ marginBottom: 24 }}>
+          <table>
+            <thead>
+              <tr><th>Imię i nazwisko</th><th>Zarchiwizowany</th><th></th></tr>
+            </thead>
+            <tbody>
+              {archived.map((s) => (
+                <tr key={s.id}>
+                  <td style={{ fontWeight: 500 }}>{s.name}</td>
+                  <td className="muted">{(s.archived_at || "").slice(0, 10)}</td>
+                  <td className="num">
+                    <button className="ghost" onClick={() => restoreStudent(s)}>Przywróć</button>
+                    <button className="ghost danger" onClick={() => purgeStudent(s)}>Usuń trwale</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       <div className="card" style={{ marginBottom: 24 }}>
         {students.length === 0 ? (
           <div className="empty">
@@ -85,7 +144,7 @@ export default function Students({ students, reload }) {
                       : <button className="ghost" onClick={() => setAccountFor(s)}>Załóż konto</button>}
                   </td>
                   <td className="num">
-                    <button className="ghost danger" onClick={() => removeStudent(s)}>Usuń</button>
+                    <button className="ghost" onClick={() => archiveStudent(s)}>Archiwizuj</button>
                   </td>
                 </tr>
               ))}

@@ -64,10 +64,15 @@ export const api = {
   logout: () => req("/auth/logout", { method: "POST" }),
 
   // ----- students (korepetytor) -----
-  listStudents: () => req("/students"),
+  listStudents: (archived = false) =>
+    req(`/students${archived ? "?archived=true" : ""}`),
   createStudent: (data) => req("/students", { method: "POST", body: JSON.stringify(data) }),
   updateStudent: (id, data) => req(`/students/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-  deleteStudent: (id) => req(`/students/${id}`, { method: "DELETE" }),
+  // Archiwizuje: uczeń znika z list, historia zostaje.
+  archiveStudent: (id) => req(`/students/${id}`, { method: "DELETE" }),
+  restoreStudent: (id) => req(`/students/${id}/restore`, { method: "POST" }),
+  // Nieodwracalne usunięcie danych (RODO art. 17). Tylko admin, tylko z archiwum.
+  purgeStudent: (id) => req(`/students/${id}/purge`, { method: "DELETE" }),
   createStudentAccount: (id, data) =>
     req(`/students/${id}/account`, { method: "POST", body: JSON.stringify(data) }),
   deleteStudentAccount: (id) => req(`/students/${id}/account`, { method: "DELETE" }),

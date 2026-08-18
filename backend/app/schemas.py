@@ -27,6 +27,7 @@ class StudentOut(StudentBase):
     created_at: datetime
     user_id: int | None = None
     has_account: bool = False
+    archived_at: datetime | None = None
 
 
 # ---------- Lesson ----------

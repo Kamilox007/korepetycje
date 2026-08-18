@@ -61,6 +61,11 @@ class Student(Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
+    # Soft delete. Removing a student used to cascade into their payments, which
+    # meant one click destroyed the financial record. Archiving hides them from
+    # the lists while every lesson and payment stays intact.
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+
     user: Mapped["User"] = relationship(
         back_populates="student_profile", foreign_keys=[user_id]
     )

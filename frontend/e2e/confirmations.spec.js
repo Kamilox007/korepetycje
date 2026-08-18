@@ -7,22 +7,52 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe("deletion confirmations", () => {
-  test("deleting a student requires retyping the name", async ({ page }) => {
+  test("archiving a student keeps their history and can be undone", async ({ page }) => {
     const name = "Anna Test";
     await addStudent(page, name);
 
     await page
       .getByRole("row", { name: new RegExp(name) })
-      .getByRole("button", { name: "Usuń" })
+      .getByRole("button", { name: "Archiwizuj" })
       .click();
 
     const dialog = confirmDialog(page);
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText(name);
+    // The wording has to say what actually happens: nothing is destroyed here.
+    await expect(dialog).toContainText("zostaje zachowana");
+
+    await dialog.getByRole("button", { name: "Archiwizuj" }).click();
+    await expect(page.getByRole("cell", { name })).toHaveCount(0);
+
+    // The student is recoverable, which is the entire reason for archiving.
+    await page.getByRole("button", { name: /Archiwum \(\d+\)/ }).click();
+    await expect(page.getByRole("cell", { name })).toBeVisible();
+    await page.getByRole("button", { name: "Przywróć" }).first().click();
+    await expect(page.getByRole("cell", { name })).toBeVisible();
+  });
+
+  test("permanent deletion requires retyping the name", async ({ page }) => {
+    const name = "Bea Purge";
+    await addStudent(page, name);
+
+    await page
+      .getByRole("row", { name: new RegExp(name) })
+      .getByRole("button", { name: "Archiwizuj" })
+      .click();
+    await confirmDialog(page).getByRole("button", { name: "Archiwizuj" }).click();
+
+    await page.getByRole("button", { name: /Archiwum \(\d+\)/ }).click();
+    await page
+      .getByRole("row", { name: new RegExp(name) })
+      .getByRole("button", { name: "Usuń trwale" })
+      .click();
+
+    const dialog = confirmDialog(page);
     await expect(dialog).toContainText("nie da się cofnąć");
 
     // This is the point of the guard: clicking "yes" on autopilot is not enough.
-    const button = dialog.getByRole("button", { name: "Usuń ucznia" });
+    const button = dialog.getByRole("button", { name: "Usuń trwale" });
     await expect(button).toBeDisabled();
 
     await dialog.getByPlaceholder(name).fill("something else");
@@ -35,13 +65,13 @@ test.describe("deletion confirmations", () => {
     await expect(page.getByRole("cell", { name })).toHaveCount(0);
   });
 
-  test("cancelling does not delete the student", async ({ page }) => {
+  test("cancelling does not archive the student", async ({ page }) => {
     const name = "Bart Stays";
     await addStudent(page, name);
 
     await page
       .getByRole("row", { name: new RegExp(name) })
-      .getByRole("button", { name: "Usuń" })
+      .getByRole("button", { name: "Archiwizuj" })
       .click();
     await confirmDialog(page).getByRole("button", { name: "Anuluj" }).click();
 
@@ -54,14 +84,18 @@ test.describe("deletion confirmations", () => {
     await addStudent(page, name);
 
     const row = page.getByRole("row", { name: new RegExp(name) });
-    await row.getByRole("button", { name: "Usuń" }).click();
+    await row.getByRole("button", { name: "Archiwizuj" }).click();
+    await confirmDialog(page).getByRole("button", { name: "Archiwizuj" }).click();
+    await page.getByRole("button", { name: /Archiwum \(\d+\)/ }).click();
+    const arch = page.getByRole("row", { name: new RegExp(name) });
+    await arch.getByRole("button", { name: "Usuń trwale" }).click();
     await confirmDialog(page).getByPlaceholder(name).fill(name);
     await confirmDialog(page).getByRole("button", { name: "Anuluj" }).click();
 
-    await row.getByRole("button", { name: "Usuń" }).click();
+    await arch.getByRole("button", { name: "Usuń trwale" }).click();
     await expect(confirmDialog(page).getByPlaceholder(name)).toHaveValue("");
     await expect(
-      confirmDialog(page).getByRole("button", { name: "Usuń ucznia" })
+      confirmDialog(page).getByRole("button", { name: "Usuń trwale" })
     ).toBeDisabled();
   });
 
@@ -71,7 +105,7 @@ test.describe("deletion confirmations", () => {
 
     await page
       .getByRole("row", { name: new RegExp(name) })
-      .getByRole("button", { name: "Usuń" })
+      .getByRole("button", { name: "Archiwizuj" })
       .click();
     // Click the corner of the overlay, outside the dialog itself.
     await confirmDialog(page).click({ position: { x: 5, y: 5 } });

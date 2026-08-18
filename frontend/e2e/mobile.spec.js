@@ -48,14 +48,13 @@ test("the confirmation dialog stays usable with the keyboard open", async ({ pag
 
   await page
     .getByRole("row", { name: new RegExp(name) })
-    .getByRole("button", { name: "Usuń" })
+    .getByRole("button", { name: "Archiwizuj" })
     .click();
 
   const dialog = confirmDialog(page);
-  await dialog.getByPlaceholder(name).fill(name);
 
-  // The button must remain visible and clickable despite the text field above.
-  const button = dialog.getByRole("button", { name: "Usuń ucznia" });
+  // The button must remain visible and clickable despite the dialog layout.
+  const button = dialog.getByRole("button", { name: "Archiwizuj" });
   await expect(button).toBeInViewport();
   await button.click();
   await expect(page.getByRole("cell", { name })).toHaveCount(0);

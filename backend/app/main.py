@@ -340,9 +340,16 @@ def _student_out(s: models.Student) -> schemas.StudentOut:
 
 
 @app.get("/api/students", response_model=list[schemas.StudentOut])
-def list_students(user: models.User = Depends(auth.require_staff), db: Session = Depends(get_db)):
-    rows = db.query(models.Student).order_by(models.Student.name).all()
-    return [_student_out(s) for s in rows]
+def list_students(
+    archived: bool = False,
+    user: models.User = Depends(auth.require_staff),
+    db: Session = Depends(get_db),
+):
+    """Active students by default; `?archived=true` lists the archive instead."""
+    q = db.query(models.Student)
+    q = q.filter(models.Student.archived_at.isnot(None)) if archived \
+        else q.filter(models.Student.archived_at.is_(None))
+    return [_student_out(s) for s in q.order_by(models.Student.name).all()]
 
 
 @app.post("/api/students", response_model=schemas.StudentOut)
@@ -386,14 +393,72 @@ def delete_student(
     user: models.User = Depends(auth.require_staff),
     db: Session = Depends(get_db),
 ):
+    """Archive a student: hide them from the lists, keep every record.
+
+    Their login account is removed, so access ends immediately, and unfinished
+    future lessons are dropped because they will not happen. Completed lessons
+    and payments stay, because they are the settlement history.
+    """
     student = _get_student(db, student_id)
+    if student.archived_at:
+        raise HTTPException(400, "Uczeń jest już zarchiwizowany")
+
     if student.user_id:
         acc = db.get(models.User, student.user_id)
         if acc:
+            auth.revoke_user_sessions(db, acc.id)
             db.delete(acc)
+        student.user_id = None
+
+    today = date.today()
+    db.query(models.Lesson).filter(
+        models.Lesson.student_id == student.id,
+        models.Lesson.date >= today,
+        models.Lesson.completed.is_(False),
+    ).delete(synchronize_session=False)
+    db.query(models.LessonSeries).filter(
+        models.LessonSeries.student_id == student.id
+    ).update({models.LessonSeries.active: False}, synchronize_session=False)
+
+    student.archived_at = auth.utcnow()
+    db.commit()
+    return {"ok": True, "archived": True}
+
+
+@app.post("/api/students/{student_id}/restore", response_model=schemas.StudentOut)
+def restore_student(
+    student_id: int,
+    user: models.User = Depends(auth.require_staff),
+    db: Session = Depends(get_db),
+):
+    """Bring an archived student back. Their series stay inactive on purpose:
+    resuming lessons is a separate decision from undoing a mistaken archive."""
+    student = _get_student(db, student_id)
+    if not student.archived_at:
+        raise HTTPException(400, "Uczeń nie jest zarchiwizowany")
+    student.archived_at = None
+    db.commit()
+    return _student_out(student)
+
+
+@app.delete("/api/students/{student_id}/purge")
+def purge_student(
+    student_id: int,
+    user: models.User = Depends(auth.require_admin),
+    db: Session = Depends(get_db),
+):
+    """Erase a student and everything attached to them, irreversibly.
+
+    Exists for erasure requests under GDPR art. 17, which archiving cannot
+    satisfy. Admin only, and only for an already archived student, so it cannot
+    happen by a slip of the hand.
+    """
+    student = _get_student(db, student_id)
+    if not student.archived_at:
+        raise HTTPException(400, "Najpierw zarchiwizuj ucznia")
     db.delete(student)
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "purged": True}
 
 
 @app.post("/api/students/{student_id}/account", response_model=schemas.StudentAccountOut)
@@ -722,7 +787,12 @@ def _summary_for_students(students):
 
 @app.get("/api/summary", response_model=schemas.SummaryOut)
 def get_summary(user: models.User = Depends(auth.require_staff), db: Session = Depends(get_db)):
-    students = db.query(models.Student).order_by(models.Student.name).all()
+    students = (
+        db.query(models.Student)
+        .filter(models.Student.archived_at.is_(None))
+        .order_by(models.Student.name)
+        .all()
+    )
     return _summary_for_students(students)
 
 
