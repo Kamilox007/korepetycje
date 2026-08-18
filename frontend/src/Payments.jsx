@@ -88,6 +88,22 @@ export default function Payments({ students, reload }) {
   );
 }
 
+/** Tutors this student actually has lessons with. Offering the full staff list
+ *  would invite crediting money to somebody who never taught them. */
+function useStudentTutors(studentId) {
+  const [tutors, setTutors] = useState([]);
+  useEffect(() => {
+    if (!studentId) { setTutors([]); return; }
+    api.summary()
+      .then((s) => {
+        const row = s.students.find((r) => r.student_id === Number(studentId));
+        setTutors((row?.by_tutor || []).filter((t) => t.tutor_id));
+      })
+      .catch(() => setTutors([]));
+  }, [studentId]);
+  return tutors;
+}
+
 function PaymentForm({ students, onClose, onSaved }) {
   const uid = useId();
   const [studentId, setStudentId] = useState(students[0]?.id || "");
@@ -96,7 +112,9 @@ function PaymentForm({ students, onClose, onSaved }) {
   const [date, setDate] = useState(today);
   const [payer, setPayer] = useState("");
   const [note, setNote] = useState("");
+  const [tutorId, setTutorId] = useState("");
   const [busy, setBusy] = useState(false);
+  const tutors = useStudentTutors(studentId);
 
   if (!students.length) {
     return <Modal title="Brak uczniów" onClose={onClose}><p>Najpierw dodaj ucznia.</p></Modal>;
@@ -111,6 +129,7 @@ function PaymentForm({ students, onClose, onSaved }) {
       date,
       payer: payer || null,
       note: note || null,
+      assigned_tutor_id: tutorId ? Number(tutorId) : null,
     });
     onSaved();
   }
@@ -132,6 +151,24 @@ function PaymentForm({ students, onClose, onSaved }) {
           {students.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
       </div>
+
+      {tutors.length > 1 && (
+        <div>
+          <label htmlFor={`${uid}-tutor`}>Dla którego korepetytora</label>
+          <select id={`${uid}-tutor`} value={tutorId} onChange={(e) => setTutorId(e.target.value)}>
+            <option value="">— wybierz —</option>
+            {tutors.map((t) => (
+              <option key={t.tutor_id} value={t.tutor_id}>
+                {t.tutor_name}{t.balance < 0 ? ` (zalega ${(-t.balance).toFixed(2)} zł)` : ""}
+              </option>
+            ))}
+          </select>
+          <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+            Uczeń ma zajęcia u kilku osób — wpłata zmniejszy saldo tylko u wybranej.
+          </p>
+        </div>
+      )}
+
       <div className="field-row">
         <div>
           <label htmlFor={`${uid}-kwota-pln-2`}>Kwota (PLN)</label>

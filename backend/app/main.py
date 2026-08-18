@@ -271,6 +271,18 @@ def update_user(
     if target.role in ("admin", "secretary") and user.role != "admin":
         raise HTTPException(403, "Brak uprawnień do edycji tego konta")
     data = payload.model_dump(exclude_unset=True)
+
+    if "bank_account" in data:
+        # Restricted to admins. The risk with an account number is not that it
+        # is seen — it goes on every invoice — but that it is swapped, which
+        # silently redirects every payment until somebody notices.
+        if user.role != "admin":
+            raise HTTPException(403, "Tylko administrator zmienia numer rachunku")
+        acc = transfer_code.normalize_account(data["bank_account"] or "")
+        if acc and not transfer_code.valid_account(acc):
+            raise HTTPException(400, "Numer rachunku jest nieprawidłowy")
+        data["bank_account"] = acc or None
+
     for k, v in data.items():
         setattr(target, k, v)
     db.commit()
@@ -570,6 +582,11 @@ def list_series(user: models.User = Depends(auth.require_staff), db: Session = D
         if s.subject_id:
             subj = db.get(models.Subject, s.subject_id)
             item.subject_name = subj.name if subj else None
+        if s.assigned_tutor_id:
+            t = db.get(models.User, s.assigned_tutor_id)
+            if t:
+                item.assigned_tutor_name = t.display_name or t.username
+                item.assigned_tutor_color = t.color
         out.append(item)
     return out
 

@@ -126,6 +126,8 @@ class SeriesOut(SeriesBase):
     id: int
     active: bool
     subject_name: str | None = None
+    assigned_tutor_name: str | None = None
+    assigned_tutor_color: str | None = None
 
 
 # ---------- Payment ----------
@@ -293,11 +295,14 @@ class UserOut(BaseModel):
     role: str
     display_name: str | None = None
     color: str | None = None
+    bank_account: str | None = None
 
 
 class UserUpdate(BaseModel):
     display_name: str | None = None
     color: str | None = None
+    # Admin only; see the handler for why.
+    bank_account: str | None = None
 
 
 class UserCreatedOut(BaseModel):

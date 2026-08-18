@@ -164,12 +164,34 @@ export default function Students({ students, reload }) {
         ) : (
           <table>
             <thead>
-              <tr><th>Uczeń</th><th>Dzień</th><th>Godzina</th><th className="num">Cena</th><th>Od</th><th></th></tr>
+              <tr>
+                <th>Uczeń</th><th>Przedmiot</th><th>Prowadzący</th>
+                <th>Dzień</th><th>Godzina</th><th className="num">Cena</th><th>Od</th><th></th>
+              </tr>
             </thead>
             <tbody>
               {activeSeries.map((s) => (
                 <tr key={s.id}>
                   <td style={{ fontWeight: 500 }}>{studentName(s.student_id)}</td>
+                  <td>
+                    {s.subject_name || <span className="muted">—</span>}
+                    {s.level && (
+                      <span className="muted" style={{ fontSize: 12 }}>
+                        {" "}· {s.level === "rozszerzenie" ? "R" : "P"}
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    {s.assigned_tutor_name ? (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <span className="legend-dot"
+                              style={{ background: s.assigned_tutor_color || "var(--ink-faint)" }} />
+                        {s.assigned_tutor_name}
+                      </span>
+                    ) : (
+                      <span className="muted">nieprzypisany</span>
+                    )}
+                  </td>
                   <td>{DAYS_PL[s.weekday]}</td>
                   <td>{fmtTime(s.start_time)}</td>
                   <td className="num">{fmtMoney(s.price)}</td>

@@ -31,6 +31,7 @@ const STAFF_TABS = [
 
 const TUTOR_TABS = [
   { path: "/zajecia", label: "Zajęcia" },
+  { path: "/rozliczenia", label: "Rozliczenia" },
   { path: "/prosby", label: "Prośby" },
   { path: "/dyspozycyjnosc", label: "Dyspozycyjność" },
 ];
@@ -106,6 +107,7 @@ export default function App() {
                    subtitle="panel korepetytora" tabs={TUTOR_TABS} badge={pending}>
           <Routes>
             <Route path="/zajecia" element={<TutorPanel section="lessons" />} />
+            <Route path="/rozliczenia" element={<Summary tutorView />} />
             <Route path="/prosby" element={<TutorPanel section="requests" />} />
             <Route path="/dyspozycyjnosc" element={<TutorPanel section="availability" />} />
             <Route path="*" element={<Navigate to="/zajecia" replace />} />

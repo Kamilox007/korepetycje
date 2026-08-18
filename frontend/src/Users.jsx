@@ -62,7 +62,7 @@ export default function Users({ myRole }) {
       {err && <div className="err">{err}</div>}
 
       {myRole === "admin" && (
-        <Section title="Administracja" users={staff} onRemove={remove} onReset={resetPassword} />
+        <Section title="Administracja" users={staff} onRemove={remove} onReset={resetPassword} showColor onColor={setColorFor} />
       )}
       <Section title="Korepetytorzy" users={tutors} onRemove={remove} onReset={resetPassword} showColor onColor={setColorFor} />
       <Section title="Uczniowie (konta)" users={students} onRemove={remove} onReset={resetPassword} />
@@ -90,7 +90,7 @@ export default function Users({ myRole }) {
         <UserForm myRole={myRole} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); load(); }} />
       )}
       {colorFor && (
-        <ColorModal user={colorFor} onClose={() => setColorFor(null)} onSaved={() => { setColorFor(null); load(); }} />
+        <ColorModal user={colorFor} myRole={myRole} onClose={() => setColorFor(null)} onSaved={() => { setColorFor(null); load(); }} />
       )}
     </div>
   );
@@ -155,23 +155,56 @@ function ColorPicker({ value, onChange }) {
   );
 }
 
-function ColorModal({ user, onClose, onSaved }) {
+function ColorModal({ user, myRole, onClose, onSaved }) {
   const uid = useId();
   const [color, setColor] = useState(user.color || TUTOR_COLORS[0]);
+  const [account, setAccount] = useState(user.bank_account || "");
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
   async function save() {
     setBusy(true);
-    await api.updateUser(user.id, { color });
-    onSaved();
+    setErr("");
+    try {
+      const data = { color };
+      // Only an admin may touch the account, so anyone else sends colour alone
+      // and the backend never has to reject the request.
+      if (myRole === "admin") data.bank_account = account.trim() || null;
+      await api.updateUser(user.id, data);
+      onSaved();
+    } catch (e) {
+      setErr(e.message);
+      setBusy(false);
+    }
   }
+
   return (
-    <Modal title={`Kolor — ${user.display_name || user.username}`} onClose={onClose}
+    <Modal title={`Ustawienia — ${user.display_name || user.username}`} onClose={onClose}
       footer={<>
         <button onClick={onClose}>Anuluj</button>
         <button className="primary" onClick={save} disabled={busy}>Zapisz</button>
       </>}>
-      <label>Wybierz kolor w kalendarzu</label>
+      {err && <div className="err">{err}</div>}
+
+      <label>Kolor w kalendarzu</label>
       <ColorPicker value={color} onChange={setColor} />
+
+      {myRole === "admin" && (
+        <div style={{ marginTop: 18 }}>
+          <label htmlFor={`${uid}-account`}>Numer rachunku</label>
+          <input
+            id={`${uid}-account`}
+            value={account}
+            onChange={(e) => setAccount(e.target.value)}
+            placeholder="26 cyfr, można wkleić ze spacjami"
+          />
+          <p className="muted" style={{ fontSize: 12, marginTop: 6, marginBottom: 0 }}>
+            Na ten rachunek uczniowie tego korepetytora wysyłają przelewy — kod QR
+            w ich panelu wskazuje właśnie tutaj. Suma kontrolna jest sprawdzana
+            przy zapisie.
+          </p>
+        </div>
+      )}
     </Modal>
   );
 }

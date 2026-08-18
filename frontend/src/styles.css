@@ -331,6 +331,10 @@ tbody tr:hover { background: var(--surface-2); }
 .transfer-value { font-size: 15px; }
 .transfer-details button { padding: 4px 10px; font-size: 12px; }
 
+/* Per-tutor breakdown under a student's row: recessed so the eye reads the
+   student line first and the split as detail. */
+.sub-row td { background: var(--surface-2); font-size: 13px; padding-top: 6px; padding-bottom: 6px; }
+
 .transfer-note { font-size: 12px; margin: 16px 0 0; max-width: 620px; }
 
 /* One block per tutor, separated only when there is more than one. */
