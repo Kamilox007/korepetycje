@@ -29,6 +29,10 @@ TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 PASSWORD_RESET_EXPIRE_MINUTES = 30
 
 # Account lockout after a run of failed attempts.
+# Single source of truth: the same limit applies to a self-service change
+# and to a reset performed by staff.
+MIN_PASSWORD_LENGTH = 10
+
 MAX_FAILED_LOGINS = 5
 LOCKOUT_MINUTES = 15
 

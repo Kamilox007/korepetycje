@@ -1,4 +1,5 @@
 import os
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 from datetime import date, timedelta
@@ -158,8 +159,11 @@ def change_password(
 ):
     if not auth.verify_password(payload.old_password, user.password_hash):
         raise HTTPException(status_code=400, detail="Błędne dotychczasowe hasło")
-    if len(payload.new_password) < 10:
-        raise HTTPException(status_code=400, detail="Nowe hasło musi mieć min. 10 znaków")
+    if len(payload.new_password) < auth.MIN_PASSWORD_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Nowe hasło musi mieć min. {auth.MIN_PASSWORD_LENGTH} znaków",
+        )
     if auth.verify_password(payload.new_password, user.password_hash):
         raise HTTPException(status_code=400, detail="Nowe hasło musi różnić się od dotychczasowego")
     user.password_hash = auth.hash_password(payload.new_password)
@@ -264,6 +268,47 @@ def update_user(
     db.commit()
     db.refresh(target)
     return target
+
+
+@app.post("/api/users/{user_id}/reset-password", response_model=schemas.UserCreatedOut)
+def reset_user_password(
+    user_id: int,
+    payload: schemas.PasswordResetIn | None = None,
+    user: models.User = Depends(auth.require_staff),
+    db: Session = Depends(get_db),
+):
+    """Set a starting password for a staff account and force a change at next login.
+
+    For the case a tutor forgets their password. The new password is shown once,
+    in the response; nothing stores it in readable form afterwards. Every session
+    of that account is revoked, so a reset also ends access from anywhere the old
+    password was still in use.
+    """
+    target = db.get(models.User, user_id)
+    if not target:
+        raise HTTPException(404, "Użytkownik nie znaleziony")
+    # Same rule as when creating accounts: a secretary handles tutors only.
+    if target.role in ("admin", "secretary") and user.role != "admin":
+        raise HTTPException(403, "Brak uprawnień do resetu hasła tego konta")
+    if target.id == user.id:
+        raise HTTPException(400, "Własne hasło zmień przez „Zmień hasło”")
+
+    new_password = (payload.password if payload and payload.password else None) \
+        or secrets.token_urlsafe(9)
+    if len(new_password) < auth.MIN_PASSWORD_LENGTH:
+        raise HTTPException(400, f"Hasło musi mieć co najmniej {auth.MIN_PASSWORD_LENGTH} znaków")
+
+    target.password_hash = auth.hash_password(new_password)
+    target.must_change_password = True
+    target.failed_logins = 0
+    target.locked_until = None
+    auth.revoke_user_sessions(db, target.id)
+    db.commit()
+
+    return schemas.UserCreatedOut(
+        id=target.id, username=target.username, role=target.role,
+        display_name=target.display_name, password=new_password,
+    )
 
 
 @app.delete("/api/users/{user_id}")

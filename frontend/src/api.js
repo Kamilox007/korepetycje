@@ -115,6 +115,9 @@ export const api = {
   createUser: (data) => req("/users", { method: "POST", body: JSON.stringify(data) }),
   updateUser: (id, data) => req(`/users/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteUser: (id) => req(`/users/${id}`, { method: "DELETE" }),
+  // Zwraca nowe hasło startowe — pokazywane raz, nigdzie nie przechowywane.
+  resetUserPassword: (id) =>
+    req(`/users/${id}/reset-password`, { method: "POST", body: JSON.stringify({}) }),
   assignTutor: (lessonId, tutorId) =>
     req(`/lessons/${lessonId}/assign${tutorId ? `?tutor_id=${tutorId}` : ""}`, { method: "POST" }),
 

@@ -29,6 +29,7 @@ export default function App() {
   const [auth, setAuth] = useState(null);
   const [loading, setLoading] = useState(true);
   const [forcePw, setForcePw] = useState(false);
+  const [showPw, setShowPw] = useState(false);
 
   useEffect(() => {
     setUnauthorizedHandler(() => setAuth(null));
@@ -74,14 +75,15 @@ export default function App() {
 
   return (
     <>
-      {isStaff && <StaffShell auth={auth} onLogout={logout} />}
-      {auth.role === "tutor" && <RoleShell auth={auth} onLogout={logout} subtitle="panel korepetytora"><TutorPanel /></RoleShell>}
-      {auth.role === "student" && <RoleShell auth={auth} onLogout={logout} subtitle="panel ucznia"><StudentPanel /></RoleShell>}
+      {isStaff && <StaffShell auth={auth} onLogout={logout} onChangePassword={() => setShowPw(true)} />}
+      {auth.role === "tutor" && <RoleShell auth={auth} onLogout={logout} onChangePassword={() => setShowPw(true)} subtitle="panel korepetytora"><TutorPanel /></RoleShell>}
+      {auth.role === "student" && <RoleShell auth={auth} onLogout={logout} onChangePassword={() => setShowPw(true)} subtitle="panel ucznia"><StudentPanel /></RoleShell>}
+      {showPw && <ChangePassword onClose={() => setShowPw(false)} onDone={() => setShowPw(false)} />}
     </>
   );
 }
 
-function Sidebar({ auth, subtitle, onLogout, tabs, activeTab, setTab, badge }) {
+function Sidebar({ auth, subtitle, onLogout, onChangePassword, tabs, activeTab, setTab, badge }) {
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -97,6 +99,7 @@ function Sidebar({ auth, subtitle, onLogout, tabs, activeTab, setTab, badge }) {
       <div className="spacer" />
       <div className="sidebar-user">
         <div className="muted" style={{ fontSize: 12, padding: "0 8px 6px" }}>{auth.display_name || auth.username}</div>
+        <button className="nav-item" onClick={onChangePassword}><span>Zmień hasło</span></button>
         <button className="nav-item" onClick={onLogout}><span>Wyloguj</span></button>
       </div>
     </aside>
@@ -104,16 +107,16 @@ function Sidebar({ auth, subtitle, onLogout, tabs, activeTab, setTab, badge }) {
 }
 
 // Simple shell for roles without tabs (tutor, student)
-function RoleShell({ auth, subtitle, onLogout, children }) {
+function RoleShell({ auth, subtitle, onLogout, onChangePassword, children }) {
   return (
     <div className="app">
-      <Sidebar auth={auth} subtitle={subtitle} onLogout={onLogout} tabs={[]} activeTab="" setTab={() => {}} badge={0} />
+      <Sidebar auth={auth} subtitle={subtitle} onLogout={onLogout} onChangePassword={onChangePassword} onChangePassword={onChangePassword} tabs={[]} activeTab="" setTab={() => {}} badge={0} />
       <main className="main">{children}</main>
     </div>
   );
 }
 
-function StaffShell({ auth, onLogout }) {
+function StaffShell({ auth, onLogout, onChangePassword }) {
   const [tab, setTab] = usePersistentState("staff_tab", "calendar");
   const [students, setStudents] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -133,7 +136,7 @@ function StaffShell({ auth, onLogout }) {
 
   return (
     <div className="app">
-      <Sidebar auth={auth} subtitle={subtitle} onLogout={onLogout}
+      <Sidebar auth={auth} subtitle={subtitle} onLogout={onLogout} onChangePassword={onChangePassword}
         tabs={STAFF_TABS} activeTab={tab} setTab={setTab} badge={pending} />
       <main className="main">
         {tab === "calendar" && <Calendar students={students} onChanged={refresh} />}

@@ -12,12 +12,28 @@ export default function Users({ myRole }) {
   const [showForm, setShowForm] = useState(false);
   const [colorFor, setColorFor] = useState(null);
   const [err, setErr] = useState("");
+  const [resetResult, setResetResult] = useState(null);
 
   async function load() {
     try { setUsers(await api.listUsers()); setErr(""); }
     catch { setErr("Nie udało się pobrać użytkowników."); }
   }
   useEffect(() => { load(); }, []);
+
+  async function resetPassword(u) {
+    const ok = await confirm({
+      title: "Zresetować hasło?",
+      message: `${u.display_name || u.username} (${u.username}) dostanie nowe hasło startowe.`,
+      consequence:
+        "Dotychczasowe hasło przestanie działać, a wszystkie sesje tego konta " +
+        "zostaną zamknięte. Przy pierwszym logowaniu użytkownik ustawi własne hasło.",
+      confirmLabel: "Resetuj hasło",
+      danger: false,
+    });
+    if (!ok) return;
+    try { setResetResult(await api.resetUserPassword(u.id)); }
+    catch (e) { alert(e.message); }
+  }
 
   async function remove(u) {
     const ok = await confirm({
@@ -46,10 +62,29 @@ export default function Users({ myRole }) {
       {err && <div className="err">{err}</div>}
 
       {myRole === "admin" && (
-        <Section title="Administracja" users={staff} onRemove={remove} />
+        <Section title="Administracja" users={staff} onRemove={remove} onReset={resetPassword} />
       )}
-      <Section title="Korepetytorzy" users={tutors} onRemove={remove} showColor onColor={setColorFor} />
-      <Section title="Uczniowie (konta)" users={students} onRemove={remove} />
+      <Section title="Korepetytorzy" users={tutors} onRemove={remove} onReset={resetPassword} showColor onColor={setColorFor} />
+      <Section title="Uczniowie (konta)" users={students} onRemove={remove} onReset={resetPassword} />
+
+      {resetResult && (
+        <Modal
+          title="Nowe hasło startowe"
+          onClose={() => setResetResult(null)}
+          footer={<button className="primary" onClick={() => setResetResult(null)}>Gotowe</button>}
+        >
+          <p>
+            Przekaż je użytkownikowi <strong>{resetResult.display_name || resetResult.username}</strong>.
+            Hasło pokazujemy tylko teraz — nigdzie nie jest przechowywane w czytelnej postaci.
+          </p>
+          <div className="card" style={{ padding: 12, marginTop: 10 }}>
+            <div className="muted" style={{ fontSize: 12 }}>Login</div>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>{resetResult.username}</div>
+            <div className="muted" style={{ fontSize: 12 }}>Hasło startowe</div>
+            <code style={{ fontSize: 16 }}>{resetResult.password}</code>
+          </div>
+        </Modal>
+      )}
 
       {showForm && (
         <UserForm myRole={myRole} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); load(); }} />
@@ -61,7 +96,7 @@ export default function Users({ myRole }) {
   );
 }
 
-function Section({ title, users, onRemove, showColor, onColor }) {
+function Section({ title, users, onRemove, onReset, showColor, onColor }) {
   return (
     <>
       <h2 style={{ fontSize: 16, margin: "0 0 12px" }}>{title}</h2>
@@ -90,7 +125,10 @@ function Section({ title, users, onRemove, showColor, onColor }) {
                   <td style={{ fontWeight: 500 }}>{u.display_name || "—"}</td>
                   <td className="muted">{u.username}</td>
                   <td>{ROLE_LABEL[u.role] || u.role}</td>
-                  <td className="num"><button className="ghost danger" onClick={() => onRemove(u)}>Usuń</button></td>
+                  <td className="num">
+                    <button className="ghost" onClick={() => onReset(u)}>Resetuj hasło</button>
+                    <button className="ghost danger" onClick={() => onRemove(u)}>Usuń</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -147,6 +185,7 @@ function UserForm({ myRole, onClose, onSaved }) {
   const [color, setColor] = useState(TUTOR_COLORS[0]);
   const [created, setCreated] = useState(null);
   const [err, setErr] = useState("");
+  const [resetResult, setResetResult] = useState(null);
   const [busy, setBusy] = useState(false);
 
   function gen() { return Math.random().toString(36).slice(2, 8) + Math.floor(Math.random() * 90 + 10); }

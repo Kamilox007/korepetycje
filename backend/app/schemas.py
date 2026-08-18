@@ -246,6 +246,11 @@ class UserCreatedOut(BaseModel):
     password: str | None = None  # returned once, on creation
 
 
+class PasswordResetIn(BaseModel):
+    # Optional: when absent the server generates one.
+    password: str | None = None
+
+
 # lightweight entry for the assignable-tutor list
 class TutorOption(BaseModel):
     id: int
