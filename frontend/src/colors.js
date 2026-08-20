@@ -15,6 +15,14 @@ export const TUTOR_COLORS = [
 // neutral colour for lessons with no tutor assigned
 export const UNASSIGNED_COLOR = "#9b9fab";
 
+// Deterministic colour per student, drawn from the same palette as tutors.
+// Not persisted anywhere: just a stable way to tell students apart at a glance
+// in the tutor/student calendar, where every lesson used to look identical.
+export function colorForStudent(id) {
+  if (id == null) return null;
+  return TUTOR_COLORS[id % TUTOR_COLORS.length];
+}
+
 // lighten a hex colour for use as a background (mix with white)
 export function tint(hex, amount = 0.85) {
   if (!hex) return null;
