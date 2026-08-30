@@ -3,6 +3,7 @@ import {
   DAYS_SHORT, MONTHS_PL, startOfWeek, addDays, toISODate, parseISO,
   sameDay, fmtTime, fmtMoney, monthGrid, DAYS_PL, MONTHS_PL as _M,
 } from "./dates";
+import { colorForStudent, tint } from "./colors";
 
 /**
  * Read-only calendar for the tutor and student panels.
@@ -107,6 +108,16 @@ function chipClass(l) {
   return `mini-chip${l.completed ? " done" : ""}${l.cancelled ? " cancelled" : ""}`;
 }
 
+// Tile colour by student, so a tutor with several students on one day can
+// tell them apart at a glance. Completed/cancelled lessons keep their own
+// styling (green/greyed-out), so they return null here.
+function lessonStyle(l) {
+  if (l.completed || l.cancelled) return null;
+  const c = colorForStudent(l.student_id);
+  if (!c) return null;
+  return { background: tint(c, 0.85), borderLeftColor: c };
+}
+
 /** A lesson tile. Draggable only when moving is allowed and the lesson is still
  *  open: a completed or cancelled one has nothing left to reschedule. */
 function Chip({ lesson, label, onPick, onMove, style }) {
@@ -114,7 +125,7 @@ function Chip({ lesson, label, onPick, onMove, style }) {
   return (
     <div
       className={chipClass(lesson)}
-      style={style}
+      style={{ ...(lessonStyle(lesson) || {}), ...style }}
       draggable={movable}
       onDragStart={(e) => { e.stopPropagation(); window.__dragLesson = lesson; }}
       onDragEnd={() => { window.__dragLesson = null; }}
@@ -291,6 +302,7 @@ function DayView({ day, lessons, onPick, label, onMoveTime }) {
                 height: heightFor(l.duration_min),
                 left: 8,
                 width: "calc(100% - 16px)",
+                ...(lessonStyle(l) || {}),
               }}
               draggable={movable}
               onDragStart={() => setDrag({

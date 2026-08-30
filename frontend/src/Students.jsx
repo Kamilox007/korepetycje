@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useId } from "react";
 import { api } from "./api";
 import Modal from "./Modal";
-import { DAYS_PL, fmtMoney, fmtTime } from "./dates";
+import { DAYS_PL, DURATION_OPTIONS, fmtMoney, fmtTime } from "./dates";
 import { useConfirm } from "./Confirm";
 
 export default function Students({ students, reload }) {
@@ -13,6 +13,7 @@ export default function Students({ students, reload }) {
   const [archived, setArchived] = useState([]);
   const [showArchive, setShowArchive] = useState(false);
   const [editSeries, setEditSeries] = useState(null);
+  const [editStudent, setEditStudent] = useState(null);
 
   // One entry point for reloading everything this view shows. Three separate
   // loaders meant that every new operation had to remember which of them to
@@ -47,6 +48,19 @@ export default function Students({ students, reload }) {
 
   async function restoreStudent(s) {
     await api.restoreStudent(s.id);
+    refresh();
+  }
+
+  async function removeAccount(s) {
+    const ok = await confirm({
+      title: "Usunąć konto ucznia?",
+      message: `${s.name} straci możliwość zalogowania się dotychczasowym loginem.`,
+      consequence:
+        "Zajęcia, wpłaty i saldo zostają bez zmian — możesz od razu założyć nowe konto z innym loginem.",
+      confirmLabel: "Usuń konto",
+    });
+    if (!ok) return;
+    await api.deleteStudentAccount(s.id);
     refresh();
   }
 
@@ -143,11 +157,17 @@ export default function Students({ students, reload }) {
                   <td className="muted">{s.contact || "-"}</td>
                   <td className="num">{fmtMoney(s.default_price)}</td>
                   <td>
-                    {s.has_account
-                      ? <span className="badge done">ma konto</span>
-                      : <button className="ghost" onClick={() => setAccountFor(s)}>Załóż konto</button>}
+                    {s.has_account ? (
+                      <span className="row" style={{ gap: 6, alignItems: "center" }}>
+                        <span className="badge done">ma konto</span>
+                        <button className="ghost" onClick={() => removeAccount(s)}>Usuń konto</button>
+                      </span>
+                    ) : (
+                      <button className="ghost" onClick={() => setAccountFor(s)}>Załóż konto</button>
+                    )}
                   </td>
                   <td className="num">
+                    <button className="ghost" onClick={() => setEditStudent(s)}>Edytuj</button>
                     <button className="ghost" onClick={() => archiveStudent(s)}>Archiwizuj</button>
                   </td>
                 </tr>
@@ -220,6 +240,13 @@ export default function Students({ students, reload }) {
           onSaved={() => { setEditSeries(null); refresh(); }}
         />
       )}
+      {editStudent && (
+        <StudentEditForm
+          student={editStudent}
+          onClose={() => setEditStudent(null)}
+          onSaved={() => { setEditStudent(null); refresh(); }}
+        />
+      )}
 
       {showSeries && (
         <SeriesForm
@@ -239,9 +266,21 @@ export default function Students({ students, reload }) {
   );
 }
 
+// Polish diacritics have no place in a login: swap each for its plain-letter
+// equivalent first, so only actual word separators (spaces, hyphens) turn
+// into dots below — not every ł/ą/ż along the way.
+const PL_DIACRITICS = {
+  ą: "a", ć: "c", ę: "e", ł: "l", ń: "n", ó: "o", ś: "s", ź: "z", ż: "z",
+  Ą: "a", Ć: "c", Ę: "e", Ł: "l", Ń: "n", Ó: "o", Ś: "s", Ź: "z", Ż: "z",
+};
+function toLoginSlug(name) {
+  const ascii = name.replace(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g, (c) => PL_DIACRITICS[c]);
+  return ascii.toLowerCase().replace(/[^a-z0-9]+/g, ".").replace(/^\.|\.$/g, "");
+}
+
 function AccountForm({ student, onClose, onSaved }) {
   const uid = useId();
-  const suggested = student.name.toLowerCase().replace(/[^a-z0-9]+/g, ".").replace(/^\.|\.$/g, "");
+  const suggested = toLoginSlug(student.name);
   const [username, setUsername] = useState(suggested);
   const [password, setPassword] = useState(genPassword());
   const [created, setCreated] = useState(null);
@@ -344,11 +383,53 @@ function StudentForm({ onClose, onSaved }) {
   );
 }
 
+function StudentEditForm({ student, onClose, onSaved }) {
+  const uid = useId();
+  const [name, setName] = useState(student.name);
+  const [contact, setContact] = useState(student.contact || "");
+  const [price, setPrice] = useState(student.default_price);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    if (!name.trim()) return;
+    setBusy(true);
+    await api.updateStudent(student.id, {
+      name: name.trim(), contact, default_price: Number(price),
+    });
+    onSaved();
+  }
+
+  return (
+    <Modal
+      title="Edycja ucznia"
+      onClose={onClose}
+      footer={<>
+        <button onClick={onClose}>Anuluj</button>
+        <button className="primary" onClick={save} disabled={busy || !name.trim()}>Zapisz</button>
+      </>}
+    >
+      <div>
+        <label htmlFor={`${uid}-imie-i-nazwisko-edit`}>Imię i nazwisko</label>
+        <input id={`${uid}-imie-i-nazwisko-edit`} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+      </div>
+      <div>
+        <label htmlFor={`${uid}-kontakt-edit`}>Kontakt (opcjonalnie)</label>
+        <input id={`${uid}-kontakt-edit`} value={contact} onChange={(e) => setContact(e.target.value)} placeholder="telefon, e-mail, rodzic..." />
+      </div>
+      <div>
+        <label htmlFor={`${uid}-domyslna-cena-edit`}>Domyślna cena za zajęcia (PLN)</label>
+        <input id={`${uid}-domyslna-cena-edit`} type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
+      </div>
+    </Modal>
+  );
+}
+
 function SeriesForm({ students, onClose, onSaved }) {
   const uid = useId();
   const [studentId, setStudentId] = useState(students[0]?.id || "");
   const [weekday, setWeekday] = useState(0);
   const [time, setTime] = useState("16:00");
+  const [duration, setDuration] = useState(60);
   const [price, setPrice] = useState(students[0]?.default_price || 0);
   const today = new Date().toISOString().slice(0, 10);
   const [startDate, setStartDate] = useState(today);
@@ -379,6 +460,7 @@ function SeriesForm({ students, onClose, onSaved }) {
       student_id: Number(studentId),
       weekday: Number(weekday),
       start_time: time + ":00",
+      duration_min: Number(duration),
       price: Number(price),
       start_date: startDate,
       end_date: endDate || null,
@@ -444,9 +526,17 @@ function SeriesForm({ students, onClose, onSaved }) {
           {tutors.map((t) => <option key={t.id} value={t.id}>{t.display_name}</option>)}
         </select>
       </div>
-      <div>
-        <label htmlFor={`${uid}-cena-za-zajecia-pln-12`}>Cena za zajęcia (PLN)</label>
-        <input id={`${uid}-cena-za-zajecia-pln-12`} type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
+      <div className="field-row">
+        <div>
+          <label htmlFor={`${uid}-czas-trwania-15`}>Czas trwania</label>
+          <select id={`${uid}-czas-trwania-15`} value={duration} onChange={(e) => setDuration(e.target.value)}>
+            {DURATION_OPTIONS.map((m) => <option key={m} value={m}>{m} min</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor={`${uid}-cena-za-zajecia-pln-12`}>Cena za zajęcia (PLN)</label>
+          <input id={`${uid}-cena-za-zajecia-pln-12`} type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
+        </div>
       </div>
       <div className="field-row">
         <div>
@@ -469,6 +559,7 @@ function SeriesEditForm({ series, onClose, onSaved }) {
   const uid = useId();
   const [weekday, setWeekday] = useState(series.weekday);
   const [time, setTime] = useState(fmtTime(series.start_time));
+  const [duration, setDuration] = useState(series.duration_min || 60);
   const [price, setPrice] = useState(series.price);
   const [endDate, setEndDate] = useState(series.end_date || "");
   const [subjectId, setSubjectId] = useState(series.subject_id || "");
@@ -484,7 +575,8 @@ function SeriesEditForm({ series, onClose, onSaved }) {
     api.listTutors().then(setTutors).catch(() => {});
   }, []);
 
-  const timeChanged = time !== fmtTime(series.start_time) || weekday !== series.weekday;
+  const timeChanged = time !== fmtTime(series.start_time) || weekday !== series.weekday
+    || Number(duration) !== (series.duration_min || 60);
 
   async function save() {
     setBusy(true);
@@ -492,6 +584,7 @@ function SeriesEditForm({ series, onClose, onSaved }) {
       await api.updateSeries(series.id, {
         weekday: Number(weekday),
         start_time: time.length === 5 ? `${time}:00` : time,
+        duration_min: Number(duration),
         price: Number(price),
         end_date: endDate || null,
         subject_id: subjectId ? Number(subjectId) : null,
@@ -549,15 +642,21 @@ function SeriesEditForm({ series, onClose, onSaved }) {
 
       <div className="field-row">
         <div>
+          <label htmlFor={`${uid}-duration`}>Czas trwania</label>
+          <select id={`${uid}-duration`} value={duration} onChange={(e) => setDuration(e.target.value)}>
+            {DURATION_OPTIONS.map((m) => <option key={m} value={m}>{m} min</option>)}
+          </select>
+        </div>
+        <div>
           <label htmlFor={`${uid}-price`}>Cena (PLN)</label>
           <input id={`${uid}-price`} type="number" step="0.01" value={price}
                  onChange={(e) => setPrice(e.target.value)} />
         </div>
-        <div>
-          <label htmlFor={`${uid}-end`}>Koniec serii (opcjonalnie)</label>
-          <input id={`${uid}-end`} type="date" value={endDate}
-                 onChange={(e) => setEndDate(e.target.value)} />
-        </div>
+      </div>
+      <div>
+        <label htmlFor={`${uid}-end`}>Koniec serii (opcjonalnie)</label>
+        <input id={`${uid}-end`} type="date" value={endDate}
+               onChange={(e) => setEndDate(e.target.value)} />
       </div>
 
       <div>

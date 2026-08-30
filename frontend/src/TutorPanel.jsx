@@ -101,7 +101,7 @@ export default function TutorPanel({ section = "lessons" }) {
           setAnchor={setAnchor}
           view={view}
           setView={setView}
-          onPick={(l) => { if (!l.completed && !l.cancelled) setEditing(l); }}
+          onPick={setEditing}
           label={(l) => l.student_name}
           onMove={moveLesson}
           onMoveTime={moveLessonTime}
