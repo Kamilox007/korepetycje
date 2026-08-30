@@ -126,6 +126,7 @@ function Section({ title, users, onRemove, onReset, showColor, onColor }) {
                   <td className="muted">{u.username}</td>
                   <td>{ROLE_LABEL[u.role] || u.role}</td>
                   <td className="num">
+                    {showColor && <button className="ghost" onClick={() => onColor(u)}>Edytuj</button>}
                     <button className="ghost" onClick={() => onReset(u)}>Resetuj hasło</button>
                     <button className="ghost danger" onClick={() => onRemove(u)}>Usuń</button>
                   </td>
@@ -157,16 +158,18 @@ function ColorPicker({ value, onChange }) {
 
 function ColorModal({ user, myRole, onClose, onSaved }) {
   const uid = useId();
+  const [displayName, setDisplayName] = useState(user.display_name || "");
   const [color, setColor] = useState(user.color || TUTOR_COLORS[0]);
   const [account, setAccount] = useState(user.bank_account || "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
   async function save() {
+    if (!displayName.trim()) return;
     setBusy(true);
     setErr("");
     try {
-      const data = { color };
+      const data = { display_name: displayName.trim(), color };
       // Only an admin may touch the account, so anyone else sends colour alone
       // and the backend never has to reject the request.
       if (myRole === "admin") data.bank_account = account.trim() || null;
@@ -182,9 +185,14 @@ function ColorModal({ user, myRole, onClose, onSaved }) {
     <Modal title={`Ustawienia - ${user.display_name || user.username}`} onClose={onClose}
       footer={<>
         <button onClick={onClose}>Anuluj</button>
-        <button className="primary" onClick={save} disabled={busy}>Zapisz</button>
+        <button className="primary" onClick={save} disabled={busy || !displayName.trim()}>Zapisz</button>
       </>}>
       {err && <div className="err">{err}</div>}
+
+      <div>
+        <label htmlFor={`${uid}-nazwa`}>Imię i nazwisko</label>
+        <input id={`${uid}-nazwa`} value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoFocus />
+      </div>
 
       <label>Kolor w kalendarzu</label>
       <ColorPicker value={color} onChange={setColor} />
