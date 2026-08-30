@@ -51,6 +51,19 @@ export default function Students({ students, reload }) {
     refresh();
   }
 
+  async function removeAccount(s) {
+    const ok = await confirm({
+      title: "Usunąć konto ucznia?",
+      message: `${s.name} straci możliwość zalogowania się dotychczasowym loginem.`,
+      consequence:
+        "Zajęcia, wpłaty i saldo zostają bez zmian — możesz od razu założyć nowe konto z innym loginem.",
+      confirmLabel: "Usuń konto",
+    });
+    if (!ok) return;
+    await api.deleteStudentAccount(s.id);
+    refresh();
+  }
+
   async function purgeStudent(s) {
     const ok = await confirm({
       title: "Usunąć dane trwale?",
@@ -144,9 +157,14 @@ export default function Students({ students, reload }) {
                   <td className="muted">{s.contact || "—"}</td>
                   <td className="num">{fmtMoney(s.default_price)}</td>
                   <td>
-                    {s.has_account
-                      ? <span className="badge done">ma konto</span>
-                      : <button className="ghost" onClick={() => setAccountFor(s)}>Załóż konto</button>}
+                    {s.has_account ? (
+                      <span className="row" style={{ gap: 6, alignItems: "center" }}>
+                        <span className="badge done">ma konto</span>
+                        <button className="ghost" onClick={() => removeAccount(s)}>Usuń konto</button>
+                      </span>
+                    ) : (
+                      <button className="ghost" onClick={() => setAccountFor(s)}>Załóż konto</button>
+                    )}
                   </td>
                   <td className="num">
                     <button className="ghost" onClick={() => setEditStudent(s)}>Edytuj</button>
@@ -248,9 +266,21 @@ export default function Students({ students, reload }) {
   );
 }
 
+// Polish diacritics have no place in a login: swap each for its plain-letter
+// equivalent first, so only actual word separators (spaces, hyphens) turn
+// into dots below — not every ł/ą/ż along the way.
+const PL_DIACRITICS = {
+  ą: "a", ć: "c", ę: "e", ł: "l", ń: "n", ó: "o", ś: "s", ź: "z", ż: "z",
+  Ą: "a", Ć: "c", Ę: "e", Ł: "l", Ń: "n", Ó: "o", Ś: "s", Ź: "z", Ż: "z",
+};
+function toLoginSlug(name) {
+  const ascii = name.replace(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g, (c) => PL_DIACRITICS[c]);
+  return ascii.toLowerCase().replace(/[^a-z0-9]+/g, ".").replace(/^\.|\.$/g, "");
+}
+
 function AccountForm({ student, onClose, onSaved }) {
   const uid = useId();
-  const suggested = student.name.toLowerCase().replace(/[^a-z0-9]+/g, ".").replace(/^\.|\.$/g, "");
+  const suggested = toLoginSlug(student.name);
   const [username, setUsername] = useState(suggested);
   const [password, setPassword] = useState(genPassword());
   const [created, setCreated] = useState(null);
