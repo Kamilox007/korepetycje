@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useId } from "react";
 import { api } from "./api";
 import Modal from "./Modal";
-import { DAYS_PL, fmtMoney, fmtTime } from "./dates";
+import { DAYS_PL, DURATION_OPTIONS, fmtMoney, fmtTime } from "./dates";
 import { useConfirm } from "./Confirm";
 
 export default function Students({ students, reload }) {
@@ -349,6 +349,7 @@ function SeriesForm({ students, onClose, onSaved }) {
   const [studentId, setStudentId] = useState(students[0]?.id || "");
   const [weekday, setWeekday] = useState(0);
   const [time, setTime] = useState("16:00");
+  const [duration, setDuration] = useState(60);
   const [price, setPrice] = useState(students[0]?.default_price || 0);
   const today = new Date().toISOString().slice(0, 10);
   const [startDate, setStartDate] = useState(today);
@@ -379,6 +380,7 @@ function SeriesForm({ students, onClose, onSaved }) {
       student_id: Number(studentId),
       weekday: Number(weekday),
       start_time: time + ":00",
+      duration_min: Number(duration),
       price: Number(price),
       start_date: startDate,
       end_date: endDate || null,
@@ -444,9 +446,17 @@ function SeriesForm({ students, onClose, onSaved }) {
           {tutors.map((t) => <option key={t.id} value={t.id}>{t.display_name}</option>)}
         </select>
       </div>
-      <div>
-        <label htmlFor={`${uid}-cena-za-zajecia-pln-12`}>Cena za zajęcia (PLN)</label>
-        <input id={`${uid}-cena-za-zajecia-pln-12`} type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
+      <div className="field-row">
+        <div>
+          <label htmlFor={`${uid}-czas-trwania-15`}>Czas trwania</label>
+          <select id={`${uid}-czas-trwania-15`} value={duration} onChange={(e) => setDuration(e.target.value)}>
+            {DURATION_OPTIONS.map((m) => <option key={m} value={m}>{m} min</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor={`${uid}-cena-za-zajecia-pln-12`}>Cena za zajęcia (PLN)</label>
+          <input id={`${uid}-cena-za-zajecia-pln-12`} type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
+        </div>
       </div>
       <div className="field-row">
         <div>
@@ -469,6 +479,7 @@ function SeriesEditForm({ series, onClose, onSaved }) {
   const uid = useId();
   const [weekday, setWeekday] = useState(series.weekday);
   const [time, setTime] = useState(fmtTime(series.start_time));
+  const [duration, setDuration] = useState(series.duration_min || 60);
   const [price, setPrice] = useState(series.price);
   const [endDate, setEndDate] = useState(series.end_date || "");
   const [subjectId, setSubjectId] = useState(series.subject_id || "");
@@ -484,7 +495,8 @@ function SeriesEditForm({ series, onClose, onSaved }) {
     api.listTutors().then(setTutors).catch(() => {});
   }, []);
 
-  const timeChanged = time !== fmtTime(series.start_time) || weekday !== series.weekday;
+  const timeChanged = time !== fmtTime(series.start_time) || weekday !== series.weekday
+    || Number(duration) !== (series.duration_min || 60);
 
   async function save() {
     setBusy(true);
@@ -492,6 +504,7 @@ function SeriesEditForm({ series, onClose, onSaved }) {
       await api.updateSeries(series.id, {
         weekday: Number(weekday),
         start_time: time.length === 5 ? `${time}:00` : time,
+        duration_min: Number(duration),
         price: Number(price),
         end_date: endDate || null,
         subject_id: subjectId ? Number(subjectId) : null,
@@ -549,15 +562,21 @@ function SeriesEditForm({ series, onClose, onSaved }) {
 
       <div className="field-row">
         <div>
+          <label htmlFor={`${uid}-duration`}>Czas trwania</label>
+          <select id={`${uid}-duration`} value={duration} onChange={(e) => setDuration(e.target.value)}>
+            {DURATION_OPTIONS.map((m) => <option key={m} value={m}>{m} min</option>)}
+          </select>
+        </div>
+        <div>
           <label htmlFor={`${uid}-price`}>Cena (PLN)</label>
           <input id={`${uid}-price`} type="number" step="0.01" value={price}
                  onChange={(e) => setPrice(e.target.value)} />
         </div>
-        <div>
-          <label htmlFor={`${uid}-end`}>Koniec serii (opcjonalnie)</label>
-          <input id={`${uid}-end`} type="date" value={endDate}
-                 onChange={(e) => setEndDate(e.target.value)} />
-        </div>
+      </div>
+      <div>
+        <label htmlFor={`${uid}-end`}>Koniec serii (opcjonalnie)</label>
+        <input id={`${uid}-end`} type="date" value={endDate}
+               onChange={(e) => setEndDate(e.target.value)} />
       </div>
 
       <div>

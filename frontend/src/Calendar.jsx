@@ -4,7 +4,7 @@ import Modal from "./Modal";
 import { usePersistentState } from "./usePersistentState";
 import { TUTOR_COLORS, UNASSIGNED_COLOR, tint } from "./colors";
 import {
-  DAYS_SHORT, DAYS_PL, MONTHS_PL, startOfWeek, addDays, toISODate, parseISO,
+  DAYS_SHORT, DAYS_PL, MONTHS_PL, DURATION_OPTIONS, startOfWeek, addDays, toISODate, parseISO,
   sameDay, fmtMoney, fmtTime, monthGrid, pyWeekday,
 } from "./dates";
 import { useConfirm } from "./Confirm";
@@ -482,6 +482,7 @@ function EditLesson({ lesson, onClose, onSaved }) {
   const confirm = useConfirm();
   const [date, setDate] = useState(lesson.date);
   const [time, setTime] = useState(fmtTime(lesson.start_time));
+  const [duration, setDuration] = useState(lesson.duration_min || 60);
   const [price, setPrice] = useState(lesson.price);
   const [completed, setCompleted] = useState(lesson.completed);
   const [cancelled, setCancelled] = useState(lesson.cancelled);
@@ -501,7 +502,7 @@ function EditLesson({ lesson, onClose, onSaved }) {
   async function save() {
     setBusy(true);
     await api.updateLesson(lesson.id, {
-      date, start_time: time + ":00", price: Number(price), completed, cancelled, note,
+      date, start_time: time + ":00", duration_min: Number(duration), price: Number(price), completed, cancelled, note,
       assigned_tutor_id: tutorId === "" ? null : Number(tutorId),
       subject_id: subjectId === "" ? null : Number(subjectId),
       level: level === "" ? null : level,
@@ -548,7 +549,15 @@ function EditLesson({ lesson, onClose, onSaved }) {
         <div><label htmlFor={`${uid}-data-1`}>Data</label><input id={`${uid}-data-1`} type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
         <div><label htmlFor={`${uid}-godzina-2`}>Godzina</label><input id={`${uid}-godzina-2`} type="time" value={time} onChange={(e) => setTime(e.target.value)} /></div>
       </div>
-      <div><label htmlFor={`${uid}-cena-pln-3`}>Cena (PLN)</label><input id={`${uid}-cena-pln-3`} type="number" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
+      <div className="field-row">
+        <div>
+          <label htmlFor={`${uid}-czas-trwania`}>Czas trwania</label>
+          <select id={`${uid}-czas-trwania`} value={duration} onChange={(e) => setDuration(e.target.value)}>
+            {DURATION_OPTIONS.map((m) => <option key={m} value={m}>{m} min</option>)}
+          </select>
+        </div>
+        <div><label htmlFor={`${uid}-cena-pln-3`}>Cena (PLN)</label><input id={`${uid}-cena-pln-3`} type="number" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
+      </div>
       <div className="field-row">
         <div>
           <label htmlFor={`${uid}-przedmiot-4`}>Przedmiot</label>
@@ -593,6 +602,7 @@ function AddLesson({ date, time: initialTime, students, onClose, onSaved }) {
   const [studentId, setStudentId] = useState(students[0]?.id || "");
   const [d, setD] = useState(date);
   const [time, setTime] = useState(initialTime || "16:00");
+  const [duration, setDuration] = useState(60);
   const [price, setPrice] = useState(students[0]?.default_price || 0);
   const [busy, setBusy] = useState(false);
 
@@ -603,7 +613,8 @@ function AddLesson({ date, time: initialTime, students, onClose, onSaved }) {
   async function save() {
     setBusy(true);
     await api.createLesson({
-      student_id: Number(studentId), date: d, start_time: time + ":00", price: Number(price),
+      student_id: Number(studentId), date: d, start_time: time + ":00",
+      duration_min: Number(duration), price: Number(price),
     });
     onSaved();
   }
@@ -631,7 +642,15 @@ function AddLesson({ date, time: initialTime, students, onClose, onSaved }) {
         <div><label htmlFor={`${uid}-data-9`}>Data</label><input id={`${uid}-data-9`} type="date" value={d} onChange={(e) => setD(e.target.value)} /></div>
         <div><label htmlFor={`${uid}-godzina-10`}>Godzina</label><input id={`${uid}-godzina-10`} type="time" value={time} onChange={(e) => setTime(e.target.value)} /></div>
       </div>
-      <div><label htmlFor={`${uid}-cena-pln-11`}>Cena (PLN)</label><input id={`${uid}-cena-pln-11`} type="number" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
+      <div className="field-row">
+        <div>
+          <label htmlFor={`${uid}-czas-trwania-add`}>Czas trwania</label>
+          <select id={`${uid}-czas-trwania-add`} value={duration} onChange={(e) => setDuration(e.target.value)}>
+            {DURATION_OPTIONS.map((m) => <option key={m} value={m}>{m} min</option>)}
+          </select>
+        </div>
+        <div><label htmlFor={`${uid}-cena-pln-11`}>Cena (PLN)</label><input id={`${uid}-cena-pln-11`} type="number" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
+      </div>
     </Modal>
   );
 }
