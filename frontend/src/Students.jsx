@@ -13,6 +13,7 @@ export default function Students({ students, reload }) {
   const [archived, setArchived] = useState([]);
   const [showArchive, setShowArchive] = useState(false);
   const [editSeries, setEditSeries] = useState(null);
+  const [editStudent, setEditStudent] = useState(null);
 
   // One entry point for reloading everything this view shows. Three separate
   // loaders meant that every new operation had to remember which of them to
@@ -148,6 +149,7 @@ export default function Students({ students, reload }) {
                       : <button className="ghost" onClick={() => setAccountFor(s)}>Załóż konto</button>}
                   </td>
                   <td className="num">
+                    <button className="ghost" onClick={() => setEditStudent(s)}>Edytuj</button>
                     <button className="ghost" onClick={() => archiveStudent(s)}>Archiwizuj</button>
                   </td>
                 </tr>
@@ -218,6 +220,13 @@ export default function Students({ students, reload }) {
           series={editSeries}
           onClose={() => setEditSeries(null)}
           onSaved={() => { setEditSeries(null); refresh(); }}
+        />
+      )}
+      {editStudent && (
+        <StudentEditForm
+          student={editStudent}
+          onClose={() => setEditStudent(null)}
+          onSaved={() => { setEditStudent(null); refresh(); }}
         />
       )}
 
@@ -339,6 +348,47 @@ function StudentForm({ onClose, onSaved }) {
       <div>
         <label htmlFor={`${uid}-domyslna-cena-za-zajecia-pln-5`}>Domyślna cena za zajęcia (PLN)</label>
         <input id={`${uid}-domyslna-cena-za-zajecia-pln-5`} type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
+      </div>
+    </Modal>
+  );
+}
+
+function StudentEditForm({ student, onClose, onSaved }) {
+  const uid = useId();
+  const [name, setName] = useState(student.name);
+  const [contact, setContact] = useState(student.contact || "");
+  const [price, setPrice] = useState(student.default_price);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    if (!name.trim()) return;
+    setBusy(true);
+    await api.updateStudent(student.id, {
+      name: name.trim(), contact, default_price: Number(price),
+    });
+    onSaved();
+  }
+
+  return (
+    <Modal
+      title="Edycja ucznia"
+      onClose={onClose}
+      footer={<>
+        <button onClick={onClose}>Anuluj</button>
+        <button className="primary" onClick={save} disabled={busy || !name.trim()}>Zapisz</button>
+      </>}
+    >
+      <div>
+        <label htmlFor={`${uid}-imie-i-nazwisko-edit`}>Imię i nazwisko</label>
+        <input id={`${uid}-imie-i-nazwisko-edit`} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+      </div>
+      <div>
+        <label htmlFor={`${uid}-kontakt-edit`}>Kontakt (opcjonalnie)</label>
+        <input id={`${uid}-kontakt-edit`} value={contact} onChange={(e) => setContact(e.target.value)} placeholder="telefon, e-mail, rodzic..." />
+      </div>
+      <div>
+        <label htmlFor={`${uid}-domyslna-cena-edit`}>Domyślna cena za zajęcia (PLN)</label>
+        <input id={`${uid}-domyslna-cena-edit`} type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
       </div>
     </Modal>
   );
