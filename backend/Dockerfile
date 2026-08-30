@@ -6,13 +6,13 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Warstwa zależności osobno — zmiana kodu nie unieważnia cache pipa
+# Warstwa zależności osobno - zmiana kodu nie unieważnia cache pipa
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Baza leży na wolumenie, nie w obrazie — inaczej znika przy każdym deployu
+# Baza leży na wolumenie, nie w obrazie - inaczej znika przy każdym deployu
 ENV DATABASE_URL=sqlite:////data/korepetycje.db
 
 # Nie uruchamiamy jako root

@@ -1,8 +1,8 @@
 """Bank transfer QR payloads, per the ZBP "2D" recommendation (v1.0, 2013).
 
 Polish banking apps scan this and pre-fill the transfer form: account, amount
-and title. It is not a payment gateway — nobody is charged automatically, the
-payer still confirms in their own bank — but it removes the retyping, which is
+and title. It is not a payment gateway - nobody is charged automatically, the
+payer still confirms in their own bank - but it removes the retyping, which is
 where mistakes in the transfer title come from.
 
 Field layout, pipe-separated:

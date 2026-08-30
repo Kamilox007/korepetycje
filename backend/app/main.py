@@ -216,7 +216,7 @@ def list_users(user: models.User = Depends(auth.require_staff), db: Session = De
 def list_tutors(user: models.User = Depends(auth.require_staff), db: Session = Depends(get_db)):
     # Admins are included: in a one- or two-person practice the owner teaches,
     # and leaving them off this list makes their own lessons unassignable.
-    # Secretaries are not — they administer, they do not run lessons.
+    # Secretaries are not - they administer, they do not run lessons.
     rows = (
         db.query(models.User)
         .filter(models.User.role.in_(("tutor", "admin")))
@@ -274,7 +274,7 @@ def update_user(
 
     if "bank_account" in data:
         # Restricted to admins. The risk with an account number is not that it
-        # is seen — it goes on every invoice — but that it is swapped, which
+        # is seen - it goes on every invoice - but that it is swapped, which
         # silently redirects every payment until somebody notices.
         if user.role != "admin":
             raise HTTPException(403, "Tylko administrator zmienia numer rachunku")
@@ -620,7 +620,7 @@ def update_series(
     different things:
 
     * Metadata (subject, level, tutor, title) describes what the lesson IS, so it
-      lands on every future occurrence — including ones already moved to another
+      lands on every future occurrence - including ones already moved to another
       date. A lesson shifted to Thursday still has the wrong level.
     * Timing (weekday, start_time, duration) describes WHEN the slot falls, so it
       skips occurrences whose date was changed by hand. Those were moved
@@ -817,7 +817,7 @@ def update_lesson(
 
     # A completed lesson has to say who taught it: it is what the charge is
     # credited against, and without it the amount lands on nobody's account.
-    # Rather than refuse outright, fill in the obvious answer first — the series
+    # Rather than refuse outright, fill in the obvious answer first - the series
     # it came from, or the person marking it done if they teach.
     if lesson.completed and not lesson.assigned_tutor_id:
         if lesson.series_id:
@@ -1252,7 +1252,7 @@ def tutor_update_lesson(
 
     # A completed lesson has to say who taught it: it is what the charge is
     # credited against, and without it the amount lands on nobody's account.
-    # Rather than refuse outright, fill in the obvious answer first — the series
+    # Rather than refuse outright, fill in the obvious answer first - the series
     # it came from, or the person marking it done if they teach.
     if lesson.completed and not lesson.assigned_tutor_id:
         if lesson.series_id:
@@ -1353,7 +1353,7 @@ def my_transfer_info(
 
     Not a payment gateway: nothing is charged, the payer confirms in their own
     banking app. It removes the retyping, which is where wrong transfer titles
-    come from — and with two tutors, where money sent to the wrong account
+    come from - and with two tutors, where money sent to the wrong account
     comes from.
     """
     student = _student_for_user(db, user)

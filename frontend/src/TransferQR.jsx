@@ -28,7 +28,7 @@ export default function TransferQR() {
       <h3 style={{ marginTop: 0 }}>Zapłać przelewem</h3>
       {info.targets.length > 1 && (
         <p className="muted" style={{ marginTop: 0 }}>
-          Masz zajęcia u {info.targets.length} korepetytorów — każdy ma własny
+          Masz zajęcia u {info.targets.length} korepetytorów - każdy ma własny
           rachunek, więc płatności są osobne.
         </p>
       )}
@@ -37,7 +37,7 @@ export default function TransferQR() {
                         showRecipient={info.targets.length > 1} />
       ))}
       <p className="muted transfer-note">
-        Zachowaj tytuł bez zmian — po nim rozpoznajemy, czyja to wpłata.
+        Zachowaj tytuł bez zmian - po nim rozpoznajemy, czyja to wpłata.
         Zaksięgowanie zajmuje zwykle jeden dzień roboczy.
       </p>
     </div>
@@ -79,7 +79,7 @@ function TransferTarget({ target, showRecipient }) {
         </p>
       ) : (
         <p className="muted" style={{ marginTop: 0 }}>
-          Brak zaległości. Kod pozwala wpłacić dowolną kwotę — aplikacja banku
+          Brak zaległości. Kod pozwala wpłacić dowolną kwotę - aplikacja banku
           poprosi o jej podanie.
         </p>
       )}
@@ -88,7 +88,7 @@ function TransferTarget({ target, showRecipient }) {
         <figure className="transfer-qr">
           <canvas ref={canvasRef} aria-label="Kod QR przelewu" />
           <figcaption className="muted">
-            Zeskanuj w aplikacji banku — poszukaj opcji „Skanuj i płać”
+            Zeskanuj w aplikacji banku - poszukaj opcji „Skanuj i płać”
             albo „Zapłać kodem QR”.
           </figcaption>
         </figure>

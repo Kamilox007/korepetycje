@@ -198,7 +198,7 @@ function WeekView({ weekStart, today, lessonsFor, onPick, label, onMove }) {
               <span className="day-num">{day.getDate()}</span>
             </div>
             {dl.length === 0 ? (
-              <div className="muted" style={{ fontSize: 12 }}>—</div>
+              <div className="muted" style={{ fontSize: 12 }}>-</div>
             ) : (
               dl.map((l) => (
                 <Chip key={l.id} lesson={l} label={label} onPick={onPick}

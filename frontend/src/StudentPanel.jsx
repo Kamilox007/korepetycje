@@ -28,7 +28,7 @@ export default function StudentPanel({ section = "lessons" }) {
 
   async function loadAll() {
     try {
-      // Zakres podąża za tym, co widać w kalendarzu — inaczej przejście
+      // Zakres podąża za tym, co widać w kalendarzu - inaczej przejście
       // na kolejny miesiąc pokazywałoby pusty widok.
       const start = toISODate(addDays(anchor, -45));
       const end = toISODate(addDays(anchor, 75));
@@ -112,8 +112,8 @@ export default function StudentPanel({ section = "lessons" }) {
                     <tr key={l.id}>
                       <td>{DAYS_PL[pyWeekday(d)]}, {d.getDate()} {MONTHS_PL[d.getMonth()]}</td>
                       <td>{fmtTime(l.start_time)} {l.rescheduled ? "↻" : ""}</td>
-                      <td>{l.subject_name ? `${l.subject_name}${l.level ? ` (${l.level})` : ""}` : "—"}</td>
-                      <td className="muted">{l.assigned_tutor_name || "—"}</td>
+                      <td>{l.subject_name ? `${l.subject_name}${l.level ? ` (${l.level})` : ""}` : "-"}</td>
+                      <td className="muted">{l.assigned_tutor_name || "-"}</td>
                       <td>
                         {l.completed
                           ? <span className="badge done">odbyte</span>
@@ -146,7 +146,7 @@ export default function StudentPanel({ section = "lessons" }) {
                 {payments.map((p) => (
                   <tr key={p.id}>
                     <td className="muted">{p.date}</td>
-                    <td>{p.payer || "—"}</td>
+                    <td>{p.payer || "-"}</td>
                     <td className="muted">{p.note || ""}</td>
                     <td className="num" style={{ fontWeight: 600, color: "var(--done)" }}>{fmtMoney(p.amount)}</td>
                   </tr>
@@ -168,7 +168,7 @@ export default function StudentPanel({ section = "lessons" }) {
                 {requests.map((r) => (
                   <tr key={r.id}>
                     <td>{r.lesson_date} {fmtTime(r.lesson_time)}</td>
-                    <td>{r.proposed_date || "—"} {fmtTime(r.proposed_time)}</td>
+                    <td>{r.proposed_date || "-"} {fmtTime(r.proposed_time)}</td>
                     <td>
                       {r.status === "pending" && <span className="badge resched">oczekuje</span>}
                       {r.status === "approved" && <span className="badge done">zaakceptowana</span>}
@@ -254,7 +254,7 @@ function RequestForm({ lesson, onClose, onSent }) {
           <div>
             <label htmlFor={`${uid}-wybierz-dzien-1`}>Wybierz dzień</label>
             <select id={`${uid}-wybierz-dzien-1`} value={selectedDay} onChange={(e) => { setSelectedDay(e.target.value); setTime(""); }}>
-              <option value="">— wybierz —</option>
+              <option value="">- wybierz -</option>
               {slots.days.map((d) => {
                 const dt = parseISO(d.date);
                 const win = d.windows.map((w) => `${w.start}–${w.end}`).join(", ");
@@ -270,7 +270,7 @@ function RequestForm({ lesson, onClose, onSent }) {
             <div>
               <label htmlFor={`${uid}-wybierz-godzine-2`}>Wybierz godzinę</label>
               <select id={`${uid}-wybierz-godzine-2`} value={time} onChange={(e) => setTime(e.target.value)}>
-                <option value="">— wybierz —</option>
+                <option value="">- wybierz -</option>
                 {timeOptions(dayObj).map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
@@ -282,7 +282,7 @@ function RequestForm({ lesson, onClose, onSent }) {
         <>
           <p className="muted" style={{ fontSize: 12, margin: 0 }}>
             {slots.has_tutor === false && slots.tutor_name
-              ? "Korepetytor nie ustawił jeszcze dostępnych godzin — wpisz proponowany termin ręcznie."
+              ? "Korepetytor nie ustawił jeszcze dostępnych godzin - wpisz proponowany termin ręcznie."
               : "Wpisz proponowany termin ręcznie."}
           </p>
           <div className="field-row">
