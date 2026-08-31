@@ -1,4 +1,4 @@
-# Korepetycje — panel zarządzania zajęciami i rozliczeniami
+# Korepetycje - panel zarządzania zajęciami i rozliczeniami
 
 ![testy](https://github.com/Kamilox007/korepetycje/actions/workflows/testy.yml/badge.svg)
 
@@ -13,7 +13,7 @@ Wersja produkcyjna: <https://panel.kamilkrzywon.pl>
 | Warstwa | Technologia |
 |---|---|
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2.0, Pydantic v2 |
-| Migracje | Alembic (tryb `batch` — wymagany przez SQLite) |
+| Migracje | Alembic (tryb `batch` - wymagany przez SQLite) |
 | Baza | SQLite |
 | Uwierzytelnianie | JWT (HS256) w ciasteczku httpOnly, hasła haszowane bcryptem |
 | Ochrona logowania | slowapi (limit per IP) + blokada konta w bazie |
@@ -48,9 +48,9 @@ z tymi samymi trzema widokami, przenoszenie zajęć na inny dzień i godzinę or
 rozpatrywanie próśb swoich uczniów.
 
 ### Uczeń
-- Kalendarz własnych zajęć (dzień, tydzień, miesiąc) i saldo — tylko do odczytu
+- Kalendarz własnych zajęć (dzień, tydzień, miesiąc) i saldo - tylko do odczytu
 - Kod QR przelewu z kwotą do zapłaty i tytułem (standard 2D ZBP)
-- Prośby o przesunięcie — termin zmienia się dopiero po akceptacji
+- Prośby o przesunięcie - termin zmienia się dopiero po akceptacji
 - Podpowiadane wolne terminy na podstawie dostępności korepetytora
 
 ## Uruchomienie lokalne
@@ -62,7 +62,7 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-alembic upgrade head             # schemat bazy — konieczne przed startem
+alembic upgrade head             # schemat bazy - konieczne przed startem
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -92,7 +92,7 @@ i `/api/auth/change-password` zwraca 403, a wydany token żyje 30 minut zamiast
 ## Migracje
 
 Schemat bazy jest wersjonowany Alembikiem. Aplikacja **nie wystartuje**, jeśli
-baza nie jest na najnowszej rewizji — zamiast tego zgłosi błąd z instrukcją.
+baza nie jest na najnowszej rewizji - zamiast tego zgłosi błąd z instrukcją.
 
 ```bash
 alembic upgrade head                          # aktualizacja
@@ -122,14 +122,14 @@ Zmienne środowiskowe (`.env`, wzór w `.env.example`):
 | Zmienna | Znaczenie |
 |---|---|
 | `APP_ENV` | `dev` lub `prod`. Poza `dev` brak `JWT_SECRET` zatrzymuje start |
-| `JWT_SECRET` | sekret podpisujący tokeny — długi, losowy |
+| `JWT_SECRET` | sekret podpisujący tokeny - długi, losowy |
 | `DOMAIN` | domena, na którą Caddy pobiera certyfikat |
 | `CORS_ORIGINS` | dozwolone originy, rozdzielone przecinkiem. `*` jest odrzucane |
 | `DATABASE_URL` | domyślnie SQLite; Postgres przez `postgresql+psycopg://…` |
 | `B2_KEY_ID`, `B2_APP_KEY` | poświadczenia Backblaze B2 dla Litestream |
 | `BANK_ACCOUNT`, `BANK_RECIPIENT` | opcjonalne: włączają kod QR przelewu w panelu ucznia |
 
-`APP_ENV` steruje też flagą `Secure` na ciasteczku sesyjnym — w `dev` jest
+`APP_ENV` steruje też flagą `Secure` na ciasteczku sesyjnym - w `dev` jest
 wyłączona, bo po HTTP przeglądarka odrzuciłaby takie ciasteczko.
 
 Generowanie sekretu:
@@ -140,7 +140,7 @@ python -c "import secrets; print(secrets.token_urlsafe(64))"
 
 ## Wdrożenie
 
-Sieć współdzielona z aplikacjami stojącymi za tym samym reverse proxy —
+Sieć współdzielona z aplikacjami stojącymi za tym samym reverse proxy -
 jednorazowo, przed pierwszym uruchomieniem:
 
 ```bash
@@ -155,7 +155,7 @@ cp .env.example .env && nano .env
 docker compose up -d --build
 ```
 
-Caddy w tej usłudze terminuje TLS dla wszystkich domen na serwerze — także
+Caddy w tej usłudze terminuje TLS dla wszystkich domen na serwerze - także
 dla strony `kamilkrzywon.pl`, która stoi w osobnym repozytorium
 ([kamilkrzywon-pl](https://github.com/Kamilox007/kamilkrzywon-pl)) i dołącza
 do sieci `edge` pod nazwą `site`. Uruchom ją **przed** panelem, żeby Caddy
@@ -168,12 +168,12 @@ miał dokąd kierować ruch.
 | `deploy/Caddyfile` | `docker compose restart web` (montowany, bez builda) |
 | `.env` | `docker compose up -d` |
 
-Rekord A domeny musi wskazywać na serwer **przed** pierwszym uruchomieniem —
+Rekord A domeny musi wskazywać na serwer **przed** pierwszym uruchomieniem -
 Caddy od razu występuje o certyfikat, a Let's Encrypt limituje nieudane
 walidacje.
 
 Po wdrożeniu zmiany w uwierzytelnianiu wszyscy zalogowani muszą podać login
-i hasło ponownie — stare tokeny z `localStorage` przestają być wysyłane,
+i hasło ponownie - stare tokeny z `localStorage` przestają być wysyłane,
 a ciasteczka jeszcze nie ma.
 
 ### Zadanie okresowe
@@ -190,7 +190,7 @@ Alternatywnie `POST /api/maintenance/generate-lessons` (rola staff, idempotentne
 
 ## Testy
 
-### Backend — regresje
+### Backend - regresje
 
 Wymagają dodatkowej zależności spoza obrazu produkcyjnego:
 
@@ -215,10 +215,10 @@ python test_transfer_code.py      # kod QR przelewu (standard 2D ZBP)
 ```
 
 Każdy zestaw pracuje na własnej bazie w katalogu tymczasowym i nie dotyka bazy
-deweloperskiej. Wszystkie to regresje konkretnych błędów — jeśli któryś zacznie
+deweloperskiej. Wszystkie to regresje konkretnych błędów - jeśli któryś zacznie
 padać po zmianie, prawdopodobnie ta zmiana cofnęła poprawkę.
 
-### Frontend — end-to-end (Playwright)
+### Frontend - end-to-end (Playwright)
 
 ```bash
 cd frontend
@@ -230,7 +230,7 @@ npm run e2e:report                 # raport z ostatniego przebiegu
 ```
 
 Playwright sam uruchamia backend i frontend, na **osobnej bazie `e2e.db`**
-kasowanej przy każdym przebiegu — testy tworzą i usuwają uczniów, więc nie
+kasowanej przy każdym przebiegu - testy tworzą i usuwają uczniów, więc nie
 mogą dotykać bazy deweloperskiej ani produkcyjnej. Sesja startowa (logowanie
 plus wymuszona zmiana hasła) przygotowywana jest raz w `e2e/auth.setup.js`
 i zapisywana do `e2e/.auth/`.
@@ -246,7 +246,7 @@ po którym da się przewijać stan DOM krok po kroku.
 
 **Kwoty jako liczby całkowite w groszach.** `float` nie zapisuje dokładnie
 `0.1`, więc sumowanie cen zajęć kumuluje błąd i saldo rozjeżdża się o grosz.
-Konwersja odbywa się wyłącznie na granicy API — modele wystawiają właściwości
+Konwersja odbywa się wyłącznie na granicy API - modele wystawiają właściwości
 w złotych, arytmetyka idzie na `int`. Zaokrąglanie handlowe (`ROUND_HALF_UP`),
 bo wbudowane `round()` używa bankierskiego i zwraca `2.67` dla `2.675`.
 
@@ -267,21 +267,21 @@ jest wymuszona przez bazę, bo deduplikacja w Pythonie jest podatna na wyścig.
 
 **Generowanie nie odbywa się w handlerach GET.** Odczyt nie ma efektów ubocznych,
 a horyzont generowania jest zaklamrowany niezależnie od parametrów żądania.
-Ma to też skutek uboczny dla bezpieczeństwa — patrz punkt niżej.
+Ma to też skutek uboczny dla bezpieczeństwa - patrz punkt niżej.
 
 **Sesja w ciasteczku httpOnly, bez tokenu CSRF.** Token nie jest dostępny dla
 JavaScriptu, więc XSS nie wystarcza do jego wykradzenia. Ochronę przed CSRF
 daje `SameSite=Lax`: przeglądarka nie dołącza ciasteczka do żądań POST, PATCH
 i DELETE inicjowanych z obcych witryn, a wszystkie operacje zmieniające stan
 używają tych metod. Warunkiem poprawności jest to, że żaden GET nie zmienia
-danych. Nagłówek `Authorization` nadal działa — korzystają z niego `/docs`,
+danych. Nagłówek `Authorization` nadal działa - korzystają z niego `/docs`,
 `curl` i zadania crona.
 
 **Potwierdzenia usuwania we własnym oknie, nie przez `confirm()`.** Natywne
 okno przeglądarki da się wyłączyć („nie pokazuj więcej okien dialogowych"),
 po czym `confirm()` zwraca `false` i usuwanie po cichu przestaje działać.
-Komunikaty opisują konsekwencje, a nie samą czynność; usunięcie ucznia —
-jedyna operacja kasująca historię finansową — wymaga przepisania jego nazwiska.
+Komunikaty opisują konsekwencje, a nie samą czynność; usunięcie ucznia -
+jedyna operacja kasująca historię finansową - wymaga przepisania jego nazwiska.
 
 **Etykiety powiązane z kontrolkami przez `htmlFor`/`id`.** Identyfikatory
 generuje `useId()`, bo część formularzy bywa otwarta jednocześnie i statyczne
@@ -291,20 +291,20 @@ chwytają pola po widocznym tekście zamiast po strukturze HTML.
 
 **Edycja serii propaguje się zależnie od rodzaju pola.** Metadane (przedmiot,
 poziom, prowadzący) trafiają na wszystkie przyszłe zajęcia, także te ręcznie
-przesunięte — opisują, czym zajęcia są, niezależnie od terminu. Zmiana terminu
+przesunięte - opisują, czym zajęcia są, niezależnie od terminu. Zmiana terminu
 pomija zajęcia z ręcznie zmienioną datą, bo cofnęłaby czyjąś decyzję. Cena idzie
 na przyszłe; odbyte zachowują stawkę zamrożoną w momencie odbycia.
 
 **Usunięcie ucznia archiwizuje, nie kasuje.** `cascade delete` na wpłatach
 oznaczał, że jedno kliknięcie niszczyło historię rozliczeń. Archiwizacja ukrywa
 ucznia i kasuje jego konto oraz przyszłe nieodbyte zajęcia, ale zostawia zajęcia
-odbyte i wpłaty. Trwałe usunięcie jest osobnym endpointem — tylko admin, tylko
-dla zarchiwizowanego ucznia — bo art. 17 RODO wymaga, żeby dało się je wykonać.
+odbyte i wpłaty. Trwałe usunięcie jest osobnym endpointem - tylko admin, tylko
+dla zarchiwizowanego ucznia - bo art. 17 RODO wymaga, żeby dało się je wykonać.
 
 **Sesje są rejestrowane w bazie.** JWT są bezstanowe, więc bez tabeli `sessions`
 zmiana hasła nie kończyłaby sesji otwartych gdzie indziej. Każde żądanie
 sprawdza, czy `jti` z tokenu nadal ma otwartą sesję. Koszt to jedno zapytanie na
-żądanie — przy tej skali nieodczuwalny, a alternatywa (krótkie tokeny dostępowe
+żądanie - przy tej skali nieodczuwalny, a alternatywa (krótkie tokeny dostępowe
 z refresh tokenem) opóźniałaby unieważnienie o kilkanaście minut i dokładała
 kolejkowanie odświeżeń po stronie przeglądarki.
 
@@ -318,7 +318,7 @@ przelew w aplikacji banku: kwota i tytuł są wypełnione, więc wpłaty da się
 przypisać do ucznia bez zgadywania. Bramka wymagałaby zarejestrowanej
 działalności, regulaminu i prowizji od transakcji, a przy kilku uczniach
 minimalna prowizja umowna przewyższyłaby wartość usługi. Kod QR daje większość
-tej wygody za zero kosztów — kosztem ręcznego oznaczenia wpłaty, co i tak
+tej wygody za zero kosztów - kosztem ręcznego oznaczenia wpłaty, co i tak
 trzeba robić.
 
 ## Model danych
@@ -341,7 +341,7 @@ trzeba robić.
 Litestream replikuje bazę do Backblaze B2 na bieżąco (interwał 1 s), ze
 snapshotem dobowym i retencją 30 dni.
 
-Odtworzenie — **przetestuj, zanim będzie potrzebne**:
+Odtworzenie - **przetestuj, zanim będzie potrzebne**:
 
 ```bash
 docker run --rm -v ./restore:/out \
@@ -351,4 +351,4 @@ docker run --rm -v ./restore:/out \
 ```
 
 Ostatni argument to ścieżka bazy, po której Litestream odnajduje wpis
-w konfiguracji — nie adres repliki. Podanie obu naraz kończy się błędem.
+w konfiguracji - nie adres repliki. Podanie obu naraz kończy się błędem.

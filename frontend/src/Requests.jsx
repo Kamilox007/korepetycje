@@ -31,7 +31,7 @@ export default function Requests({ reload }) {
                 <tr key={r.id}>
                   <td style={{ fontWeight: 500 }}>{r.student_name}</td>
                   <td>{r.lesson_date} {fmtTime(r.lesson_time)}</td>
-                  <td>{r.proposed_date || "—"} {fmtTime(r.proposed_time)}</td>
+                  <td>{r.proposed_date || "-"} {fmtTime(r.proposed_time)}</td>
                   <td className="muted">{r.message || ""}</td>
                   <td className="num row" style={{ justifyContent: "flex-end" }}>
                     <button className="primary" onClick={() => setDecision({ req: r, action: "approve" })}>Akceptuj</button>
@@ -106,7 +106,7 @@ function DecisionModal({ decision, onClose, onDone }) {
       </>}
     >
       <p style={{ margin: 0 }}>
-        {req.student_name} — {approve ? "termin zostanie zmieniony na " : "prośba o "}
+        {req.student_name} - {approve ? "termin zostanie zmieniony na " : "prośba o "}
         <strong>{req.proposed_date} {fmtTime(req.proposed_time)}</strong>
       </p>
       {req.message && <p className="muted" style={{ fontSize: 13, margin: 0 }}>Wiadomość ucznia: {req.message}</p>}
