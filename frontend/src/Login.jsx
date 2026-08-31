@@ -38,6 +38,10 @@ export default function Login({ onLogin }) {
         <button className="primary" type="submit" disabled={busy || !username || !password} style={{ width: "100%" }}>
           {busy ? "Logowanie…" : "Zaloguj się"}
         </button>
+        <a href="/privacy-policy.html" target="_blank" rel="noreferrer"
+           className="muted" style={{ fontSize: 12, textAlign: "center" }}>
+          Polityka Prywatności
+        </a>
       </form>
     </div>
   );
