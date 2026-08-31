@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useId } from "react";
 import { api } from "./api";
 import Modal from "./Modal";
 import { DAYS_PL, DURATION_OPTIONS, fmtMoney, fmtTime } from "./dates";
+import { PASSWORD_HINT, passwordError, genStartPassword } from "./password";
 import { useConfirm } from "./Confirm";
 
 export default function Students({ students, reload }) {
@@ -282,17 +283,16 @@ function AccountForm({ student, onClose, onSaved }) {
   const uid = useId();
   const suggested = toLoginSlug(student.name);
   const [username, setUsername] = useState(suggested);
-  const [password, setPassword] = useState(genPassword());
+  const [password, setPassword] = useState(genStartPassword());
   const [created, setCreated] = useState(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
-  function genPassword() {
-    return Math.random().toString(36).slice(2, 8) + Math.floor(Math.random() * 90 + 10);
-  }
+  const pwError = passwordError(password);
 
   async function save() {
     setErr("");
+    if (pwError) { setErr(pwError); return; }
     setBusy(true);
     try {
       const res = await api.createStudentAccount(student.id, { username: username.trim(), password });
@@ -325,7 +325,7 @@ function AccountForm({ student, onClose, onSaved }) {
       onClose={onClose}
       footer={<>
         <button onClick={onClose}>Anuluj</button>
-        <button className="primary" onClick={save} disabled={busy || !username.trim()}>Utwórz konto</button>
+        <button className="primary" onClick={save} disabled={busy || !username.trim() || Boolean(pwError)}>Utwórz konto</button>
       </>}
     >
       {err && <div className="err">{err}</div>}
@@ -334,8 +334,9 @@ function AccountForm({ student, onClose, onSaved }) {
       <div><label htmlFor={`${uid}-haso-startowe-2`}>Hasło startowe</label>
         <div className="row">
           <input id={`${uid}-haso-startowe-2`} value={password} onChange={(e) => setPassword(e.target.value)} />
-          <button onClick={() => setPassword(genPassword())} title="Wygeneruj">↻</button>
+          <button onClick={() => setPassword(genStartPassword())} title="Wygeneruj">↻</button>
         </div>
+        <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>{PASSWORD_HINT}</p>
       </div>
       <p className="muted" style={{ fontSize: 12, margin: 0 }}>
         Uczeń zaloguje się tymi danymi i zobaczy swój terminarz oraz saldo. Hasło zmieni przy pierwszym wejściu.

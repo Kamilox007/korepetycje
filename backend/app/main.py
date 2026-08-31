@@ -1,8 +1,7 @@
 import os
-import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from fastapi import FastAPI, Depends, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
@@ -159,13 +158,20 @@ def change_password(
 ):
     if not auth.verify_password(payload.old_password, user.password_hash):
         raise HTTPException(status_code=400, detail="Błędne dotychczasowe hasło")
-    if len(payload.new_password) < auth.MIN_PASSWORD_LENGTH:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Nowe hasło musi mieć min. {auth.MIN_PASSWORD_LENGTH} znaków",
-        )
+    policy_error = auth.password_policy_error(payload.new_password)
+    if policy_error:
+        raise HTTPException(status_code=400, detail=policy_error)
     if auth.verify_password(payload.new_password, user.password_hash):
         raise HTTPException(status_code=400, detail="Nowe hasło musi różnić się od dotychczasowego")
+    # This endpoint doubles as the first-login flow (must_change_password is
+    # true for every freshly created or reset account), so it is also the one
+    # place every account is guaranteed to pass through — hence the consent
+    # checkbox lives here rather than as a separate gate to build and enforce.
+    if user.must_change_password:
+        if not payload.accept_privacy:
+            raise HTTPException(400, "Musisz zaakceptować Politykę Prywatności, aby kontynuować.")
+        if user.privacy_accepted_at is None:
+            user.privacy_accepted_at = datetime.utcnow()
     user.password_hash = auth.hash_password(payload.new_password)
     user.must_change_password = False
     db.commit()
@@ -240,6 +246,9 @@ def create_user(
         raise HTTPException(403, "Tylko administrator może tworzyć konta administracji")
     if db.query(models.User).filter(models.User.username == payload.username).first():
         raise HTTPException(400, "Login jest już zajęty")
+    policy_error = auth.password_policy_error(payload.password)
+    if policy_error:
+        raise HTTPException(400, policy_error)
     u = models.User(
         username=payload.username,
         password_hash=auth.hash_password(payload.password),
@@ -314,9 +323,10 @@ def reset_user_password(
         raise HTTPException(400, "Własne hasło zmień przez „Zmień hasło”")
 
     new_password = (payload.password if payload and payload.password else None) \
-        or secrets.token_urlsafe(9)
-    if len(new_password) < auth.MIN_PASSWORD_LENGTH:
-        raise HTTPException(400, f"Hasło musi mieć co najmniej {auth.MIN_PASSWORD_LENGTH} znaków")
+        or auth.generate_password()
+    policy_error = auth.password_policy_error(new_password)
+    if policy_error:
+        raise HTTPException(400, policy_error)
 
     target.password_hash = auth.hash_password(new_password)
     target.must_change_password = True
@@ -538,6 +548,9 @@ def create_student_account(
         raise HTTPException(400, "Ten uczeń ma już konto")
     if db.query(models.User).filter(models.User.username == payload.username).first():
         raise HTTPException(400, "Login jest już zajęty")
+    policy_error = auth.password_policy_error(payload.password)
+    if policy_error:
+        raise HTTPException(400, policy_error)
     account = models.User(
         username=payload.username,
         password_hash=auth.hash_password(payload.password),

@@ -40,6 +40,10 @@ class User(Base):
     # here - not the number being seen, since it goes on every invoice anyway.
     bank_account: Mapped[str | None] = mapped_column(String(26), nullable=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Set once, the first time the account clears must_change_password with the
+    # privacy-policy checkbox ticked. Kept indefinitely as evidence of consent;
+    # never overwritten on a later password reset that reuses the same flow.
+    privacy_accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # failed login counter and the moment until which the account stays locked (naive UTC)
     failed_logins: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

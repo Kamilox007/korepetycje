@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Polityka Prywatności - Korepetycje</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 20px 80px;
+        line-height: 1.6;
+        color: #1f2430;
+        background: #fff;
+      }
+      h1 {
+        font-size: 22px;
+        margin-bottom: 4px;
+      }
+      .updated {
+        color: #6b7280;
+        font-size: 13px;
+        margin-bottom: 32px;
+      }
+      h2 {
+        font-size: 16px;
+        margin-top: 34px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+      ol, ul {
+        padding-left: 22px;
+      }
+      li {
+        margin-bottom: 8px;
+      }
+      a {
+        color: #2563eb;
+      }
+      .back {
+        display: inline-block;
+        margin-bottom: 24px;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <a class="back" href="/">← Powrót do panelu</a>
+    <h1>Polityka Prywatności</h1>
+    <p class="updated">Ostatnia aktualizacja: 20 sierpnia 2026 r.</p>
+
+    <h2>1. Informacje ogólne</h2>
+    <ol>
+      <li>Niniejsza polityka dotyczy Serwisu www, funkcjonującego pod adresem url: <b>panel.kamilkrzywon.pl</b>.</li>
+      <li>Operatorem Serwisu oraz Administratorem danych osobowych jest: Kamil Krzywoń, Szersznika 5/3, 43-400 Cieszyn.</li>
+      <li>Adres kontaktowy poczty elektronicznej Operatora: <a href="mailto:kontakt@kamilkrzywon.pl">kontakt@kamilkrzywon.pl</a>.</li>
+      <li>
+        Serwis nie jest ogólnodostępną stroną internetową - korzystanie z niego wymaga zalogowania. Operator jest
+        Administratorem danych osobowych przetwarzanych w związku z prowadzeniem działalności korepetytorskiej: zarówno
+        danych podawanych bezpośrednio w Serwisie (np. przy logowaniu), jak i danych przekazanych Operatorowi w inny
+        sposób (telefonicznie, mailowo, osobiście) w celu umówienia i rozliczenia zajęć.
+      </li>
+      <li>
+        Serwis wykorzystuje dane osobowe wyłącznie w celu:
+        <ul>
+          <li>realizacji zamówionych usług - organizacji i rozliczania korepetycji.</li>
+        </ul>
+      </li>
+      <li>
+        Serwis nie udostępnia publicznego formularza rejestracyjnego. Dane osobowe trafiają do systemu w następujący
+        sposób:
+        <ol>
+          <li>
+            Konta w Serwisie (dla korepetytorów, sekretariatu oraz uczniów) zakłada wyłącznie Operator lub upoważniony
+            przez niego pracownik, na podstawie danych przekazanych mu wcześniej w inny sposób (np. telefonicznie,
+            mailowo, osobiście).
+          </li>
+          <li>
+            Poprzez zapisanie w Twoim urządzeniu jednego pliku cookie, niezbędnego do utrzymania sesji zalogowania -
+            szczegóły w punkcie 8.
+          </li>
+        </ol>
+      </li>
+    </ol>
+
+    <h2>2. Wybrane metody ochrony danych stosowane przez Operatora</h2>
+    <ol>
+      <li>
+        Miejsca logowania i wprowadzania danych osobowych są chronione w warstwie transmisji certyfikatem SSL
+        (Let's Encrypt, odnawianym automatycznie). Dzięki temu dane przesyłane do Serwisu są szyfrowane i mogą zostać
+        odczytane wyłącznie na docelowym serwerze.
+      </li>
+      <li>
+        Hasła użytkowników są przechowywane w postaci hashowanej (algorytm bcrypt). Funkcja hashująca działa
+        jednokierunkowo - nie jest możliwe odtworzenie z niej oryginalnego hasła.
+      </li>
+      <li>Operator okresowo zmienia swoje hasła administracyjne.</li>
+      <li>
+        Serwis wymusza hasła o długości co najmniej 10 znaków, zawierające co najmniej jedną wielką literę, jedną
+        cyfrę i jeden znak specjalny. Dodatkowo konto zostaje tymczasowo zablokowane na 15 minut po 5 nieudanych
+        próbach logowania z rzędu, co utrudnia próby odgadnięcia hasła.
+      </li>
+      <li>
+        Operator regularnie aktualizuje oprogramowanie wykorzystywane do obsługi Serwisu, w tym jego komponenty
+        programistyczne.
+      </li>
+      <li>
+        Baza danych Serwisu jest na bieżąco replikowana, w formie zaszyfrowanej podczas przesyłu (HTTPS), do magazynu
+        kopii zapasowych Backblaze B2 znajdującego się na terenie Unii Europejskiej, z dodatkową migawką wykonywaną raz
+        na dobę i przechowywaniem historii przez 30 dni.
+      </li>
+    </ol>
+
+    <h2>3. Hosting</h2>
+    <ol>
+      <li>Serwis jest hostowany (technicznie utrzymywany) na serwerze zlokalizowanym w Polsce, u dostawcy OVHcloud.</li>
+      <li>
+        Oprogramowanie obsługujące Serwis zapisuje na serwerze standardowe logi dostępowe. Zapisowi mogą podlegać:
+        <ul>
+          <li>zasoby określone identyfikatorem URL (adresy żądanych stron, plików, zapytań do API),</li>
+          <li>czas nadejścia zapytania i czas wysłania odpowiedzi,</li>
+          <li>informacje o błędach, jakie nastąpiły przy realizacji żądania,</li>
+          <li>informacje o przeglądarce i systemie użytkownika,</li>
+          <li>adres IP.</li>
+        </ul>
+        Dostawca hostingu (OVHcloud), jako podmiot przetwarzający, ma dostęp do infrastruktury, na której działa
+        Serwis, na mocy zawartej z nim umowy powierzenia przetwarzania danych.
+      </li>
+    </ol>
+
+    <h2>4. Twoje prawa i dodatkowe informacje o sposobie wykorzystania danych</h2>
+    <ol>
+      <li>
+        Administrator przekazuje Twoje dane osobowe innym podmiotom wyłącznie wtedy, gdy jest to niezbędne do
+        wykonania usługi lub obowiązków ciążących na Administratorze. Dotyczy to następujących grup odbiorców:
+        <ul>
+          <li>firma hostingowa (OVHcloud) - na zasadzie powierzenia przetwarzania,</li>
+          <li>dostawca magazynu kopii zapasowych (Backblaze B2, region UE) - na zasadzie powierzenia przetwarzania,</li>
+          <li>upoważnieni pracownicy i współpracownicy Operatora, korzystający z danych wyłącznie w celu realizacji usług korepetycji.</li>
+        </ul>
+      </li>
+      <li>
+        Twoje dane osobowe nie są przekazywane poza Europejski Obszar Gospodarczy (EOG) - zarówno serwer Serwisu, jak
+        i magazyn kopii zapasowych, znajdują się na terenie Unii Europejskiej.
+      </li>
+      <li>
+        Twoje dane są przetwarzane tak długo, jak jest to konieczne do świadczenia usług korepetycji i związanych z
+        nimi rozliczeń, a także przez okres wymagany odrębnymi przepisami (np. przepisami o rachunkowości). Historia
+        odbytych zajęć i dokonanych wpłat jest zachowywana także po zakończeniu współpracy - do czasu zgłoszenia przez
+        Ciebie żądania jej trwałego usunięcia, o ile nie stoją temu na przeszkodzie obowiązki prawne Administratora.
+      </li>
+      <li>
+        Przysługuje Ci prawo żądania od Administratora:
+        <ul>
+          <li>dostępu do danych osobowych Ciebie dotyczących,</li>
+          <li>ich sprostowania,</li>
+          <li>usunięcia,</li>
+          <li>ograniczenia przetwarzania,</li>
+          <li>oraz przenoszenia danych.</li>
+        </ul>
+      </li>
+      <li>
+        Na działania Administratora przysługuje Ci skarga do Prezesa Urzędu Ochrony Danych Osobowych, ul. Stawki 2,
+        00-193 Warszawa.
+      </li>
+      <li>
+        Podanie danych osobowych jest dobrowolne, jednak niezbędne do umówienia i rozliczenia zajęć - bez nich
+        Operator nie będzie w stanie świadczyć usługi.
+      </li>
+      <li>
+        Wobec Twoich danych nie są podejmowane żadne zautomatyzowane decyzje, w tym w formie profilowania. Serwis nie
+        prowadzi też działań marketingowych - patrz punkt 7.
+      </li>
+    </ol>
+
+    <h2>5. Konto w Serwisie</h2>
+    <ol>
+      <li>
+        Serwis nie udostępnia publicznego formularza rejestracyjnego. Konta zakłada wyłącznie Operator lub upoważniony
+        przez niego pracownik, na podstawie danych przekazanych mu w inny sposób (telefonicznie, mailowo, osobiście).
+      </li>
+      <li>
+        Jedynymi formularzami dostępnymi bezpośrednio w Serwisie są: formularz logowania (login i hasło) oraz - przy
+        pierwszym logowaniu - formularz ustawienia własnego hasła w miejsce hasła startowego.
+      </li>
+      <li>
+        Serwis zapisuje informacje o parametrach połączenia (znacznik czasu, adres IP) w logach opisanych w punkcie 3.
+      </li>
+    </ol>
+
+    <h2>6. Rejestr sesji logowania</h2>
+    <ol>
+      <li>
+        Operator prowadzi rejestr sesji logowania (m.in. czas utworzenia sesji, adres IP, informacje o przeglądarce),
+        co pozwala wykryć nieautoryzowany dostęp oraz natychmiast unieważnić aktywne sesje, np. w momencie zmiany
+        hasła.
+      </li>
+    </ol>
+
+    <h2>7. Techniki marketingowe</h2>
+    <ol>
+      <li>
+        Serwis nie wykorzystuje żadnych technik marketingowych - w tym Google Analytics, pikseli konwersji (np.
+        Facebook Pixel), narzędzi marketing automation, remarketingu, nagrywania ekranu ani profilowania użytkowników.
+      </li>
+    </ol>
+
+    <h2>8. Informacja o plikach cookies</h2>
+    <ol>
+      <li>Serwis korzysta z jednego pliku cookie: <code>korepetycje_session</code>.</li>
+      <li>
+        Plik ten jest niezbędny do utrzymania Twojej sesji zalogowania - dzięki niemu nie musisz podawać loginu i
+        hasła przy każdym przejściu między widokami Serwisu. Serwis nie wykorzystuje żadnych plików cookies w celach
+        marketingowych, analitycznych ani pochodzących od podmiotów trzecich.
+      </li>
+      <li>Podmiotem zamieszczającym plik cookie na Twoim urządzeniu i uzyskującym do niego dostęp jest Operator Serwisu.</li>
+      <li>
+        Plik cookie jest niedostępny dla skryptów JavaScript (flaga <i>HttpOnly</i>), przesyłany wyłącznie po
+        szyfrowanym połączeniu HTTPS (flaga <i>Secure</i>) i nie jest dołączany do żądań inicjowanych z obcych stron
+        internetowych (flaga <i>SameSite=Lax</i>), co chroni przed atakami typu CSRF.
+      </li>
+      <li>
+        Standardowy czas ważności pliku cookie to 7 dni od zalogowania. W okresie, gdy konto korzysta jeszcze z hasła
+        startowego (przed jego zmianą), czas ten jest skrócony do 30 minut.
+      </li>
+      <li>
+        Wyłączenie obsługi tego pliku cookie w przeglądarce uniemożliwi zalogowanie się do Serwisu - bez niego
+        korzystanie z Serwisu nie jest możliwe.
+      </li>
+    </ol>
+
+    <h2>9. Zarządzanie plikami cookies</h2>
+    <ol>
+      <li>
+        W celu zarządzania ustawieniami cookies wybierz z listy poniżej przeglądarkę, której używasz, i postępuj
+        zgodnie z instrukcjami:
+        <ul>
+          <li><a href="https://support.microsoft.com/pl-pl/help/10607/microsoft-edge-view-delete-browser-history">Edge</a></li>
+          <li><a href="http://support.google.com/chrome/bin/answer.py?hl=pl&amp;answer=95647">Chrome</a></li>
+          <li><a href="http://support.apple.com/kb/PH5042">Safari</a></li>
+          <li><a href="http://support.mozilla.org/pl/kb/W%C5%82%C4%85czanie%20i%20wy%C5%82%C4%85czanie%20obs%C5%82ugi%20ciasteczek">Firefox</a></li>
+          <li><a href="http://help.opera.com/Windows/12.10/pl/cookies.html">Opera</a></li>
+        </ul>
+        Urządzenia mobilne:
+        <ul>
+          <li><a href="http://support.google.com/chrome/bin/answer.py?hl=pl&amp;answer=95647">Android</a></li>
+          <li><a href="http://support.apple.com/kb/HT1677?viewlocale=pl_PL">Safari (iOS)</a></li>
+        </ul>
+      </li>
+    </ol>
+  </body>
+</html>
