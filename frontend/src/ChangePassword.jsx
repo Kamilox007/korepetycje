@@ -17,7 +17,7 @@ export default function ChangePassword({ forced, onDone, onClose, onLogout }) {
     const pwError = passwordError(newP);
     if (pwError) { setErr(pwError); return; }
     if (newP !== newP2) { setErr("Hasła nie są identyczne."); return; }
-    if (forced && !acceptPrivacy) { setErr("Musisz zaakceptować Politykę Prywatności, aby kontynuować."); return; }
+    if (forced && !acceptPrivacy) { setErr("Musisz zaakceptować Regulamin i Politykę Prywatności, aby kontynuować."); return; }
     setBusy(true);
     try {
       await api.changePassword(oldP, newP, acceptPrivacy);
@@ -60,8 +60,10 @@ export default function ChangePassword({ forced, onDone, onClose, onLogout }) {
             onChange={(e) => setAcceptPrivacy(e.target.checked)} />
           <label htmlFor="accept-privacy" style={{ margin: 0 }}>
             Zapoznałem/-am się z{" "}
+            <a href="/regulamin.html" target="_blank" rel="noreferrer">Regulaminem</a>
+            {" "}oraz{" "}
             <a href="/privacy-policy.html" target="_blank" rel="noreferrer">Polityką Prywatności</a>
-            {" "}i akceptuję jej postanowienia.
+            {" "}i akceptuję ich postanowienia.
           </label>
         </div>
       )}
