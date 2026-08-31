@@ -19,14 +19,6 @@ export default function Summary({ refreshKey, tutorView = false }) {
 
       <div className="metrics">
         <div className="metric">
-          <div className="label">Należność za odbyte zajęcia</div>
-          <div className="value">{fmtMoney(data.total_due)}</div>
-        </div>
-        <div className="metric">
-          <div className="label">Wpłacono łącznie</div>
-          <div className="value">{fmtMoney(data.total_paid)}</div>
-        </div>
-        <div className="metric">
           <div className="label">Saldo</div>
           <div className={`value ${data.total_balance >= 0 ? "pos" : "neg"}`}>
             {fmtMoney(data.total_balance)}
@@ -44,8 +36,6 @@ export default function Summary({ refreshKey, tutorView = false }) {
                 <th>Uczeń</th>
                 <th className="num">Zajęcia</th>
                 <th className="num">Odbyte</th>
-                <th className="num">Należność</th>
-                <th className="num">Wpłacono</th>
                 <th className="num">Saldo</th>
               </tr>
             </thead>
@@ -60,8 +50,6 @@ export default function Summary({ refreshKey, tutorView = false }) {
                       <td style={{ fontWeight: 500 }}>{s.student_name}</td>
                       <td className="num">{s.lessons_total}</td>
                       <td className="num">{s.lessons_completed}</td>
-                      <td className="num">{fmtMoney(s.amount_due)}</td>
-                      <td className="num">{fmtMoney(s.amount_paid)}</td>
                       <td className="num">
                         <span className={`badge ${s.balance >= 0 ? "done" : "due"}`}>
                           {fmtMoney(s.balance)}
@@ -75,8 +63,6 @@ export default function Summary({ refreshKey, tutorView = false }) {
                         </td>
                         <td className="num" />
                         <td className="num" />
-                        <td className="num muted">{fmtMoney(t.amount_due)}</td>
-                        <td className="num muted">{fmtMoney(t.amount_paid)}</td>
                         <td className="num">
                           <span className={`badge ${t.balance >= 0 ? "done" : "due"}`}>
                             {fmtMoney(t.balance)}
