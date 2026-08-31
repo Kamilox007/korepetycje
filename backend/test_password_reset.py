@@ -29,7 +29,7 @@ TUTOR_PW = "TutorPassword1"
 with TestClient(app) as admin:
     admin.post("/api/auth/login", data={"username": "admin", "password": "admin"})
     admin.post("/api/auth/change-password",
-               json={"old_password": "admin", "new_password": ADMIN_PW})
+               json={"old_password": "admin", "new_password": ADMIN_PW, "accept_privacy": True})
 
     r = admin.post("/api/users", json={
         "username": "tutor1", "password": TUTOR_PW, "role": "tutor",
@@ -42,7 +42,7 @@ with TestClient(app) as admin:
     with TestClient(app) as t1, TestClient(app) as t2:
         t1.post("/api/auth/login", data={"username": "tutor1", "password": TUTOR_PW})
         t1.post("/api/auth/change-password",
-                json={"old_password": TUTOR_PW, "new_password": "OwnPassword123"})
+                json={"old_password": TUTOR_PW, "new_password": "OwnPassword123", "accept_privacy": True})
         t2.post("/api/auth/login", data={"username": "tutor1", "password": "OwnPassword123"})
         check("tutor works on a second device", t2.get("/api/auth/me").status_code == 200)
 
@@ -67,7 +67,7 @@ with TestClient(app) as admin:
         check("nothing else is reachable yet", t.get("/api/students").status_code == 403)
 
         r = t.post("/api/auth/change-password",
-                   json={"old_password": new_pw, "new_password": "SecondOwn123"})
+                   json={"old_password": new_pw, "new_password": "SecondOwn123", "accept_privacy": True})
         check("the tutor can set their own password again", r.status_code == 200)
 
     # --- guard rails ---
@@ -89,7 +89,7 @@ with TestClient(app) as admin, TestClient(app) as sec:
     })
     sec.post("/api/auth/login", data={"username": "sec1", "password": "SecPassword1"})
     sec.post("/api/auth/change-password",
-             json={"old_password": "SecPassword1", "new_password": "SecOwn12345"})
+             json={"old_password": "SecPassword1", "new_password": "SecOwn12345", "accept_privacy": True})
 
     check("secretary may reset a tutor",
           sec.post(f"/api/users/{tutor_id}/reset-password").status_code == 200)

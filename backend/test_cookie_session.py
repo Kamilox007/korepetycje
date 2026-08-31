@@ -41,7 +41,7 @@ with TestClient(app) as c:
 
     # --- changing the password refreshes the cookie to a full one ---
     r = c.post("/api/auth/change-password",
-               json={"old_password": "admin", "new_password": "HasloTestowe123"})
+               json={"old_password": "admin", "new_password": "HasloTestowe123", "accept_privacy": True})
     check("password change -> 200", r.status_code == 200)
     raw = r.headers.get("set-cookie", "")
     check("cookie refreshed to a full 7 days after the change",

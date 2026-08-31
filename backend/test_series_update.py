@@ -30,7 +30,7 @@ PASSWORD = "SeriesTest123"
 with TestClient(app) as c:
     c.post("/api/auth/login", data={"username": "admin", "password": "admin"})
     c.post("/api/auth/change-password",
-           json={"old_password": "admin", "new_password": PASSWORD})
+           json={"old_password": "admin", "new_password": PASSWORD, "accept_privacy": True})
 
     sid = c.post("/api/students", json={"name": "Series Student", "default_price": 80}).json()["id"]
     subj = c.post("/api/subjects", json={"name": "Matematyka"}).json()["id"]

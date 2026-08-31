@@ -33,7 +33,7 @@ with TestClient(app) as c:
     r = c.post("/api/auth/login", data={"username": "admin", "password": "admin"})
     tok = {"Authorization": f"Bearer {r.json()['access_token']}"}
     c.post("/api/auth/change-password",
-           json={"old_password": "admin", "new_password": "HasloTestowe123"}, headers=tok)
+           json={"old_password": "admin", "new_password": "HasloTestowe123", "accept_privacy": True}, headers=tok)
     tok = {"Authorization": f"Bearer {c.post('/api/auth/login', data={'username': 'admin', 'password': 'HasloTestowe123'}).json()['access_token']}"}
 
     # --- the API still speaks zloty ---

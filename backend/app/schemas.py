@@ -240,6 +240,9 @@ class MeOut(BaseModel):
 class ChangePasswordIn(BaseModel):
     old_password: str
     new_password: str
+    # Required (and checked) only while must_change_password is still set —
+    # see the handler. Ignored on a routine, already-onboarded password change.
+    accept_privacy: bool = False
 
 
 # student account created by staff

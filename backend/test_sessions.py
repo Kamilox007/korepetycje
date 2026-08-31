@@ -38,7 +38,7 @@ with TestClient(app) as c:
     # --- get past the forced password change ---
     c.post("/api/auth/login", data={"username": "admin", "password": "admin"})
     c.post("/api/auth/change-password",
-           json={"old_password": "admin", "new_password": PASSWORD})
+           json={"old_password": "admin", "new_password": PASSWORD, "accept_privacy": True})
 
     # --- every token carries a jti and is recorded ---
     tok = token_of(c)

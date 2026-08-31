@@ -2,7 +2,7 @@ import os
 import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from fastapi import FastAPI, Depends, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
@@ -166,6 +166,15 @@ def change_password(
         )
     if auth.verify_password(payload.new_password, user.password_hash):
         raise HTTPException(status_code=400, detail="Nowe hasło musi różnić się od dotychczasowego")
+    # This endpoint doubles as the first-login flow (must_change_password is
+    # true for every freshly created or reset account), so it is also the one
+    # place every account is guaranteed to pass through — hence the consent
+    # checkbox lives here rather than as a separate gate to build and enforce.
+    if user.must_change_password:
+        if not payload.accept_privacy:
+            raise HTTPException(400, "Musisz zaakceptować Politykę Prywatności, aby kontynuować.")
+        if user.privacy_accepted_at is None:
+            user.privacy_accepted_at = datetime.utcnow()
     user.password_hash = auth.hash_password(payload.new_password)
     user.must_change_password = False
     db.commit()

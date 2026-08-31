@@ -53,12 +53,12 @@ export const api = {
     return res.json();
   },
   me: () => req("/auth/me"),
-  changePassword: (oldP, newP) =>
+  changePassword: (oldP, newP, acceptPrivacy = false) =>
     // The backend refreshes the cookie in its response, so there is nothing to
     // store here. The old token was short-lived, the new one is full length.
     req("/auth/change-password", {
       method: "POST",
-      body: JSON.stringify({ old_password: oldP, new_password: newP }),
+      body: JSON.stringify({ old_password: oldP, new_password: newP, accept_privacy: acceptPrivacy }),
     }),
 
   logout: () => req("/auth/logout", { method: "POST" }),

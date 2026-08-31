@@ -57,9 +57,15 @@ with TestClient(app) as c:
                json={"old_password": "zle", "new_password": "PoprawneHaslo123"}, headers=tok)
     check("wrong current password -> 400", r.status_code == 400)
 
-    # --- poprawna zmiana ---
+    # --- privacy policy acceptance is required while must_change_password is set ---
     r = c.post("/api/auth/change-password",
                json={"old_password": "admin", "new_password": "PoprawneHaslo123"}, headers=tok)
+    check("valid change without accepting the privacy policy -> 400", r.status_code == 400)
+
+    # --- poprawna zmiana ---
+    r = c.post("/api/auth/change-password",
+               json={"old_password": "admin", "new_password": "PoprawneHaslo123", "accept_privacy": True},
+               headers=tok)
     check("valid change -> 200", r.status_code == 200)
     new_tok = {"Authorization": f"Bearer {r.json()['access_token']}"}
     check("a new token was returned", "access_token" in r.json())
