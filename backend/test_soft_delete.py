@@ -25,7 +25,7 @@ def check(label, cond):
         FAILS.append(label)
 
 
-PASSWORD = "ArchiveTest123"
+PASSWORD = "ArchiveTest123!"
 
 with TestClient(app) as c:
     c.post("/api/auth/login", data={"username": "admin", "password": "admin"})
@@ -47,7 +47,7 @@ with TestClient(app) as c:
     c.post("/api/payments", json={"student_id": sid, "date": str(today), "amount": 50})
 
     acc = c.post(f"/api/students/{sid}/account",
-                 json={"username": "anna", "password": "StartPassword1"})
+                 json={"username": "anna", "password": "StartPassword1!"})
     check("student account created", acc.status_code == 200)
 
     # --- archiving ---

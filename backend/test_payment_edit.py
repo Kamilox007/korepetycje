@@ -27,7 +27,7 @@ def check(label, cond):
 with TestClient(app) as c:
     c.post("/api/auth/login", data={"username": "admin", "password": "admin"})
     c.post("/api/auth/change-password",
-           json={"old_password": "admin", "new_password": "PaymentTest123", "accept_privacy": True})
+           json={"old_password": "admin", "new_password": "PaymentTest123!", "accept_privacy": True})
 
     sid = c.post("/api/students", json={"name": "Payer Student", "default_price": 80}).json()["id"]
     pay = c.post("/api/payments", json={

@@ -1,5 +1,8 @@
 import os
+import random
+import re
 import secrets
+import string
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -95,6 +98,44 @@ def verify_password(plain: str, hashed: str) -> bool:
         return bcrypt.checkpw(pw, hashed.encode("utf-8"))
     except (ValueError, TypeError):
         return False
+
+
+_SPECIAL_RE = re.compile(r"[^A-Za-z0-9]")
+
+
+def password_policy_error(password: str) -> str | None:
+    """None if the password satisfies the policy, otherwise a Polish message
+    naming the first unmet rule. Single source of truth: every endpoint that
+    sets a password (self-service change, staff-issued starting password,
+    reset) runs a new or generated password through this."""
+    if len(password) < MIN_PASSWORD_LENGTH:
+        return f"Hasło musi mieć co najmniej {MIN_PASSWORD_LENGTH} znaków"
+    if not re.search(r"[A-Z]", password):
+        return "Hasło musi zawierać co najmniej jedną wielką literę"
+    if not re.search(r"[0-9]", password):
+        return "Hasło musi zawierać co najmniej jedną cyfrę"
+    if not _SPECIAL_RE.search(password):
+        return "Hasło musi zawierać co najmniej jeden znak specjalny"
+    return None
+
+
+_PW_SPECIALS = "!@#$%^&*-_=+"
+
+
+def generate_password(length: int = 12) -> str:
+    """A starting password that always satisfies password_policy_error, for
+    the "generate one for me" paths (reset, and the frontend's own generator
+    mirrors this rule). Not meant to be memorised — every account it's issued
+    to has must_change_password set, forcing a real password on first login."""
+    required = [
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.digits),
+        secrets.choice(_PW_SPECIALS),
+    ]
+    pool = string.ascii_letters + string.digits + _PW_SPECIALS
+    chars = required + [secrets.choice(pool) for _ in range(length - len(required))]
+    random.SystemRandom().shuffle(chars)
+    return "".join(chars)
 
 
 def token_lifetime(user: models.User) -> int:

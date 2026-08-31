@@ -32,7 +32,7 @@ def jti_of(token):
     return jwt.decode(token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])["jti"]
 
 
-PASSWORD = "SessionTest123"
+PASSWORD = "SessionTest123!"
 
 with TestClient(app) as c:
     # --- get past the forced password change ---
@@ -82,7 +82,7 @@ with TestClient(app) as phone, TestClient(app) as laptop:
 
     check("they are separate sessions", jti_of(token_of(phone)) != jti_of(token_of(laptop)))
 
-    NEW = "AfterChange456"
+    NEW = "AfterChange456!"
     r = laptop.post("/api/auth/change-password",
                     json={"old_password": PASSWORD, "new_password": NEW})
     check("password change -> 200", r.status_code == 200)
@@ -106,7 +106,7 @@ with TestClient(app) as phone, TestClient(app) as laptop:
 
 # --- expired rows are cleaned up ---
 with TestClient(app) as c:
-    c.post("/api/auth/login", data={"username": "admin", "password": "AfterChange456"})
+    c.post("/api/auth/login", data={"username": "admin", "password": NEW})
 
     db = SessionLocal()
     from datetime import timedelta

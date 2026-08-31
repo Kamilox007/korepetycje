@@ -25,7 +25,7 @@ def check(label, cond):
         FAILS.append(label)
 
 
-PASSWORD = "SeriesTest123"
+PASSWORD = "SeriesTest123!"
 
 with TestClient(app) as c:
     c.post("/api/auth/login", data={"username": "admin", "password": "admin"})
