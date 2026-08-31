@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light;
   --bg: #f7f6f2;
   --surface: #ffffff;
   --surface-2: #f0eee8;
@@ -8,16 +9,68 @@
   --ink-soft: #5c6170;
   --ink-faint: #9b9fab;
   --accent: #2f4858;
+  --accent-hover: #243845;
   --accent-soft: #e3eaee;
   --done: #1d7a5f;
   --done-soft: #dcefe8;
   --due: #b5481f;
   --due-soft: #f6e4dc;
   --warn: #9a6b00;
+  --warn-soft: #fdf0d6;
+  --overlay: rgba(31, 36, 48, 0.4);
   --radius: 10px;
   --radius-sm: 7px;
   --shadow: 0 1px 3px rgba(31, 36, 48, 0.06);
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Dark palette: applied automatically from the OS/browser preference, unless
+   the user picked a theme explicitly (data-theme), which always wins. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #14171c;
+    --surface: #1c2029;
+    --surface-2: #262b35;
+    --border: #313846;
+    --border-strong: #414a5c;
+    --ink: #e7e9ee;
+    --ink-soft: #a9afbd;
+    --ink-faint: #6b7284;
+    --accent: #6b9dc2;
+    --accent-hover: #86b3d4;
+    --accent-soft: #223140;
+    --done: #5cc999;
+    --done-soft: #16352a;
+    --due: #e88a63;
+    --due-soft: #3a2419;
+    --warn: #d9a441;
+    --warn-soft: #3a2f14;
+    --overlay: rgba(0, 0, 0, 0.55);
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #14171c;
+  --surface: #1c2029;
+  --surface-2: #262b35;
+  --border: #313846;
+  --border-strong: #414a5c;
+  --ink: #e7e9ee;
+  --ink-soft: #a9afbd;
+  --ink-faint: #6b7284;
+  --accent: #6b9dc2;
+  --accent-hover: #86b3d4;
+  --accent-soft: #223140;
+  --done: #5cc999;
+  --done-soft: #16352a;
+  --due: #e88a63;
+  --due-soft: #3a2419;
+  --warn: #d9a441;
+  --warn-soft: #3a2f14;
+  --overlay: rgba(0, 0, 0, 0.55);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 * { box-sizing: border-box; }
@@ -49,7 +102,7 @@ button.primary {
   border-color: var(--accent);
   color: #fff;
 }
-button.primary:hover { background: #243845; }
+button.primary:hover { background: var(--accent-hover); }
 button.ghost { border-color: transparent; background: transparent; }
 button.ghost:hover { background: var(--surface-2); }
 button.danger { color: var(--due); border-color: var(--due-soft); }
@@ -142,7 +195,7 @@ tbody tr:hover { background: var(--surface-2); }
 .badge.done { background: var(--done-soft); color: var(--done); }
 .badge.due { background: var(--due-soft); color: var(--due); }
 .badge.plan { background: var(--accent-soft); color: var(--accent); }
-.badge.resched { background: #fdf0d6; color: var(--warn); }
+.badge.resched { background: var(--warn-soft); color: var(--warn); }
 
 /* calendar */
 .cal-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
@@ -169,7 +222,7 @@ tbody tr:hover { background: var(--surface-2); }
 .lesson-chip .n { color: var(--ink-soft); }
 
 /* modal */
-.overlay { position: fixed; inset: 0; background: rgba(31,36,48,0.4); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+.overlay { position: fixed; inset: 0; background: var(--overlay); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
 .modal { background: var(--surface); border-radius: var(--radius); width: 100%; max-width: 440px; box-shadow: 0 12px 40px rgba(0,0,0,0.18); max-height: 90vh; overflow-y: auto; }
 .modal-head { padding: 18px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
 .modal-head h2 { margin: 0; font-size: 17px; }
@@ -191,7 +244,7 @@ tbody tr:hover { background: var(--surface-2); }
 .view-switch .seg { border: none; border-radius: 0; background: var(--surface); padding: 7px 14px; border-right: 1px solid var(--border); }
 .view-switch .seg:last-child { border-right: none; }
 .view-switch .seg.active { background: var(--accent); color: #fff; }
-.view-switch .seg.active:hover { background: #243845; }
+.view-switch .seg.active:hover { background: var(--accent-hover); }
 
 .cal-head .range { margin-left: 6px; }
 .add-cell { width: 100%; color: var(--ink-faint); font-size: 18px; padding: 2px; }
@@ -348,6 +401,30 @@ tbody tr:hover { background: var(--surface-2); }
 /* Okno potwierdzenia otwarte na tle innego modala (np. edycji zajęć)
    musi leżeć wyżej, inaczej zniknie pod spodem. */
 .overlay.overlay-confirm { z-index: 100; }
+
+/* ----- informacja o plikach cookies ----- */
+.cookie-notice {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  /* Below .overlay (50): an open modal should never have its footer buttons
+     covered by this. */
+  z-index: 40;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  max-width: 620px;
+  margin: 0 auto;
+}
+.cookie-notice p { margin: 0; font-size: 13px; color: var(--ink-soft); flex: 1 1 260px; }
+.cookie-notice button { flex-shrink: 0; }
 
 /* ==========================================================================
    Mobile - do 820 px.

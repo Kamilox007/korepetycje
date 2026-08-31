@@ -1,7 +1,9 @@
 import { useState, useId } from "react";
+import { useTheme } from "./useTheme";
 
 export default function Login({ onLogin }) {
   const uid = useId();
+  const { theme, toggle: toggleTheme } = useTheme();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
@@ -41,6 +43,10 @@ export default function Login({ onLogin }) {
         <div className="muted" style={{ fontSize: 12, textAlign: "center", display: "flex", gap: 12, justifyContent: "center" }}>
           <a href="/privacy-policy.html" target="_blank" rel="noreferrer">Polityka Prywatności</a>
           <a href="/regulamin.html" target="_blank" rel="noreferrer">Regulamin</a>
+          <button type="button" onClick={toggleTheme}
+            style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "var(--accent)", textDecoration: "underline", cursor: "pointer" }}>
+            {theme === "dark" ? "Jasny motyw" : "Ciemny motyw"}
+          </button>
         </div>
       </form>
     </div>
