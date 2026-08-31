@@ -85,33 +85,55 @@ function TransferTarget({ target, showRecipient }) {
       )}
 
       <div className="transfer-row">
-        <figure className="transfer-qr">
-          <canvas ref={canvasRef} aria-label="Kod QR przelewu" />
-          <figcaption className="muted">
-            Zeskanuj w aplikacji banku - poszukaj opcji „Skanuj i płać”
-            albo „Zapłać kodem QR”.
-          </figcaption>
-        </figure>
+        {target.qr_payload && (
+          <figure className="transfer-qr">
+            <canvas ref={canvasRef} aria-label="Kod QR przelewu" />
+            <figcaption className="muted">
+              Zeskanuj w aplikacji banku — poszukaj opcji „Skanuj i płać”
+              albo „Zapłać kodem QR”.
+            </figcaption>
+          </figure>
+        )}
 
         <dl className="transfer-details">
           <dt>Odbiorca</dt>
           <dd>{target.recipient}</dd>
 
-          <dt>Numer rachunku</dt>
-          <dd>
-            <span className="transfer-value num">{target.account}</span>
-            <button onClick={() => copy(target.account.replace(/\s/g, ""), "konto")}>
-              {copied === "konto" ? "Skopiowano ✓" : "Kopiuj"}
-            </button>
-          </dd>
+          {target.account && (
+            <>
+              <dt>Numer rachunku</dt>
+              <dd>
+                <span className="transfer-value num">{target.account}</span>
+                <button onClick={() => copy(target.account.replace(/\s/g, ""), "konto")}>
+                  {copied === "konto" ? "Skopiowano ✓" : "Kopiuj"}
+                </button>
+              </dd>
+            </>
+          )}
 
-          <dt>Tytuł przelewu</dt>
-          <dd>
-            <span className="transfer-value">{target.title}</span>
-            <button onClick={() => copy(target.title, "tytul")}>
-              {copied === "tytul" ? "Skopiowano ✓" : "Kopiuj"}
-            </button>
-          </dd>
+          {target.account && (
+            <>
+              <dt>Tytuł przelewu</dt>
+              <dd>
+                <span className="transfer-value">{target.title}</span>
+                <button onClick={() => copy(target.title, "tytul")}>
+                  {copied === "tytul" ? "Skopiowano ✓" : "Kopiuj"}
+                </button>
+              </dd>
+            </>
+          )}
+
+          {target.phone && (
+            <>
+              <dt>BLIK na numer</dt>
+              <dd>
+                <span className="transfer-value num">{target.phone}</span>
+                <button onClick={() => copy(target.phone.replace(/\s/g, ""), "telefon")}>
+                  {copied === "telefon" ? "Skopiowano ✓" : "Kopiuj"}
+                </button>
+              </dd>
+            </>
+          )}
         </dl>
       </div>
     </section>

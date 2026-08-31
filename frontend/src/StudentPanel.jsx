@@ -67,8 +67,6 @@ export default function StudentPanel({ section = "lessons" }) {
       {summary && (
         <div className="metrics">
           <div className="metric"><div className="label">Odbyte zajęcia</div><div className="value">{summary.lessons_completed}</div></div>
-          <div className="metric"><div className="label">Należność</div><div className="value">{fmtMoney(summary.amount_due)}</div></div>
-          <div className="metric"><div className="label">Wpłacono</div><div className="value">{fmtMoney(summary.amount_paid)}</div></div>
           <div className="metric"><div className="label">Saldo</div>
             <div className={`value ${summary.balance >= 0 ? "pos" : "neg"}`}>{fmtMoney(summary.balance)}</div></div>
         </div>

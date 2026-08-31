@@ -62,6 +62,25 @@ def format_account(account: str) -> str:
     return " ".join([acc[:2]] + [acc[i:i + 4] for i in range(2, len(acc), 4)])
 
 
+def normalize_phone(phone: str) -> str:
+    """Digits only, dropping a leading +48/48 country code."""
+    digits = re.sub(r"\D", "", phone or "")
+    if len(digits) == 11 and digits.startswith("48"):
+        digits = digits[2:]
+    return digits
+
+
+def valid_phone(phone: str) -> bool:
+    """A Polish mobile number is 9 digits. No checksum to verify, unlike a NRB."""
+    return len(normalize_phone(phone)) == 9
+
+
+def format_phone(phone: str) -> str:
+    """Group as XXX XXX XXX for display."""
+    digits = normalize_phone(phone)
+    return " ".join(digits[i:i + 3] for i in range(0, len(digits), 3))
+
+
 def build(*, account: str, recipient: str, title: str,
           amount_grosze: int | None, nip: str = "") -> str:
     """Assemble the payload. `amount_grosze=None` lets the payer type the amount."""
@@ -98,8 +117,10 @@ def configured() -> dict | None:
     recipient = os.environ.get("BANK_RECIPIENT", "").strip()
     if not account or not recipient:
         return None
+    phone = os.environ.get("BANK_BLIK_PHONE", "").strip()
     return {
         "account": normalize_account(account),
         "recipient": recipient,
         "nip": os.environ.get("BANK_NIP", "").strip(),
+        "phone": normalize_phone(phone) if valid_phone(phone) else "",
     }

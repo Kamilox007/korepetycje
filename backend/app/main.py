@@ -292,6 +292,15 @@ def update_user(
             raise HTTPException(400, "Numer rachunku jest nieprawidłowy")
         data["bank_account"] = acc or None
 
+    if "blik_phone" in data:
+        # Same restriction and reasoning as bank_account, above.
+        if user.role != "admin":
+            raise HTTPException(403, "Tylko administrator zmienia numer telefonu do BLIK")
+        phone = transfer_code.normalize_phone(data["blik_phone"] or "")
+        if phone and not transfer_code.valid_phone(phone):
+            raise HTTPException(400, "Numer telefonu jest nieprawidłowy")
+        data["blik_phone"] = phone or None
+
     for k, v in data.items():
         setattr(target, k, v)
     db.commit()
@@ -1377,37 +1386,45 @@ def my_transfer_info(
     for row in summary.by_tutor:
         owed_grosze = max(0, -money.to_grosze(row.balance))
 
-        account = recipient = None
+        account = phone = recipient = None
         if row.tutor_id:
             tutor = db.get(models.User, row.tutor_id)
-            if tutor and tutor.bank_account:
-                account = tutor.bank_account
+            if tutor:
                 recipient = tutor.display_name or tutor.username
+                account = tutor.bank_account
+                phone = tutor.blik_phone
         if not account and fallback:
             # Lessons with no tutor, or a tutor who has not set an account yet.
-            account, recipient = fallback["account"], fallback["recipient"]
-        if not account:
+            account, recipient = fallback["account"], recipient or fallback["recipient"]
+        if not phone and fallback and fallback.get("phone"):
+            phone = fallback["phone"]
+        if not account and not phone:
             continue
 
         title = f"Korepetycje {student.name}"
-        try:
-            payload = transfer_code.build(
-                account=account, recipient=recipient, title=title,
-                amount_grosze=owed_grosze,
-                nip=(fallback or {}).get("nip", ""),
-            )
-        except ValueError:
-            # A misconfigured account: skip it rather than show a code that
-            # sends money into the void.
+        payload = None
+        if account:
+            try:
+                payload = transfer_code.build(
+                    account=account, recipient=recipient, title=title,
+                    amount_grosze=owed_grosze,
+                    nip=(fallback or {}).get("nip", ""),
+                )
+            except ValueError:
+                # A misconfigured account: drop the QR rather than show a code
+                # that sends money into the void, but still offer BLIK if set.
+                account = None
+        if not account and not phone:
             continue
 
         targets.append(schemas.TransferTarget(
             tutor_id=row.tutor_id,
             recipient=recipient,
-            account=transfer_code.format_account(account),
+            account=transfer_code.format_account(account) if account else None,
             title=title,
             amount=money.to_zlote(owed_grosze) if owed_grosze else None,
             qr_payload=payload,
+            phone=transfer_code.format_phone(phone) if phone else None,
         ))
 
     return schemas.TransferInfo(configured=bool(targets), targets=targets)

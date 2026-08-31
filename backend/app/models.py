@@ -39,6 +39,9 @@ class User(Base):
     # swapping the number silently redirects payments, which is the real risk
     # here - not the number being seen, since it goes on every invoice anyway.
     bank_account: Mapped[str | None] = mapped_column(String(26), nullable=True)
+    # Same rationale and same admin-only restriction as bank_account: a BLIK
+    # phone number is an alternative way for students to pay this tutor.
+    blik_phone: Mapped[str | None] = mapped_column(String(9), nullable=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
     # Set once, the first time the account clears must_change_password with the
     # checkbox ticked (covers both the Regulamin and the Polityka Prywatności —
