@@ -169,9 +169,9 @@ def change_password(
     # checkbox lives here rather than as a separate gate to build and enforce.
     if user.must_change_password:
         if not payload.accept_privacy:
-            raise HTTPException(400, "Musisz zaakceptować Politykę Prywatności, aby kontynuować.")
+            raise HTTPException(400, "Musisz zaakceptować Regulamin i Politykę Prywatności, aby kontynuować.")
         if user.privacy_accepted_at is None:
-            user.privacy_accepted_at = datetime.utcnow()
+            user.privacy_accepted_at = datetime.utcnow()  # covers both documents, one checkbox
     user.password_hash = auth.hash_password(payload.new_password)
     user.must_change_password = False
     db.commit()

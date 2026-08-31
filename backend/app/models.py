@@ -41,7 +41,8 @@ class User(Base):
     bank_account: Mapped[str | None] = mapped_column(String(26), nullable=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
     # Set once, the first time the account clears must_change_password with the
-    # privacy-policy checkbox ticked. Kept indefinitely as evidence of consent;
+    # checkbox ticked (covers both the Regulamin and the Polityka Prywatności —
+    # one checkbox, two documents). Kept indefinitely as evidence of consent;
     # never overwritten on a later password reset that reuses the same flow.
     privacy_accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # failed login counter and the moment until which the account stays locked (naive UTC)
