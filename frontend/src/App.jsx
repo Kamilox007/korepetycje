@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { usePersistentState } from "./usePersistentState";
+import { useTheme } from "./useTheme";
 import { api, setUnauthorizedHandler } from "./api";
 import Login from "./Login";
+import CookieNotice from "./CookieNotice";
 import ChangePassword from "./ChangePassword";
 import Calendar from "./Calendar";
 import Students from "./Students";
@@ -89,14 +91,14 @@ export default function App() {
   }, [auth]);
 
   if (loading) return <div className="empty" style={{ marginTop: 80 }}>Ładowanie…</div>;
-  if (!auth) return <Login onLogin={handleLogin} />;
+  if (!auth) return <><Login onLogin={handleLogin} /><CookieNotice /></>;
 
   const isStaff = auth.role === "admin" || auth.role === "secretary";
 
   // While the account sits on its starting password the backend rejects everything
   // but the password change, so do not mount the panels: their requests return 403.
   if (forcePw) {
-    return <ChangePassword forced onDone={() => setForcePw(false)} onLogout={logout} />;
+    return <><ChangePassword forced onDone={() => setForcePw(false)} onLogout={logout} /><CookieNotice /></>;
   }
 
   return (
@@ -126,11 +128,13 @@ export default function App() {
         </RoleShell>
       )}
       {showPw && <ChangePassword onClose={() => setShowPw(false)} onDone={() => setShowPw(false)} />}
+      <CookieNotice />
     </>
   );
 }
 
 function Sidebar({ auth, subtitle, onLogout, onChangePassword, tabs, badge }) {
+  const { theme, toggle: toggleTheme } = useTheme();
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -152,6 +156,9 @@ function Sidebar({ auth, subtitle, onLogout, onChangePassword, tabs, badge }) {
       <div className="spacer" />
       <div className="sidebar-user">
         <div className="muted" style={{ fontSize: 12, padding: "0 8px 6px" }}>{auth.display_name || auth.username}</div>
+        <button className="nav-item" onClick={toggleTheme}>
+          <span>{theme === "dark" ? "Jasny motyw" : "Ciemny motyw"}</span>
+        </button>
         <button className="nav-item" onClick={onChangePassword}><span>Zmień hasło</span></button>
         <button className="nav-item" onClick={onLogout}><span>Wyloguj</span></button>
       </div>
