@@ -162,6 +162,7 @@ function ColorModal({ user, myRole, onClose, onSaved }) {
   const [displayName, setDisplayName] = useState(user.display_name || "");
   const [color, setColor] = useState(user.color || TUTOR_COLORS[0]);
   const [account, setAccount] = useState(user.bank_account || "");
+  const [phone, setPhone] = useState(user.blik_phone || "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -171,9 +172,12 @@ function ColorModal({ user, myRole, onClose, onSaved }) {
     setErr("");
     try {
       const data = { display_name: displayName.trim(), color };
-      // Only an admin may touch the account, so anyone else sends colour alone
-      // and the backend never has to reject the request.
-      if (myRole === "admin") data.bank_account = account.trim() || null;
+      // Only an admin may touch the account/phone, so anyone else sends
+      // colour alone and the backend never has to reject the request.
+      if (myRole === "admin") {
+        data.bank_account = account.trim() || null;
+        data.blik_phone = phone.trim() || null;
+      }
       await api.updateUser(user.id, data);
       onSaved();
     } catch (e) {
@@ -211,6 +215,22 @@ function ColorModal({ user, myRole, onClose, onSaved }) {
             Na ten rachunek uczniowie tego korepetytora wysyłają przelewy — kod QR
             w ich panelu wskazuje właśnie tutaj. Suma kontrolna jest sprawdzana
             przy zapisie.
+          </p>
+        </div>
+      )}
+
+      {myRole === "admin" && (
+        <div style={{ marginTop: 18 }}>
+          <label htmlFor={`${uid}-phone`}>Numer telefonu do BLIK</label>
+          <input
+            id={`${uid}-phone`}
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="9 cyfr, opcjonalnie"
+          />
+          <p className="muted" style={{ fontSize: 12, marginTop: 6, marginBottom: 0 }}>
+            Pokazywany uczniom jako alternatywa dla przelewu — do ręcznego wysłania
+            BLIK-iem, obok kodu QR.
           </p>
         </div>
       )}

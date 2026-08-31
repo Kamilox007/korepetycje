@@ -147,13 +147,19 @@ class PaymentCreate(PaymentBase):
 
 
 class TransferTarget(BaseModel):
-    """Bank details for one recipient, with the amount owed to them."""
+    """Payment details for one recipient, with the amount owed to them.
+
+    account/qr_payload and phone are independent: a tutor may have set up
+    either, both, or (transiently, mid-setup) neither, in which case this
+    target is left out entirely — see the handler.
+    """
     tutor_id: int | None = None
     recipient: str
-    account: str                        # formatted for reading
+    account: str | None = None          # formatted for reading
     title: str
     amount: float | None = None         # what is owed, zloty; None means "any"
-    qr_payload: str                     # ZBP 2D string, rendered client-side
+    qr_payload: str | None = None       # ZBP 2D string, rendered client-side
+    phone: str | None = None            # BLIK, formatted for reading
 
 
 class TransferInfo(BaseModel):
@@ -301,6 +307,7 @@ class UserOut(BaseModel):
     display_name: str | None = None
     color: str | None = None
     bank_account: str | None = None
+    blik_phone: str | None = None
 
 
 class UserUpdate(BaseModel):
@@ -308,6 +315,7 @@ class UserUpdate(BaseModel):
     color: str | None = None
     # Admin only; see the handler for why.
     bank_account: str | None = None
+    blik_phone: str | None = None
 
 
 class UserCreatedOut(BaseModel):
