@@ -2,6 +2,7 @@ import { useState, useEffect, useId } from "react";
 import { api } from "./api";
 import Modal from "./Modal";
 import { TUTOR_COLORS } from "./colors";
+import { PASSWORD_HINT, passwordError, genStartPassword } from "./password";
 import { useConfirm } from "./Confirm";
 
 const ROLE_LABEL = { admin: "Administrator", secretary: "Sekretariat", tutor: "Korepetytor", student: "Uczeń" };
@@ -222,22 +223,23 @@ function UserForm({ myRole, onClose, onSaved }) {
   const [role, setRole] = useState("tutor");
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
-  const [password, setPassword] = useState(gen());
+  const [password, setPassword] = useState(genStartPassword());
   const [color, setColor] = useState(TUTOR_COLORS[0]);
   const [created, setCreated] = useState(null);
   const [err, setErr] = useState("");
   const [resetResult, setResetResult] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  function gen() { return Math.random().toString(36).slice(2, 8) + Math.floor(Math.random() * 90 + 10); }
-
   const roleOptions = myRole === "admin"
     ? [["tutor", "Korepetytor"], ["secretary", "Sekretariat"]]
     : [["tutor", "Korepetytor"]];
 
+  const pwError = passwordError(password);
+
   async function save() {
     setErr("");
     if (!username.trim()) { setErr("Podaj login."); return; }
+    if (pwError) { setErr(pwError); return; }
     setBusy(true);
     try {
       const res = await api.createUser({
@@ -267,7 +269,7 @@ function UserForm({ myRole, onClose, onSaved }) {
     <Modal title="Nowy użytkownik" onClose={onClose}
       footer={<>
         <button onClick={onClose}>Anuluj</button>
-        <button className="primary" onClick={save} disabled={busy || !username.trim()}>Utwórz</button>
+        <button className="primary" onClick={save} disabled={busy || !username.trim() || Boolean(pwError)}>Utwórz</button>
       </>}>
       {err && <div className="err">{err}</div>}
       <div>
@@ -283,8 +285,9 @@ function UserForm({ myRole, onClose, onSaved }) {
       <div><label htmlFor={`${uid}-haso-startowe-4`}>Hasło startowe</label>
         <div className="row">
           <input id={`${uid}-haso-startowe-4`} value={password} onChange={(e) => setPassword(e.target.value)} />
-          <button onClick={() => setPassword(gen())} title="Wygeneruj">↻</button>
+          <button onClick={() => setPassword(genStartPassword())} title="Wygeneruj">↻</button>
         </div>
+        <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>{PASSWORD_HINT}</p>
       </div>
       {role === "tutor" && (
         <div>

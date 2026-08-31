@@ -1,6 +1,7 @@
 import { useState, useId } from "react";
 import Modal from "./Modal";
 import { api } from "./api";
+import { PASSWORD_HINT, passwordError } from "./password";
 
 export default function ChangePassword({ forced, onDone, onClose, onLogout }) {
   const uid = useId();
@@ -13,7 +14,8 @@ export default function ChangePassword({ forced, onDone, onClose, onLogout }) {
 
   async function save() {
     setErr("");
-    if (newP.length < 10) { setErr("Nowe hasło musi mieć min. 10 znaków."); return; }
+    const pwError = passwordError(newP);
+    if (pwError) { setErr(pwError); return; }
     if (newP !== newP2) { setErr("Hasła nie są identyczne."); return; }
     if (forced && !acceptPrivacy) { setErr("Musisz zaakceptować Politykę Prywatności, aby kontynuować."); return; }
     setBusy(true);
@@ -45,8 +47,11 @@ export default function ChangePassword({ forced, onDone, onClose, onLogout }) {
       {err && <div className="err">{err}</div>}
       <div><label htmlFor={`${uid}-dotychczasowe-haso-1`}>Dotychczasowe hasło</label>
         <input id={`${uid}-dotychczasowe-haso-1`} type="password" value={oldP} onChange={(e) => setOldP(e.target.value)} /></div>
-      <div><label htmlFor={`${uid}-nowe-haso-2`}>Nowe hasło</label>
-        <input id={`${uid}-nowe-haso-2`} type="password" value={newP} onChange={(e) => setNewP(e.target.value)} /></div>
+      <div>
+        <label htmlFor={`${uid}-nowe-haso-2`}>Nowe hasło</label>
+        <input id={`${uid}-nowe-haso-2`} type="password" value={newP} onChange={(e) => setNewP(e.target.value)} />
+        <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>{PASSWORD_HINT}</p>
+      </div>
       <div><label htmlFor={`${uid}-powtorz-nowe-haso-3`}>Powtórz nowe hasło</label>
         <input id={`${uid}-powtorz-nowe-haso-3`} type="password" value={newP2} onChange={(e) => setNewP2(e.target.value)} /></div>
       {forced && (
