@@ -45,9 +45,17 @@ export default function Calendar({ students, onChanged }) {
   const [editing, setEditing] = useState(null);
   const [adding, setAdding] = useState(null);
   const [tutors, setTutors] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  // Session-only, not persisted: an empty calendar after reload because a
+  // filter was silently still on would be more confusing than useful.
+  const [subjectFilter, setSubjectFilter] = useState("");
+  const [tutorFilter, setTutorFilter] = useState("");
   const [err, setErr] = useState("");
 
-  useEffect(() => { api.listTutors().then(setTutors).catch(() => {}); }, []);
+  useEffect(() => {
+    api.listTutors().then(setTutors).catch(() => {});
+    api.listSubjects().then(setSubjects).catch(() => {});
+  }, []);
 
   let rangeStart, rangeEnd;
   if (view === "day") {
@@ -81,6 +89,8 @@ export default function Calendar({ students, onChanged }) {
   function lessonsFor(day) {
     return lessons
       .filter((l) => sameDay(parseISO(l.date), day))
+      .filter((l) => !subjectFilter || String(l.subject_id) === subjectFilter)
+      .filter((l) => !tutorFilter || String(l.assigned_tutor_id) === tutorFilter)
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
   }
 
@@ -134,6 +144,17 @@ export default function Calendar({ students, onChanged }) {
         <button onClick={() => setAnchor(new Date())}>Dziś</button>
         <button onClick={() => navigate(1)}>→</button>
         <span className="range">{rangeLabel}</span>
+        <div className="spacer" />
+        <select value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)}
+                aria-label="Filtruj po przedmiocie" style={{ width: "auto" }}>
+          <option value="">Wszystkie przedmioty</option>
+          {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <select value={tutorFilter} onChange={(e) => setTutorFilter(e.target.value)}
+                aria-label="Filtruj po korepetytorze" style={{ width: "auto" }}>
+          <option value="">Wszyscy korepetytorzy</option>
+          {tutors.map((t) => <option key={t.id} value={t.id}>{t.display_name}</option>)}
+        </select>
       </div>
 
       {tutors.length > 0 && (
