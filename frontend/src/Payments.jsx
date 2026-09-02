@@ -9,6 +9,8 @@ export default function Payments({ students, reload }) {
   const [payments, setPayments] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [studentFilter, setStudentFilter] = useState("");
+  const [tutorFilter, setTutorFilter] = useState("");
 
   // Single entry point, same reason as in Students: two loaders invite the bug
   // where a mutation refreshes one of them and silently leaves the other stale.
@@ -31,6 +33,19 @@ export default function Payments({ students, reload }) {
     refresh();
   }
 
+  const tutorOptions = [];
+  const seenTutors = new Set();
+  for (const p of payments) {
+    const key = p.assigned_tutor_id ?? "brak";
+    if (seenTutors.has(key)) continue;
+    seenTutors.add(key);
+    tutorOptions.push({ key, name: p.assigned_tutor_id ? p.tutor_name : "nieprzypisane" });
+  }
+
+  const filtered = payments
+    .filter((p) => !studentFilter || String(p.student_id) === studentFilter)
+    .filter((p) => !tutorFilter || String(p.assigned_tutor_id ?? "brak") === tutorFilter);
+
   return (
     <div>
       <div className="page-head">
@@ -38,22 +53,40 @@ export default function Payments({ students, reload }) {
         <button className="primary" onClick={() => setShowForm(true)}>+ Dodaj wpłatę</button>
       </div>
 
+      {payments.length > 0 && (
+        <div className="cal-head" style={{ marginBottom: 12 }}>
+          <select aria-label="Filtruj po uczniu" value={studentFilter} onChange={(e) => setStudentFilter(e.target.value)} style={{ width: "auto" }}>
+            <option value="">Wszyscy uczniowie</option>
+            {students.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <select aria-label="Filtruj po korepetytorze" value={tutorFilter} onChange={(e) => setTutorFilter(e.target.value)} style={{ width: "auto" }}>
+            <option value="">Wszyscy korepetytorzy</option>
+            {tutorOptions.map((t) => <option key={t.key} value={t.key}>{t.name}</option>)}
+          </select>
+        </div>
+      )}
+
       <div className="card">
         {payments.length === 0 ? (
           <div className="empty">
             <p>Brak zarejestrowanych wpłat.</p>
             <button className="primary" onClick={() => setShowForm(true)}>Dodaj pierwszą wpłatę</button>
           </div>
+        ) : filtered.length === 0 ? (
+          <div className="empty"><p>Brak wpłat spełniających wybrane filtry.</p></div>
         ) : (
           <table>
             <thead>
-              <tr><th>Data</th><th>Uczeń</th><th>Od kogo</th><th>Notatka</th><th className="num">Kwota</th><th></th></tr>
+              <tr><th>Data</th><th>Uczeń</th><th>Korepetytor</th><th>Od kogo</th><th>Notatka</th><th className="num">Kwota</th><th></th></tr>
             </thead>
             <tbody>
-              {payments.map((p) => (
+              {filtered.map((p) => (
                 <tr key={p.id}>
                   <td className="muted">{p.date}</td>
                   <td style={{ fontWeight: 500 }}>{p.student_name}</td>
+                  <td className={p.assigned_tutor_id ? "muted" : undefined} style={p.assigned_tutor_id ? undefined : { color: "var(--due)" }}>
+                    {p.assigned_tutor_id ? p.tutor_name : "nieprzypisane"}
+                  </td>
                   <td>{p.payer || "-"}</td>
                   <td className="muted">{p.note || ""}</td>
                   <td className="num" style={{ fontWeight: 600, color: "var(--done)" }}>{fmtMoney(p.amount)}</td>
@@ -114,24 +147,38 @@ function PaymentForm({ students, onClose, onSaved }) {
   const [note, setNote] = useState("");
   const [tutorId, setTutorId] = useState("");
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
   const tutors = useStudentTutors(studentId);
 
   if (!students.length) {
     return <Modal title="Brak uczniów" onClose={onClose}><p>Najpierw dodaj ucznia.</p></Modal>;
   }
 
+  // Reset the choice whenever the student changes, so a stale tutor id from
+  // the previous student never gets submitted for this one.
+  useEffect(() => { setTutorId(""); }, [studentId]);
+
+  const needsTutorChoice = tutors.length > 1;
+
   async function save() {
     if (!amount) return;
+    if (needsTutorChoice && !tutorId) return;
     setBusy(true);
-    await api.createPayment({
-      student_id: Number(studentId),
-      amount: Number(amount),
-      date,
-      payer: payer || null,
-      note: note || null,
-      assigned_tutor_id: tutorId ? Number(tutorId) : null,
-    });
-    onSaved();
+    setErr("");
+    try {
+      await api.createPayment({
+        student_id: Number(studentId),
+        amount: Number(amount),
+        date,
+        payer: payer || null,
+        note: note || null,
+        assigned_tutor_id: tutorId ? Number(tutorId) : null,
+      });
+      onSaved();
+    } catch (e) {
+      setErr(e.message);
+      setBusy(false);
+    }
   }
 
   const sName = students.find((s) => s.id === Number(studentId))?.name;
@@ -142,9 +189,11 @@ function PaymentForm({ students, onClose, onSaved }) {
       onClose={onClose}
       footer={<>
         <button onClick={onClose}>Anuluj</button>
-        <button className="primary" onClick={save} disabled={busy || !amount}>Zapisz</button>
+        <button className="primary" onClick={save} disabled={busy || !amount || (needsTutorChoice && !tutorId)}>Zapisz</button>
       </>}
     >
+      {err && <div className="err">{err}</div>}
+
       <div>
         <label htmlFor={`${uid}-za-ktorego-ucznia-1`}>Za którego ucznia</label>
         <select id={`${uid}-za-ktorego-ucznia-1`} value={studentId} onChange={(e) => setStudentId(e.target.value)}>
@@ -152,7 +201,7 @@ function PaymentForm({ students, onClose, onSaved }) {
         </select>
       </div>
 
-      {tutors.length > 1 && (
+      {needsTutorChoice && (
         <div>
           <label htmlFor={`${uid}-tutor`}>Dla którego korepetytora</label>
           <select id={`${uid}-tutor`} value={tutorId} onChange={(e) => setTutorId(e.target.value)}>
@@ -164,7 +213,8 @@ function PaymentForm({ students, onClose, onSaved }) {
             ))}
           </select>
           <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-            Uczeń ma zajęcia u kilku osób - wpłata zmniejszy saldo tylko u wybranej.
+            Uczeń ma zajęcia u kilku osób - wybierz komu wpłata ma być zaliczona,
+            inaczej nie pomniejszy niczyjego salda.
           </p>
         </div>
       )}
@@ -202,8 +252,12 @@ function PaymentEditForm({ payment, studentName, onClose, onSaved }) {
   const [date, setDate] = useState(payment.date);
   const [payer, setPayer] = useState(payment.payer || "");
   const [note, setNote] = useState(payment.note || "");
+  const [tutorId, setTutorId] = useState(payment.assigned_tutor_id ? String(payment.assigned_tutor_id) : "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const tutors = useStudentTutors(payment.student_id);
+  // Multiple tutors, or already unassigned: needs an explicit, correctable choice.
+  const showTutorField = tutors.length > 1 || !payment.assigned_tutor_id;
 
   async function save() {
     if (!amount) return;
@@ -214,6 +268,7 @@ function PaymentEditForm({ payment, studentName, onClose, onSaved }) {
         date,
         payer: payer || null,
         note: note || null,
+        assigned_tutor_id: tutorId ? Number(tutorId) : null,
       });
       onSaved();
     } catch (e) {
@@ -236,6 +291,24 @@ function PaymentEditForm({ payment, studentName, onClose, onSaved }) {
       <p className="muted" style={{ marginTop: 0 }}>
         Wpłata ucznia <strong>{studentName || "-"}</strong>.
       </p>
+
+      {showTutorField && (
+        <div>
+          <label htmlFor={`${uid}-tutor`}>Dla którego korepetytora</label>
+          <select id={`${uid}-tutor`} value={tutorId} onChange={(e) => setTutorId(e.target.value)}>
+            <option value="">— nieprzypisane —</option>
+            {tutors.map((t) => (
+              <option key={t.tutor_id} value={t.tutor_id}>{t.tutor_name}</option>
+            ))}
+          </select>
+          {!payment.assigned_tutor_id && (
+            <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+              Ta wpłata nie jest przypisana do żadnego korepetytora i nie
+              pomniejsza niczyjego salda — wybierz komu ją zaliczyć.
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="field-row">
         <div>

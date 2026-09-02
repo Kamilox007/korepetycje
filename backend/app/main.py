@@ -904,6 +904,21 @@ def assign_tutor_to_lesson(
     return _lesson_out(lesson, db)
 
 
+def _payments_out(payments: list["models.Payment"], db: Session) -> list[schemas.PaymentOut]:
+    tutor_ids = {p.assigned_tutor_id for p in payments if p.assigned_tutor_id}
+    names = {
+        u.id: u.display_name or u.username
+        for u in db.query(models.User).filter(models.User.id.in_(tutor_ids)).all()
+    } if tutor_ids else {}
+    out = []
+    for p in payments:
+        item = schemas.PaymentOut.model_validate(p)
+        item.student_name = p.student.name if p.student else None
+        item.tutor_name = names.get(p.assigned_tutor_id)
+        out.append(item)
+    return out
+
+
 # ===================== PAYMENTS (staff) =====================
 @app.get("/api/payments", response_model=list[schemas.PaymentOut])
 def list_payments(
@@ -915,12 +930,7 @@ def list_payments(
     if student_id:
         q = q.filter(models.Payment.student_id == student_id)
     payments = q.order_by(models.Payment.date.desc()).all()
-    out = []
-    for p in payments:
-        item = schemas.PaymentOut.model_validate(p)
-        item.student_name = p.student.name if p.student else None
-        out.append(item)
-    return out
+    return _payments_out(payments, db)
 
 
 @app.post("/api/payments", response_model=schemas.PaymentOut)
@@ -939,9 +949,7 @@ def create_payment(
     db.add(payment)
     db.commit()
     db.refresh(payment)
-    item = schemas.PaymentOut.model_validate(payment)
-    item.student_name = student.name
-    return item
+    return _payments_out([payment], db)[0]
 
 
 @app.patch("/api/payments/{payment_id}", response_model=schemas.PaymentOut)
@@ -969,7 +977,7 @@ def update_payment(
 
     db.commit()
     db.refresh(payment)
-    return payment
+    return _payments_out([payment], db)[0]
 
 
 @app.delete("/api/payments/{payment_id}")
@@ -991,8 +999,10 @@ def _default_payment_tutor(db: Session, student: models.Student) -> int | None:
     """Which tutor a payment belongs to when the form did not say.
 
     Unambiguous only when the student has lessons with exactly one tutor, which
-    is the single-tutor case and the common one. With two, guessing would put
-    money on the wrong account, so the caller has to choose.
+    is the single-tutor case and the common one. With two or more, guessing
+    would put money on the wrong account, so the caller has to choose — the
+    server refuses rather than silently leaving the payment unassigned, since
+    an unassigned payment is invisible in every tutor's own balance.
     """
     ids = {
         row[0] for row in db.query(models.Lesson.assigned_tutor_id)
@@ -1000,7 +1010,9 @@ def _default_payment_tutor(db: Session, student: models.Student) -> int | None:
                 models.Lesson.assigned_tutor_id.isnot(None))
         .distinct()
     }
-    return ids.pop() if len(ids) == 1 else None
+    if len(ids) > 1:
+        raise HTTPException(400, "Uczeń ma zajęcia u kilku korepetytorów — wskaż, dla którego jest ta wpłata")
+    return ids.pop() if ids else None
 
 
 def _summary_for_students(students, db=None, only_tutor_id: int | None = None):
@@ -1238,6 +1250,20 @@ def tutor_summary(
         .all()
     )
     return _summary_for_students(students, db, only_tutor_id=user.id)
+
+
+@app.get("/api/tutor/payments", response_model=list[schemas.PaymentOut])
+def tutor_payments(
+    user: models.User = Depends(auth.require_tutor), db: Session = Depends(get_db)
+):
+    """This tutor's own credited payments — a secretary's or colleague's are not theirs to see."""
+    payments = (
+        db.query(models.Payment)
+        .filter(models.Payment.assigned_tutor_id == user.id)
+        .order_by(models.Payment.date.desc())
+        .all()
+    )
+    return _payments_out(payments, db)
 
 
 @app.get("/api/tutor/lessons", response_model=list[schemas.LessonOut])

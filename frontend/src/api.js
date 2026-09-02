@@ -129,6 +129,7 @@ export const api = {
 
   // ----- korepetytor -----
   tutorSummary: () => req("/tutor/summary"),
+  tutorPayments: () => req("/tutor/payments"),
   tutorLessons: ({ start, end } = {}) => {
     const p = new URLSearchParams();
     if (start) p.set("start", start);
