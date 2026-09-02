@@ -107,6 +107,10 @@ export const api = {
 
   // ----- summary -----
   summary: () => req("/summary"),
+  quarterlyLimits: () => req("/summary/quarterly-limits"),
+  incomeLimits: () => req("/income-limits"),
+  addIncomeLimit: (data) => req("/income-limits", { method: "POST", body: JSON.stringify(data) }),
+  deleteIncomeLimit: (id) => req(`/income-limits/${id}`, { method: "DELETE" }),
 
   // ----- reschedule (administracja) -----
   listReschedule: () => req("/reschedule-requests"),
@@ -130,6 +134,7 @@ export const api = {
   // ----- korepetytor -----
   tutorSummary: () => req("/tutor/summary"),
   tutorPayments: () => req("/tutor/payments"),
+  myQuarterlyLimit: () => req("/me/quarterly-limit"),
   tutorLessons: ({ start, end } = {}) => {
     const p = new URLSearchParams();
     if (start) p.set("start", start);

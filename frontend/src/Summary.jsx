@@ -1,10 +1,15 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect, useCallback, Fragment, useId } from "react";
 import { api } from "./api";
+import Modal from "./Modal";
 import { fmtMoney } from "./dates";
 
-export default function Summary({ refreshKey, tutorView = false }) {
+export default function Summary({ refreshKey, tutorView = false, myRole }) {
   const [data, setData] = useState(null);
   const [payments, setPayments] = useState(null);
+  const [myLimit, setMyLimit] = useState(null);
+  const [limits, setLimits] = useState(null);
+  const [showLimitManager, setShowLimitManager] = useState(false);
+  const [limitsKey, setLimitsKey] = useState(0);
 
   useEffect(() => {
     // A tutor gets their own students and their own figures only; the endpoint
@@ -16,6 +21,16 @@ export default function Summary({ refreshKey, tutorView = false }) {
     if (!tutorView) return;
     api.tutorPayments().then(setPayments).catch(() => setPayments([]));
   }, [refreshKey, tutorView]);
+
+  useEffect(() => {
+    if (!tutorView) return;
+    api.myQuarterlyLimit().then(setMyLimit).catch(() => setMyLimit(null));
+  }, [refreshKey, tutorView, limitsKey]);
+
+  useEffect(() => {
+    if (tutorView) return;
+    api.quarterlyLimits().then(setLimits).catch(() => setLimits([]));
+  }, [refreshKey, tutorView, limitsKey]);
 
   if (!data) return <div className="empty">Ładowanie…</div>;
 
@@ -151,6 +166,78 @@ export default function Summary({ refreshKey, tutorView = false }) {
         </>
       )}
 
+      {!tutorView && limits && limits.length > 0 && (
+        <>
+          <div className="page-head" style={{ marginTop: 32 }}>
+            <h2 style={{ margin: 0 }}>{limits[0].quarter_label} — limit kwartalny</h2>
+            {myRole === "admin" && (
+              <button className="ghost" onClick={() => setShowLimitManager(true)}>Zarządzaj limitem</button>
+            )}
+          </div>
+          <div className="card">
+            <table>
+              <thead>
+                <tr><th>Korepetytor</th><th className="num">Zarobiono</th><th className="num">Limit</th><th className="num">Pozostało</th></tr>
+              </thead>
+              <tbody>
+                {limits.map((l) => (
+                  <tr key={l.tutor_id}>
+                    <td style={{ fontWeight: 500 }}>{l.tutor_name}</td>
+                    <td className="num">{fmtMoney(l.earned)}</td>
+                    <td className="num">{l.limit != null ? fmtMoney(l.limit) : <span className="muted">brak</span>}</td>
+                    <td className="num">
+                      {l.remaining != null ? (
+                        <span className={`badge ${l.remaining >= 0 ? "done" : "due"}`}>{fmtMoney(l.remaining)}</span>
+                      ) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {showLimitManager && (
+        <IncomeLimitManager
+          onClose={() => setShowLimitManager(false)}
+          onChanged={() => setLimitsKey((k) => k + 1)}
+        />
+      )}
+
+      {tutorView && myLimit && (
+        <>
+          <div className="page-head" style={{ marginTop: 32 }}><h2 style={{ margin: 0 }}>{myLimit.quarter_label} — limit kwartalny</h2></div>
+          <div className="card">
+            {myLimit.limit == null ? (
+              <p className="muted" style={{ margin: 0 }}>
+                Administrator nie ustawił jeszcze limitu na ten kwartał.
+              </p>
+            ) : (
+              <>
+                <div className="metrics" style={{ marginBottom: 12 }}>
+                  <div className="metric">
+                    <div className="label">Zarobiono</div>
+                    <div className="value">{fmtMoney(myLimit.earned)}</div>
+                  </div>
+                  <div className="metric">
+                    <div className="label">Limit</div>
+                    <div className="value">{fmtMoney(myLimit.limit)}</div>
+                  </div>
+                  <div className="metric">
+                    <div className="label">Pozostało</div>
+                    <div className={`value ${myLimit.remaining >= 0 ? "pos" : "neg"}`}>
+                      {fmtMoney(myLimit.remaining)}
+                    </div>
+                  </div>
+                </div>
+                <LimitProgressBar earned={myLimit.earned} limit={myLimit.limit} />
+              </>
+            )}
+          </div>
+        </>
+      )}
+
       {tutorView && payments && payments.length > 0 && (
         <>
           <div className="page-head" style={{ marginTop: 32 }}><h2 style={{ margin: 0 }}>Wpłaty wg ucznia</h2></div>
@@ -180,5 +267,97 @@ export default function Summary({ refreshKey, tutorView = false }) {
         </>
       )}
     </div>
+  );
+}
+
+function LimitProgressBar({ earned, limit }) {
+  const pct = limit > 0 ? Math.min(100, (earned / limit) * 100) : 0;
+  const over = earned > limit;
+  return (
+    <div className="progress-track">
+      <div className="progress-fill" style={{ width: `${pct}%`, background: over ? "var(--due)" : "var(--done)" }} />
+    </div>
+  );
+}
+
+function IncomeLimitManager({ onClose, onChanged }) {
+  const uid = useId();
+  const [settings, setSettings] = useState(null);
+  const [effectiveFrom, setEffectiveFrom] = useState("");
+  const [amount, setAmount] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const load = useCallback(() => {
+    api.incomeLimits().then(setSettings).catch(() => setSettings([]));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function save() {
+    if (!effectiveFrom || !amount) return;
+    setBusy(true);
+    setErr("");
+    try {
+      await api.addIncomeLimit({ effective_from: effectiveFrom, limit: Number(amount) });
+      setEffectiveFrom("");
+      setAmount("");
+      load();
+      onChanged();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(id) {
+    await api.deleteIncomeLimit(id);
+    load();
+    onChanged();
+  }
+
+  return (
+    <Modal
+      title="Limit kwartalny"
+      onClose={onClose}
+      footer={<>
+        <button onClick={onClose}>Zamknij</button>
+        <button className="primary" onClick={save} disabled={busy || !effectiveFrom || !amount}>Zapisz</button>
+      </>}
+    >
+      {err && <div className="err">{err}</div>}
+
+      <p className="muted" style={{ marginTop: 0, fontSize: 12 }}>
+        Wartość obowiązuje od podanej daty aż do kolejnego wpisu — dopisz nową
+        stawkę z wyprzedzeniem, gdy pozna się nową kwotę (np. od 1 stycznia).
+      </p>
+
+      {settings && settings.length > 0 && (
+        <table style={{ marginBottom: 16 }}>
+          <thead><tr><th>Obowiązuje od</th><th className="num">Kwota</th><th></th></tr></thead>
+          <tbody>
+            {settings.map((s) => (
+              <tr key={s.id}>
+                <td>{s.effective_from}</td>
+                <td className="num">{fmtMoney(s.limit)}</td>
+                <td className="num"><button className="ghost danger" onClick={() => remove(s.id)}>Usuń</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <div className="field-row">
+        <div>
+          <label htmlFor={`${uid}-from`}>Obowiązuje od</label>
+          <input id={`${uid}-from`} type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
+        </div>
+        <div>
+          <label htmlFor={`${uid}-amount`}>Kwota (PLN)</label>
+          <input id={`${uid}-amount`} type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="10813.50" />
+        </div>
+      </div>
+    </Modal>
   );
 }

@@ -204,7 +204,7 @@ function StaffShell({ auth, onLogout, onChangePassword }) {
           <Route path="/kalendarz" element={<Calendar students={students} onChanged={refresh} />} />
           <Route path="/uczniowie" element={<Students students={students} reload={refresh} myRole={auth.role} />} />
           <Route path="/platnosci" element={<Payments students={students} reload={refresh} />} />
-          <Route path="/podsumowanie" element={<Summary refreshKey={refreshKey} />} />
+          <Route path="/podsumowanie" element={<Summary refreshKey={refreshKey} myRole={auth.role} />} />
           <Route path="/prosby" element={<Requests reload={refresh} />} />
           <Route path="/przedmioty" element={<Subjects />} />
           <Route path="/uzytkownicy" element={<Users myRole={auth.role} />} />
