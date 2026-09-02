@@ -5,7 +5,7 @@ import { DAYS_PL, DURATION_OPTIONS, fmtMoney, fmtTime } from "./dates";
 import { PASSWORD_HINT, passwordError, genStartPassword } from "./password";
 import { useConfirm } from "./Confirm";
 
-export default function Students({ students, reload }) {
+export default function Students({ students, reload, myRole }) {
   const confirm = useConfirm();
   const [series, setSeries] = useState([]);
   const [showStudent, setShowStudent] = useState(false);
@@ -15,6 +15,7 @@ export default function Students({ students, reload }) {
   const [showArchive, setShowArchive] = useState(false);
   const [editSeries, setEditSeries] = useState(null);
   const [editStudent, setEditStudent] = useState(null);
+  const [err, setErr] = useState("");
 
   // One entry point for reloading everything this view shows. Three separate
   // loaders meant that every new operation had to remember which of them to
@@ -43,13 +44,23 @@ export default function Students({ students, reload }) {
       danger: false,
     });
     if (!ok) return;
-    await api.archiveStudent(s.id);
-    refresh();
+    setErr("");
+    try {
+      await api.archiveStudent(s.id);
+      refresh();
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   async function restoreStudent(s) {
-    await api.restoreStudent(s.id);
-    refresh();
+    setErr("");
+    try {
+      await api.restoreStudent(s.id);
+      refresh();
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   async function removeAccount(s) {
@@ -61,8 +72,13 @@ export default function Students({ students, reload }) {
       confirmLabel: "Usuń konto",
     });
     if (!ok) return;
-    await api.deleteStudentAccount(s.id);
-    refresh();
+    setErr("");
+    try {
+      await api.deleteStudentAccount(s.id);
+      refresh();
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   async function purgeStudent(s) {
@@ -76,8 +92,13 @@ export default function Students({ students, reload }) {
       confirmLabel: "Usuń trwale",
     });
     if (!ok) return;
-    await api.purgeStudent(s.id);
-    refresh();
+    setErr("");
+    try {
+      await api.purgeStudent(s.id);
+      refresh();
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   async function removeSeries(srs) {
@@ -90,8 +111,13 @@ export default function Students({ students, reload }) {
       confirmLabel: "Zakończ serię",
     });
     if (!ok) return;
-    await api.deleteSeries(srs.id);
-    refresh();
+    setErr("");
+    try {
+      await api.deleteSeries(srs.id);
+      refresh();
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   function studentName(id) {
@@ -109,6 +135,8 @@ export default function Students({ students, reload }) {
           <button className="primary" onClick={() => setShowStudent(true)}>+ Uczeń</button>
         </div>
       </div>
+
+      {err && <div className="err">{err}</div>}
 
       {archived.length > 0 && (
         <div style={{ marginBottom: 12 }}>
@@ -131,7 +159,11 @@ export default function Students({ students, reload }) {
                   <td className="muted">{(s.archived_at || "").slice(0, 10)}</td>
                   <td className="num">
                     <button className="ghost" onClick={() => restoreStudent(s)}>Przywróć</button>
-                    <button className="ghost danger" onClick={() => purgeStudent(s)}>Usuń trwale</button>
+                    {myRole === "admin" ? (
+                      <button className="ghost danger" onClick={() => purgeStudent(s)}>Usuń trwale</button>
+                    ) : (
+                      <span className="muted" style={{ fontSize: 12 }}>tylko administrator</span>
+                    )}
                   </td>
                 </tr>
               ))}

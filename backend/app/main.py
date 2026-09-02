@@ -503,6 +503,23 @@ def update_student(
     return _student_out(student)
 
 
+def _delete_lessons(db: Session, lesson_query) -> int:
+    """Hard-delete a filtered set of lessons, along with any reschedule
+    requests pointing at them.
+
+    Neither model declares an ORM relationship for that FK, so a bare delete
+    on the lessons leaves those rows dangling — silently on SQLite (no FK
+    enforcement there), but rejected outright on Postgres.
+    """
+    lesson_ids = [row[0] for row in lesson_query.with_entities(models.Lesson.id).all()]
+    if not lesson_ids:
+        return 0
+    db.query(models.RescheduleRequest).filter(
+        models.RescheduleRequest.lesson_id.in_(lesson_ids)
+    ).delete(synchronize_session=False)
+    return lesson_query.delete(synchronize_session=False)
+
+
 @app.delete("/api/students/{student_id}")
 def delete_student(
     student_id: int,
@@ -527,11 +544,11 @@ def delete_student(
         student.user_id = None
 
     today = date.today()
-    db.query(models.Lesson).filter(
+    _delete_lessons(db, db.query(models.Lesson).filter(
         models.Lesson.student_id == student.id,
         models.Lesson.date >= today,
         models.Lesson.completed.is_(False),
-    ).delete(synchronize_session=False)
+    ))
     db.query(models.LessonSeries).filter(
         models.LessonSeries.student_id == student.id
     ).update({models.LessonSeries.active: False}, synchronize_session=False)
@@ -572,6 +589,18 @@ def purge_student(
     student = _get_student(db, student_id)
     if not student.archived_at:
         raise HTTPException(400, "Najpierw zarchiwizuj ucznia")
+    # Neither model declares an ORM relationship here, so deleting the student
+    # would not cascade to these and leaves them pointing at rows about to be
+    # removed — harmless on SQLite (no FK enforcement), but a hard failure on
+    # Postgres, where the delete is rejected outright.
+    series_ids = [s.id for s in student.series]
+    db.query(models.RescheduleRequest).filter(
+        models.RescheduleRequest.student_id == student.id
+    ).delete(synchronize_session=False)
+    if series_ids:
+        db.query(models.SeriesSkip).filter(
+            models.SeriesSkip.series_id.in_(series_ids)
+        ).delete(synchronize_session=False)
     db.delete(student)
     db.commit()
     return {"ok": True, "purged": True}
@@ -737,11 +766,11 @@ def update_series(
 
     # An end date pulled earlier drops occurrences past it.
     if data.get("end_date"):
-        db.query(models.Lesson).filter(
+        _delete_lessons(db, db.query(models.Lesson).filter(
             models.Lesson.series_id == series_id,
             models.Lesson.date > data["end_date"],
             models.Lesson.completed.is_(False),
-        ).delete(synchronize_session=False)
+        ))
 
     db.commit()
 
@@ -769,8 +798,7 @@ def delete_series(
             models.Lesson.date >= date.today(),
             models.Lesson.completed == False,  # noqa: E712
         )
-    for lesson in q.all():
-        db.delete(lesson)
+    _delete_lessons(db, q)
     series.active = False
     db.commit()
     return {"ok": True}
@@ -910,6 +938,10 @@ def delete_lesson(
         )
         if not exists:
             db.add(models.SeriesSkip(series_id=lesson.series_id, skip_date=lesson.origin_date))
+    # See _delete_lessons: no ORM cascade covers reschedule requests either.
+    db.query(models.RescheduleRequest).filter(
+        models.RescheduleRequest.lesson_id == lesson.id
+    ).delete(synchronize_session=False)
     db.delete(lesson)
     db.commit()
     return {"ok": True}
