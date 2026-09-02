@@ -417,10 +417,40 @@ def delete_subject(
 
 
 # ===================== STUDENTS (staff) =====================
-def _student_out(s: models.Student) -> schemas.StudentOut:
+def _student_out(s: models.Student, tutors: list[schemas.TutorOption] | None = None) -> schemas.StudentOut:
     item = schemas.StudentOut.model_validate(s)
     item.has_account = s.user_id is not None
+    item.tutors = tutors or []
     return item
+
+
+def _tutors_by_student(db: Session, student_ids: list[int]) -> dict[int, list[schemas.TutorOption]]:
+    """Every tutor each of these students has a lesson with, keyed by student id.
+
+    One query for the whole page rather than one per row, and the same
+    "any lesson, completed or not" definition _default_payment_tutor uses.
+    """
+    if not student_ids:
+        return {}
+    rows = (
+        db.query(models.Lesson.student_id, models.Lesson.assigned_tutor_id)
+        .filter(models.Lesson.student_id.in_(student_ids), models.Lesson.assigned_tutor_id.isnot(None))
+        .distinct()
+        .all()
+    )
+    tutor_ids = {tid for _, tid in rows}
+    users = {u.id: u for u in db.query(models.User).filter(models.User.id.in_(tutor_ids)).all()}
+    by_student: dict[int, list[schemas.TutorOption]] = {}
+    for sid, tid in rows:
+        u = users.get(tid)
+        if not u:
+            continue
+        by_student.setdefault(sid, []).append(
+            schemas.TutorOption(id=u.id, display_name=u.display_name or u.username, color=u.color)
+        )
+    for opts in by_student.values():
+        opts.sort(key=lambda t: t.display_name)
+    return by_student
 
 
 @app.get("/api/students", response_model=list[schemas.StudentOut])
@@ -433,7 +463,9 @@ def list_students(
     q = db.query(models.Student)
     q = q.filter(models.Student.archived_at.isnot(None)) if archived \
         else q.filter(models.Student.archived_at.is_(None))
-    return [_student_out(s) for s in q.order_by(models.Student.name).all()]
+    students = q.order_by(models.Student.name).all()
+    tutors_by_student = _tutors_by_student(db, [s.id for s in students])
+    return [_student_out(s, tutors_by_student.get(s.id)) for s in students]
 
 
 @app.post("/api/students", response_model=schemas.StudentOut)

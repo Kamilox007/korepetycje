@@ -25,6 +25,23 @@ export default function Summary({ refreshKey, tutorView = false }) {
     byStudent.get(p.student_id).push(p);
   }
 
+  // Totals per tutor across every student, not just the per-student split —
+  // a tutor's own view is already scoped to themselves, so this is staff-only.
+  const tutorTotals = new Map();
+  if (!tutorView) {
+    for (const s of data.students) {
+      for (const t of s.by_tutor || []) {
+        const key = t.tutor_id ?? "brak";
+        if (!tutorTotals.has(key)) {
+          tutorTotals.set(key, { name: t.tutor_name || "nieprzypisane", students: new Set(), balance: 0 });
+        }
+        const agg = tutorTotals.get(key);
+        agg.students.add(s.student_id);
+        agg.balance += t.balance;
+      }
+    }
+  }
+
   return (
     <div>
       <div className="page-head"><h1>Podsumowanie</h1></div>
@@ -92,6 +109,32 @@ export default function Summary({ refreshKey, tutorView = false }) {
       <p className="muted" style={{ fontSize: 12, marginTop: 12 }}>
         Saldo dodatnie = nadpłata / zaliczka. Saldo ujemne = uczeń zalega z płatnością za odbyte zajęcia.
       </p>
+
+      {!tutorView && tutorTotals.size > 0 && (
+        <>
+          <div className="page-head" style={{ marginTop: 32 }}><h2 style={{ margin: 0 }}>Saldo wg korepetytora</h2></div>
+          <div className="card">
+            <table>
+              <thead>
+                <tr><th>Korepetytor</th><th className="num">Uczniowie</th><th className="num">Saldo</th></tr>
+              </thead>
+              <tbody>
+                {[...tutorTotals.entries()].map(([key, t]) => (
+                  <tr key={key}>
+                    <td style={{ fontWeight: 500 }}>{t.name}</td>
+                    <td className="num">{t.students.size}</td>
+                    <td className="num">
+                      <span className={`badge ${t.balance >= 0 ? "done" : "due"}`}>
+                        {fmtMoney(t.balance)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {tutorView && payments && payments.length > 0 && (
         <>

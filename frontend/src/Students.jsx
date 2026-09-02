@@ -149,13 +149,27 @@ export default function Students({ students, reload }) {
         ) : (
           <table>
             <thead>
-              <tr><th>Imię i nazwisko</th><th>Kontakt</th><th className="num">Domyślna cena</th><th>Konto ucznia</th><th></th></tr>
+              <tr><th>Imię i nazwisko</th><th>Kontakt</th><th>Korepetytor</th><th className="num">Domyślna cena</th><th>Konto ucznia</th><th></th></tr>
             </thead>
             <tbody>
               {students.map((s) => (
                 <tr key={s.id}>
                   <td style={{ fontWeight: 500 }}>{s.name}</td>
                   <td className="muted">{s.contact || "-"}</td>
+                  <td>
+                    {s.tutors && s.tutors.length > 0 ? (
+                      <span style={{ display: "inline-flex", flexWrap: "wrap", gap: "4px 10px" }}>
+                        {s.tutors.map((t) => (
+                          <span key={t.id} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <span className="legend-dot" style={{ background: t.color || "var(--ink-faint)" }} />
+                            {t.display_name}
+                          </span>
+                        ))}
+                      </span>
+                    ) : (
+                      <span className="muted">brak zajęć</span>
+                    )}
+                  </td>
                   <td className="num">{fmtMoney(s.default_price)}</td>
                   <td>
                     {s.has_account ? (
