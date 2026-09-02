@@ -2,6 +2,12 @@ from datetime import date as date_t, time as time_t, datetime
 from pydantic import BaseModel, ConfigDict
 
 
+class TutorOption(BaseModel):
+    id: int
+    display_name: str
+    color: str | None = None
+
+
 # ---------- Student ----------
 class StudentBase(BaseModel):
     name: str
@@ -28,6 +34,10 @@ class StudentOut(StudentBase):
     user_id: int | None = None
     has_account: bool = False
     archived_at: datetime | None = None
+    # Every tutor this student has a lesson with, regardless of completion --
+    # same definition the server uses to decide whether a payment is
+    # ambiguous, so what staff sees here matches what the payment form does.
+    tutors: list[TutorOption] = []
 
 
 # ---------- Lesson ----------
@@ -334,12 +344,6 @@ class PasswordResetIn(BaseModel):
 
 
 # lightweight entry for the assignable-tutor list
-class TutorOption(BaseModel):
-    id: int
-    display_name: str
-    color: str | None = None
-
-
 # staff decision on a request (with optional feedback)
 class RescheduleDecision(BaseModel):
     response: str | None = None
