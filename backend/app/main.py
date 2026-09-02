@@ -1159,6 +1159,114 @@ def get_summary(user: models.User = Depends(auth.require_staff), db: Session = D
     return _summary_for_students(students, db)
 
 
+# ===================== INCOME LIMIT (działalność nierejestrowana) =====================
+def _quarter_bounds(d: date) -> tuple[date, date]:
+    """Calendar-quarter start/end containing d (I: Jan-Mar ... IV: Oct-Dec)."""
+    q = (d.month - 1) // 3
+    start = date(d.year, q * 3 + 1, 1)
+    next_start = date(d.year + 1, 1, 1) if q == 3 else date(d.year, q * 3 + 4, 1)
+    return start, next_start - timedelta(days=1)
+
+
+def _limit_for(db: Session, on: date) -> models.IncomeLimitSetting | None:
+    """Whichever limit was in effect on the given date: the latest setting
+    whose effective_from has already passed, since the limit changes over
+    time (tied to the minimum wage) rather than being one fixed number.
+    """
+    return (
+        db.query(models.IncomeLimitSetting)
+        .filter(models.IncomeLimitSetting.effective_from <= on)
+        .order_by(models.IncomeLimitSetting.effective_from.desc())
+        .first()
+    )
+
+
+def _quarterly_progress(db: Session, tutor: models.User) -> schemas.QuarterlyLimitOut:
+    """This tutor's income against the quarterly limit, cash basis: only
+    payments credited to them (assigned_tutor_id), counted on the date paid.
+    """
+    start, end = _quarter_bounds(date.today())
+    payments = db.query(models.Payment).filter(
+        models.Payment.assigned_tutor_id == tutor.id,
+        models.Payment.date >= start,
+        models.Payment.date <= end,
+    ).all()
+    earned = money.to_zlote(sum(p.amount_grosze for p in payments))
+    setting = _limit_for(db, start)
+    limit = setting.limit if setting else None
+    roman = ["I", "II", "III", "IV"][(start.month - 1) // 3]
+    return schemas.QuarterlyLimitOut(
+        tutor_id=tutor.id,
+        tutor_name=tutor.display_name or tutor.username,
+        quarter_label=f"{roman} kwartał {start.year}",
+        quarter_start=start,
+        quarter_end=end,
+        limit=limit,
+        earned=earned,
+        remaining=(limit - earned) if limit is not None else None,
+    )
+
+
+@app.get("/api/me/quarterly-limit", response_model=schemas.QuarterlyLimitOut)
+def my_quarterly_limit(user: models.User = Depends(auth.require_tutor), db: Session = Depends(get_db)):
+    return _quarterly_progress(db, user)
+
+
+@app.get("/api/summary/quarterly-limits", response_model=list[schemas.QuarterlyLimitOut])
+def quarterly_limits(user: models.User = Depends(auth.require_staff), db: Session = Depends(get_db)):
+    tutors = (
+        db.query(models.User)
+        .filter(models.User.role.in_(("tutor", "admin")))
+        .order_by(models.User.display_name)
+        .all()
+    )
+    return [_quarterly_progress(db, t) for t in tutors]
+
+
+@app.get("/api/income-limits", response_model=list[schemas.IncomeLimitOut])
+def list_income_limits(user: models.User = Depends(auth.require_staff), db: Session = Depends(get_db)):
+    return (
+        db.query(models.IncomeLimitSetting)
+        .order_by(models.IncomeLimitSetting.effective_from.desc())
+        .all()
+    )
+
+
+@app.post("/api/income-limits", response_model=schemas.IncomeLimitOut)
+def upsert_income_limit(
+    payload: schemas.IncomeLimitIn,
+    user: models.User = Depends(auth.require_admin),
+    db: Session = Depends(get_db),
+):
+    """Set the limit effective from a given date. Posting the same date again
+    corrects the amount rather than creating a duplicate.
+    """
+    setting = db.query(models.IncomeLimitSetting).filter(
+        models.IncomeLimitSetting.effective_from == payload.effective_from
+    ).first()
+    if not setting:
+        setting = models.IncomeLimitSetting(effective_from=payload.effective_from)
+        db.add(setting)
+    setting.limit = payload.limit
+    db.commit()
+    db.refresh(setting)
+    return setting
+
+
+@app.delete("/api/income-limits/{setting_id}")
+def delete_income_limit(
+    setting_id: int,
+    user: models.User = Depends(auth.require_admin),
+    db: Session = Depends(get_db),
+):
+    setting = db.get(models.IncomeLimitSetting, setting_id)
+    if not setting:
+        raise HTTPException(404, "Nie znaleziono ustawienia limitu")
+    db.delete(setting)
+    db.commit()
+    return {"ok": True}
+
+
 # ===================== RESCHEDULE (staff) =====================
 def _resched_out(r: models.RescheduleRequest) -> schemas.RescheduleOut:
     item = schemas.RescheduleOut.model_validate(r)

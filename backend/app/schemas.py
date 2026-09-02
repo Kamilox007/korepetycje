@@ -236,6 +236,30 @@ class SummaryOut(BaseModel):
     total_balance: float
 
 
+# ---------- Income limit (działalność nierejestrowana) ----------
+class IncomeLimitIn(BaseModel):
+    effective_from: date_t
+    limit: float
+
+
+class IncomeLimitOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    effective_from: date_t
+    limit: float
+
+
+class QuarterlyLimitOut(BaseModel):
+    tutor_id: int
+    tutor_name: str
+    quarter_label: str
+    quarter_start: date_t
+    quarter_end: date_t
+    limit: float | None = None
+    earned: float
+    remaining: float | None = None
+
+
 # ---------- Auth / User ----------
 class LoginOut(BaseModel):
     access_token: str

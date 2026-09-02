@@ -245,6 +245,29 @@ class SeriesSkip(Base):
     skip_date: Mapped[date] = mapped_column(Date, nullable=False)
 
 
+class IncomeLimitSetting(Base):
+    """The nierejestrowana-działalność quarterly income limit, from a given date.
+
+    Tied to the minimum wage, so it changes over time rather than staying one
+    number forever -- a dated setting, not a single overwritable value.
+    """
+    __tablename__ = "income_limit_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    effective_from: Mapped[date] = mapped_column(Date, unique=True, nullable=False, index=True)
+    limit_grosze: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    @property
+    def limit(self) -> float:
+        """Zloty, for (de)serialization only. Arithmetic runs on limit_grosze."""
+        return to_zlote(self.limit_grosze)
+
+    @limit.setter
+    def limit(self, value) -> None:
+        self.limit_grosze = to_grosze(value)
+
+
 class Availability(Base):
     """A tutor's availability window on a given weekday."""
     __tablename__ = "availability"
