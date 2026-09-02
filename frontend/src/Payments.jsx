@@ -121,28 +121,32 @@ export default function Payments({ students, reload }) {
   );
 }
 
-/** Tutors this student actually has lessons with. Offering the full staff list
- *  would invite crediting money to somebody who never taught them.
- *
- *  Sourced from every lesson (not just completed ones, unlike the summary),
- *  because that is what the server's own ambiguity check looks at — a
- *  narrower source here would hide the picker in cases the server still
- *  refuses to auto-resolve, leaving no way to complete the payment at all.
- *
- *  A brand new student can have no lessons at all yet (a parent paying in
- *  advance, before a series is even set up) — there is no lesson signal to
- *  narrow from, so this falls back to every tutor in the practice rather
- *  than leaving the payment with no possible tutor to pick. */
-function useStudentTutors(studentId) {
+/** Every tutor in the practice — always offered, so staff can credit a
+ *  payment to anyone, not just someone this student happens to have a
+ *  correctly-tagged lesson record with. Narrower, lesson-derived lists kept
+ *  producing gaps: no completed lesson yet, no lesson at all yet, or a
+ *  lesson that was simply never assigned a tutor — every one of them made
+ *  the picker unusable right when it was needed. */
+function useAllTutors() {
   const [tutors, setTutors] = useState([]);
   useEffect(() => {
-    if (!studentId) { setTutors([]); return; }
+    api.listTutors().then(setTutors).catch(() => setTutors([]));
+  }, []);
+  return tutors;
+}
+
+/** This student's lesson history — used only to suggest a default and to
+ *  show a "zalega" balance hint next to each option, never to restrict which
+ *  tutor can be picked. */
+function useSuggestedTutors(studentId) {
+  const [suggested, setSuggested] = useState([]);
+  useEffect(() => {
+    if (!studentId) { setSuggested([]); return; }
     Promise.all([
       api.listLessons({ studentId }),
       api.summary().catch(() => null),
-      api.listTutors().catch(() => []),
     ])
-      .then(([lessons, summary, allTutors]) => {
+      .then(([lessons, summary]) => {
         const balances = new Map();
         const row = summary?.students.find((r) => r.student_id === Number(studentId));
         for (const t of row?.by_tutor || []) {
@@ -151,22 +155,13 @@ function useStudentTutors(studentId) {
         const seen = new Map();
         for (const l of lessons) {
           if (!l.assigned_tutor_id || seen.has(l.assigned_tutor_id)) continue;
-          seen.set(l.assigned_tutor_id, {
-            tutor_id: l.assigned_tutor_id,
-            tutor_name: l.assigned_tutor_name,
-            balance: balances.get(l.assigned_tutor_id) ?? 0,
-          });
+          seen.set(l.assigned_tutor_id, { tutor_id: l.assigned_tutor_id, balance: balances.get(l.assigned_tutor_id) ?? 0 });
         }
-        if (seen.size === 0) {
-          for (const t of allTutors) {
-            seen.set(t.id, { tutor_id: t.id, tutor_name: t.display_name, balance: 0 });
-          }
-        }
-        setTutors([...seen.values()]);
+        setSuggested([...seen.values()]);
       })
-      .catch(() => setTutors([]));
+      .catch(() => setSuggested([]));
   }, [studentId]);
-  return tutors;
+  return suggested;
 }
 
 function PaymentForm({ students, onClose, onSaved }) {
@@ -180,29 +175,25 @@ function PaymentForm({ students, onClose, onSaved }) {
   const [tutorId, setTutorId] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const tutors = useStudentTutors(studentId);
+  const allTutors = useAllTutors();
+  const suggested = useSuggestedTutors(studentId);
+  const suggestedBalance = new Map(suggested.map((t) => [t.tutor_id, t.balance]));
 
   if (!students.length) {
     return <Modal title="Brak uczniów" onClose={onClose}><p>Najpierw dodaj ucznia.</p></Modal>;
   }
 
-  // Reset the choice whenever the student changes, so a stale tutor id from
-  // the previous student never gets submitted for this one.
-  useEffect(() => { setTutorId(""); }, [studentId]);
-
-  // A single candidate is sent explicitly rather than left for the server to
-  // infer: with no lesson history yet (see useStudentTutors) the server has
-  // nothing to infer from, so relying on it would leave the payment
-  // unassigned even though the choice was actually unambiguous here.
+  // Default to the one tutor this student's lessons point to, when there is
+  // exactly one — otherwise leave it for staff to pick. Also covers a
+  // student change: suggested briefly empties and repopulates for the new
+  // student, re-running this.
   useEffect(() => {
-    if (tutors.length === 1) setTutorId(String(tutors[0].tutor_id));
-  }, [tutors]);
-
-  const needsTutorChoice = tutors.length > 1;
+    setTutorId(suggested.length === 1 ? String(suggested[0].tutor_id) : "");
+  }, [studentId, suggested]);
 
   async function save() {
     if (!amount) return;
-    if (needsTutorChoice && !tutorId) return;
+    if (!tutorId) return;
     setBusy(true);
     setErr("");
     try {
@@ -229,7 +220,7 @@ function PaymentForm({ students, onClose, onSaved }) {
       onClose={onClose}
       footer={<>
         <button onClick={onClose}>Anuluj</button>
-        <button className="primary" onClick={save} disabled={busy || !amount || (needsTutorChoice && !tutorId)}>Zapisz</button>
+        <button className="primary" onClick={save} disabled={busy || !amount || !tutorId}>Zapisz</button>
       </>}
     >
       {err && <div className="err">{err}</div>}
@@ -241,23 +232,23 @@ function PaymentForm({ students, onClose, onSaved }) {
         </select>
       </div>
 
-      {needsTutorChoice && (
-        <div>
-          <label htmlFor={`${uid}-tutor`}>Dla którego korepetytora</label>
-          <select id={`${uid}-tutor`} value={tutorId} onChange={(e) => setTutorId(e.target.value)}>
-            <option value="">- wybierz -</option>
-            {tutors.map((t) => (
-              <option key={t.tutor_id} value={t.tutor_id}>
-                {t.tutor_name}{t.balance < 0 ? ` (zalega ${(-t.balance).toFixed(2)} zł)` : ""}
-              </option>
-            ))}
-          </select>
+      <div>
+        <label htmlFor={`${uid}-tutor`}>Dla którego korepetytora</label>
+        <select id={`${uid}-tutor`} value={tutorId} onChange={(e) => setTutorId(e.target.value)}>
+          <option value="">- wybierz -</option>
+          {allTutors.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.display_name}{suggestedBalance.get(t.id) < 0 ? ` (zalega ${(-suggestedBalance.get(t.id)).toFixed(2)} zł)` : ""}
+            </option>
+          ))}
+        </select>
+        {suggested.length > 1 && (
           <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
             Uczeń ma zajęcia u kilku osób - wybierz komu wpłata ma być zaliczona,
             inaczej nie pomniejszy niczyjego salda.
           </p>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="field-row">
         <div>
@@ -295,9 +286,7 @@ function PaymentEditForm({ payment, studentName, onClose, onSaved }) {
   const [tutorId, setTutorId] = useState(payment.assigned_tutor_id ? String(payment.assigned_tutor_id) : "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const tutors = useStudentTutors(payment.student_id);
-  // Multiple tutors, or already unassigned: needs an explicit, correctable choice.
-  const showTutorField = tutors.length > 1 || !payment.assigned_tutor_id;
+  const allTutors = useAllTutors();
 
   async function save() {
     if (!amount) return;
@@ -332,23 +321,21 @@ function PaymentEditForm({ payment, studentName, onClose, onSaved }) {
         Wpłata ucznia <strong>{studentName || "-"}</strong>.
       </p>
 
-      {showTutorField && (
-        <div>
-          <label htmlFor={`${uid}-tutor`}>Dla którego korepetytora</label>
-          <select id={`${uid}-tutor`} value={tutorId} onChange={(e) => setTutorId(e.target.value)}>
-            <option value="">— nieprzypisane —</option>
-            {tutors.map((t) => (
-              <option key={t.tutor_id} value={t.tutor_id}>{t.tutor_name}</option>
-            ))}
-          </select>
-          {!payment.assigned_tutor_id && (
-            <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-              Ta wpłata nie jest przypisana do żadnego korepetytora i nie
-              pomniejsza niczyjego salda — wybierz komu ją zaliczyć.
-            </p>
-          )}
-        </div>
-      )}
+      <div>
+        <label htmlFor={`${uid}-tutor`}>Dla którego korepetytora</label>
+        <select id={`${uid}-tutor`} value={tutorId} onChange={(e) => setTutorId(e.target.value)}>
+          <option value="">— nieprzypisane —</option>
+          {allTutors.map((t) => (
+            <option key={t.id} value={t.id}>{t.display_name}</option>
+          ))}
+        </select>
+        {!payment.assigned_tutor_id && (
+          <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+            Ta wpłata nie jest przypisana do żadnego korepetytora i nie
+            pomniejsza niczyjego salda — wybierz komu ją zaliczyć.
+          </p>
+        )}
+      </div>
 
       <div className="field-row">
         <div>
