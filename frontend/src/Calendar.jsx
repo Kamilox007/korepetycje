@@ -484,7 +484,7 @@ function MonthView({ anchor, today, lessonsFor, onPick, onPickDay, onDropDay }) 
                   onDragStart={(e) => { e.stopPropagation(); window.__dragLesson = l; }}
                   onDragEnd={() => { window.__dragLesson = null; setOverIso(null); }}
                   onClick={(e) => { e.stopPropagation(); onPick(l); }}
-                  title={`${fmtTime(l.start_time)} ${l.student_name}${l.assigned_tutor_name ? " — " + l.assigned_tutor_name : ""}`}
+                  title={`${fmtTime(l.start_time)} ${l.student_name}${l.assigned_tutor_name ? " - " + l.assigned_tutor_name : ""}`}
                 >
                   {fmtTime(l.start_time)} {l.student_name}
                 </div>
@@ -533,7 +533,7 @@ function EditLesson({ lesson, onClose, onSaved }) {
   async function remove() {
     const ok = await confirm({
       title: "Usunąć zajęcia?",
-      message: `${lesson.student_name} — ${lesson.date}, godz. ${String(lesson.start_time).slice(0, 5)}.`,
+      message: `${lesson.student_name} - ${lesson.date}, godz. ${String(lesson.start_time).slice(0, 5)}.`,
       consequence:
         "Zajęcia znikną z terminarza i przestaną być liczone do salda. " +
         "Jeśli chcesz zachować ślad, zamiast usuwać oznacz je jako odwołane.",
@@ -547,7 +547,7 @@ function EditLesson({ lesson, onClose, onSaved }) {
 
   return (
     <Modal
-      title={`Zajęcia — ${lesson.student_name}`}
+      title={`Zajęcia - ${lesson.student_name}`}
       onClose={onClose}
       footer={<>
         <button className="danger" onClick={remove} disabled={busy}>Usuń</button>
@@ -558,7 +558,7 @@ function EditLesson({ lesson, onClose, onSaved }) {
     >
       {lesson._movedTo && (
         <div className="info-banner">
-          Przeniesiono na nowy dzień — sprawdź lub dostosuj godzinę i zapisz.
+          Przeniesiono na nowy dzień - sprawdź lub dostosuj godzinę i zapisz.
         </div>
       )}
       {lesson.series_id && (
@@ -583,14 +583,14 @@ function EditLesson({ lesson, onClose, onSaved }) {
         <div>
           <label htmlFor={`${uid}-przedmiot-4`}>Przedmiot</label>
           <select id={`${uid}-przedmiot-4`} value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
-            <option value="">— brak —</option>
+            <option value="">- brak -</option>
             {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
         <div>
           <label htmlFor={`${uid}-poziom-5`}>Poziom</label>
           <select id={`${uid}-poziom-5`} value={level} onChange={(e) => setLevel(e.target.value)}>
-            <option value="">—</option>
+            <option value="">-</option>
             <option value="podstawa">podstawa</option>
             <option value="rozszerzenie">rozszerzenie</option>
           </select>
@@ -599,7 +599,7 @@ function EditLesson({ lesson, onClose, onSaved }) {
       <div>
         <label htmlFor={`${uid}-prowadzacy-korepetytor-6`}>Prowadzący korepetytor</label>
         <select id={`${uid}-prowadzacy-korepetytor-6`} value={tutorId} onChange={(e) => setTutorId(e.target.value)}>
-          <option value="">— nieprzypisany —</option>
+          <option value="">- nieprzypisany -</option>
           {tutors.map((t) => <option key={t.id} value={t.id}>{t.display_name}</option>)}
         </select>
       </div>

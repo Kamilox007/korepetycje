@@ -87,7 +87,7 @@ export default function Payments({ students, reload }) {
                   <td className={p.assigned_tutor_id ? "muted" : undefined} style={p.assigned_tutor_id ? undefined : { color: "var(--due)" }}>
                     {p.assigned_tutor_id ? p.tutor_name : "nieprzypisane"}
                   </td>
-                  <td>{p.payer || "—"}</td>
+                  <td>{p.payer || "-"}</td>
                   <td className="muted">{p.note || ""}</td>
                   <td className="num" style={{ fontWeight: 600, color: "var(--done)" }}>{fmtMoney(p.amount)}</td>
                   <td className="num">
@@ -245,7 +245,7 @@ function PaymentForm({ students, onClose, onSaved }) {
         <div>
           <label htmlFor={`${uid}-tutor`}>Dla którego korepetytora</label>
           <select id={`${uid}-tutor`} value={tutorId} onChange={(e) => setTutorId(e.target.value)}>
-            <option value="">— wybierz —</option>
+            <option value="">- wybierz -</option>
             {tutors.map((t) => (
               <option key={t.tutor_id} value={t.tutor_id}>
                 {t.tutor_name}{t.balance < 0 ? ` (zalega ${(-t.balance).toFixed(2)} zł)` : ""}
@@ -253,7 +253,7 @@ function PaymentForm({ students, onClose, onSaved }) {
             ))}
           </select>
           <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-            Uczeń ma zajęcia u kilku osób — wybierz komu wpłata ma być zaliczona,
+            Uczeń ma zajęcia u kilku osób - wybierz komu wpłata ma być zaliczona,
             inaczej nie pomniejszy niczyjego salda.
           </p>
         </div>
@@ -279,7 +279,7 @@ function PaymentForm({ students, onClose, onSaved }) {
       </div>
       {payer && sName && (
         <p className="muted" style={{ fontSize: 12, margin: 0 }}>
-          Zapis: {payer} zapłaciła {amount ? fmtMoney(Number(amount)) : "—"} za {sName}. Wejdzie do podsumowania.
+          Zapis: {payer} zapłaciła {amount ? fmtMoney(Number(amount)) : "-"} za {sName}. Wejdzie do podsumowania.
         </p>
       )}
     </Modal>
@@ -329,7 +329,7 @@ function PaymentEditForm({ payment, studentName, onClose, onSaved }) {
       {err && <div className="err">{err}</div>}
 
       <p className="muted" style={{ marginTop: 0 }}>
-        Wpłata ucznia <strong>{studentName || "—"}</strong>.
+        Wpłata ucznia <strong>{studentName || "-"}</strong>.
       </p>
 
       {showTutorField && (
@@ -376,7 +376,7 @@ function PaymentEditForm({ payment, studentName, onClose, onSaved }) {
       </div>
 
       <p className="muted" style={{ fontSize: 12, marginTop: 12 }}>
-        Ucznia nie da się tu zmienić — przeniesienie wpłaty między uczniami
+        Ucznia nie da się tu zmienić - przeniesienie wpłaty między uczniami
         zmienia dwa salda naraz, więc usuń ją i wprowadź na nowo, żeby zostało
         to widoczne w historii.
       </p>

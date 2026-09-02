@@ -27,7 +27,7 @@ export default function TutorPanel({ section = "lessons" }) {
 
   async function load() {
     try {
-      // Zakres podąża za tym, co widać w kalendarzu — inaczej przejście
+      // Zakres podąża za tym, co widać w kalendarzu - inaczej przejście
       // na kolejny miesiąc pokazywałoby pusty widok.
       const start = toISODate(addDays(anchor, -45));
       const end = toISODate(addDays(anchor, 75));
@@ -123,7 +123,7 @@ export default function TutorPanel({ section = "lessons" }) {
                       <td>{DAYS_PL[pyWeekday(d)]}, {d.getDate()} {MONTHS_PL[d.getMonth()]}</td>
                       <td>{fmtTime(l.start_time)} {l.rescheduled ? "↻" : ""}</td>
                       <td style={{ fontWeight: 500 }}>{l.student_name}</td>
-                      <td>{l.subject_name ? `${l.subject_name}${l.level ? ` (${l.level})` : ""}` : "—"}</td>
+                      <td>{l.subject_name ? `${l.subject_name}${l.level ? ` (${l.level})` : ""}` : "-"}</td>
                       <td>{l.completed ? <span className="badge done">odbyte</span> : <span className="badge plan">zaplanowane</span>}</td>
                       <td className="num"><button className="ghost" onClick={() => setEditing(l)}>Edytuj</button></td>
                     </tr>
@@ -179,7 +179,7 @@ function TutorRequests({ requests, onDecide }) {
                 <tr key={r.id}>
                   <td style={{ fontWeight: 500 }}>{r.student_name}</td>
                   <td>{r.lesson_date} {fmtTime(r.lesson_time)}</td>
-                  <td>{r.proposed_date || "—"} {fmtTime(r.proposed_time)}</td>
+                  <td>{r.proposed_date || "-"} {fmtTime(r.proposed_time)}</td>
                   <td className="muted">{r.message || ""}</td>
                   <td className="num row" style={{ justifyContent: "flex-end" }}>
                     <button className="primary" onClick={() => onDecide({ req: r, action: "approve" })}>Akceptuj</button>
@@ -238,7 +238,7 @@ function TutorDecisionModal({ decision, onClose, onDone }) {
         </button>
       </>}>
       <p style={{ margin: 0 }}>
-        {req.student_name} — {approve ? "termin zostanie zmieniony na " : "prośba o "}
+        {req.student_name} - {approve ? "termin zostanie zmieniony na " : "prośba o "}
         <strong>{req.proposed_date} {fmtTime(req.proposed_time)}</strong>
       </p>
       {req.message && <p className="muted" style={{ fontSize: 13, margin: 0 }}>Wiadomość ucznia: {req.message}</p>}
@@ -270,7 +270,7 @@ function EditTutorLesson({ lesson, onClose, onSaved }) {
 
   return (
     <Modal
-      title={`Zajęcia — ${lesson.student_name}`}
+      title={`Zajęcia - ${lesson.student_name}`}
       onClose={onClose}
       footer={<>
         <button onClick={onClose}>Anuluj</button>
@@ -338,7 +338,7 @@ function Availability({ avail, reload }) {
                 <td style={{ fontWeight: 500 }}>{d}</td>
                 <td>
                   {byDay[i].length === 0
-                    ? <span className="muted">—</span>
+                    ? <span className="muted">-</span>
                     : byDay[i].map((a) => (
                       <span key={a.id} className="badge plan" style={{ marginRight: 6 }}>
                         {fmtTime(a.start_time)}–{fmtTime(a.end_time)}
