@@ -427,7 +427,7 @@ tbody tr:hover { background: var(--surface-2); }
 .cookie-notice button { flex-shrink: 0; }
 
 /* ==========================================================================
-   Mobile — do 820 px.
+   Mobile - do 820 px.
    Reguły niżej działają WYŁĄCZNIE na wąskich ekranach; widok desktopowy
    pozostaje nietknięty.
    ========================================================================== */
@@ -521,7 +521,7 @@ tbody tr:hover { background: var(--surface-2); }
   .modal-foot button { width: 100%; }
 
   /* Safari na iOS przybliża stronę przy fokusie na polu o foncie < 16 px.
-     To jedyny powód tej wartości — nie estetyka. */
+     To jedyny powód tej wartości - nie estetyka. */
   input, select, textarea { font-size: 16px; }
 
   /* Palec potrzebuje ok. 44 px; myszka nie. */

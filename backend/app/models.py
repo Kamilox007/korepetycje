@@ -37,7 +37,7 @@ class User(Base):
     color: Mapped[str | None] = mapped_column(String(20), nullable=True)  # kolor korepetytora w kalendarzu
     # Where this tutor's students send their transfers. Admin-only to edit:
     # swapping the number silently redirects payments, which is the real risk
-    # here — not the number being seen, since it goes on every invoice anyway.
+    # here - not the number being seen, since it goes on every invoice anyway.
     bank_account: Mapped[str | None] = mapped_column(String(26), nullable=True)
     # Same rationale and same admin-only restriction as bank_account: a BLIK
     # phone number is an alternative way for students to pay this tutor.

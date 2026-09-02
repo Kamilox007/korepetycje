@@ -76,7 +76,7 @@ export default function Users({ myRole }) {
         >
           <p>
             Przekaż je użytkownikowi <strong>{resetResult.display_name || resetResult.username}</strong>.
-            Hasło pokazujemy tylko teraz — nigdzie nie jest przechowywane w czytelnej postaci.
+            Hasło pokazujemy tylko teraz - nigdzie nie jest przechowywane w czytelnej postaci.
           </p>
           <div className="card" style={{ padding: 12, marginTop: 10 }}>
             <div className="muted" style={{ fontSize: 12 }}>Login</div>
@@ -123,7 +123,7 @@ function Section({ title, users, onRemove, onReset, showColor, onColor }) {
                       />
                     </td>
                   )}
-                  <td style={{ fontWeight: 500 }}>{u.display_name || "—"}</td>
+                  <td style={{ fontWeight: 500 }}>{u.display_name || "-"}</td>
                   <td className="muted">{u.username}</td>
                   <td>{ROLE_LABEL[u.role] || u.role}</td>
                   <td className="num">
@@ -187,7 +187,7 @@ function ColorModal({ user, myRole, onClose, onSaved }) {
   }
 
   return (
-    <Modal title={`Ustawienia — ${user.display_name || user.username}`} onClose={onClose}
+    <Modal title={`Ustawienia - ${user.display_name || user.username}`} onClose={onClose}
       footer={<>
         <button onClick={onClose}>Anuluj</button>
         <button className="primary" onClick={save} disabled={busy || !displayName.trim()}>Zapisz</button>
@@ -212,7 +212,7 @@ function ColorModal({ user, myRole, onClose, onSaved }) {
             placeholder="26 cyfr, można wkleić ze spacjami"
           />
           <p className="muted" style={{ fontSize: 12, marginTop: 6, marginBottom: 0 }}>
-            Na ten rachunek uczniowie tego korepetytora wysyłają przelewy — kod QR
+            Na ten rachunek uczniowie tego korepetytora wysyłają przelewy - kod QR
             w ich panelu wskazuje właśnie tutaj. Suma kontrolna jest sprawdzana
             przy zapisie.
           </p>

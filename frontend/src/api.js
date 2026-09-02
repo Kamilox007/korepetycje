@@ -80,7 +80,7 @@ export const api = {
   // ----- series -----
   listSeries: () => req("/series"),
   createSeries: (data) => req("/series", { method: "POST", body: JSON.stringify(data) }),
-  // Zmiany metadanych trafiają na przyszłe zajęcia, godziny — tylko na te,
+  // Zmiany metadanych trafiają na przyszłe zajęcia, godziny - tylko na te,
   // których nikt ręcznie nie przesunął. Szczegóły w docstringu endpointu.
   updateSeries: (id, data) =>
     req(`/series/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
@@ -121,7 +121,7 @@ export const api = {
   createUser: (data) => req("/users", { method: "POST", body: JSON.stringify(data) }),
   updateUser: (id, data) => req(`/users/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteUser: (id) => req(`/users/${id}`, { method: "DELETE" }),
-  // Zwraca nowe hasło startowe — pokazywane raz, nigdzie nie przechowywane.
+  // Zwraca nowe hasło startowe - pokazywane raz, nigdzie nie przechowywane.
   resetUserPassword: (id) =>
     req(`/users/${id}/reset-password`, { method: "POST", body: JSON.stringify({}) }),
   assignTutor: (lessonId, tutorId) =>

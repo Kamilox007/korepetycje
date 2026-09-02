@@ -37,7 +37,7 @@ export default function Students({ students, reload }) {
       title: "Zarchiwizować ucznia?",
       message: `${s.name} zniknie z list, terminarza i podsumowania.`,
       consequence:
-        "Historia zajęć i wpłat zostaje zachowana — ucznia można przywrócić. " +
+        "Historia zajęć i wpłat zostaje zachowana - ucznia można przywrócić. " +
         "Konto logowania zostanie usunięte, a przyszłe nieodbyte zajęcia skasowane.",
       confirmLabel: "Archiwizuj",
       danger: false,
@@ -71,7 +71,7 @@ export default function Students({ students, reload }) {
       message: `Wszystkie dane ucznia ${s.name} zostaną nieodwracalnie usunięte.`,
       consequence:
         "Znikną zajęcia, wpłaty i cała historia rozliczeń. Tej operacji nie da " +
-        "się cofnąć — służy do realizacji żądania usunięcia danych (RODO).",
+        "się cofnąć - służy do realizacji żądania usunięcia danych (RODO).",
       requireText: s.name,
       confirmLabel: "Usuń trwale",
     });
@@ -95,7 +95,7 @@ export default function Students({ students, reload }) {
   }
 
   function studentName(id) {
-    return students.find((s) => s.id === id)?.name || "—";
+    return students.find((s) => s.id === id)?.name || "-";
   }
 
   const activeSeries = series.filter((s) => s.active);
@@ -155,7 +155,7 @@ export default function Students({ students, reload }) {
               {students.map((s) => (
                 <tr key={s.id}>
                   <td style={{ fontWeight: 500 }}>{s.name}</td>
-                  <td className="muted">{s.contact || "—"}</td>
+                  <td className="muted">{s.contact || "-"}</td>
                   <td className="num">{fmtMoney(s.default_price)}</td>
                   <td>
                     {s.has_account ? (
@@ -195,7 +195,7 @@ export default function Students({ students, reload }) {
                 <tr key={s.id}>
                   <td style={{ fontWeight: 500 }}>{studentName(s.student_id)}</td>
                   <td>
-                    {s.subject_name || <span className="muted">—</span>}
+                    {s.subject_name || <span className="muted">-</span>}
                     {s.level && (
                       <span className="muted" style={{ fontSize: 12 }}>
                         {" "}· {s.level === "rozszerzenie" ? "R" : "P"}
@@ -370,7 +370,7 @@ function StudentForm({ onClose, onSaved }) {
     >
       <div>
         <label htmlFor={`${uid}-imie-i-nazwisko-3`}>Imię i nazwisko</label>
-        <input id={`${uid}-imie-i-nazwisko-3`} value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="np. Jessika Kowalska" />
+        <input id={`${uid}-imie-i-nazwisko-3`} value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="np. Jan Kowalski" />
       </div>
       <div>
         <label htmlFor={`${uid}-kontakt-opcjonalnie-4`}>Kontakt (opcjonalnie)</label>
@@ -495,14 +495,14 @@ function SeriesForm({ students, onClose, onSaved }) {
         <div>
           <label htmlFor={`${uid}-przedmiot-7`}>Przedmiot</label>
           <select id={`${uid}-przedmiot-7`} value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
-            <option value="">— brak —</option>
+            <option value="">- brak -</option>
             {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
         <div>
           <label htmlFor={`${uid}-poziom-8`}>Poziom</label>
           <select id={`${uid}-poziom-8`} value={level} onChange={(e) => setLevel(e.target.value)}>
-            <option value="">—</option>
+            <option value="">-</option>
             <option value="podstawa">podstawa</option>
             <option value="rozszerzenie">rozszerzenie</option>
           </select>
@@ -523,7 +523,7 @@ function SeriesForm({ students, onClose, onSaved }) {
       <div>
         <label htmlFor={`${uid}-prowadzacy-korepetytor-11`}>Prowadzący korepetytor</label>
         <select id={`${uid}-prowadzacy-korepetytor-11`} value={tutorId} onChange={(e) => setTutorId(e.target.value)}>
-          <option value="">— nieprzypisany —</option>
+          <option value="">- nieprzypisany -</option>
           {tutors.map((t) => <option key={t.id} value={t.id}>{t.display_name}</option>)}
         </select>
       </div>
@@ -627,14 +627,14 @@ function SeriesEditForm({ series, onClose, onSaved }) {
         <div>
           <label htmlFor={`${uid}-subject`}>Przedmiot</label>
           <select id={`${uid}-subject`} value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
-            <option value="">—</option>
+            <option value="">-</option>
             {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
         <div>
           <label htmlFor={`${uid}-level`}>Poziom</label>
           <select id={`${uid}-level`} value={level} onChange={(e) => setLevel(e.target.value)}>
-            <option value="">—</option>
+            <option value="">-</option>
             <option value="podstawa">Podstawa</option>
             <option value="rozszerzenie">Rozszerzenie</option>
           </select>
@@ -663,20 +663,20 @@ function SeriesEditForm({ series, onClose, onSaved }) {
       <div>
         <label htmlFor={`${uid}-tutor`}>Prowadzący</label>
         <select id={`${uid}-tutor`} value={tutorId} onChange={(e) => setTutorId(e.target.value)}>
-          <option value="">— nieprzypisany —</option>
+          <option value="">- nieprzypisany -</option>
           {tutors.map((t) => <option key={t.id} value={t.id}>{t.display_name || t.username}</option>)}
         </select>
       </div>
 
       <p className="muted" style={{ marginTop: 14, fontSize: 12 }}>
         Przedmiot, poziom, prowadzący i cena trafią na wszystkie przyszłe zajęcia
-        z tej serii. Zajęcia już odbyte zostają bez zmian — zachowują cenę
+        z tej serii. Zajęcia już odbyte zostają bez zmian - zachowują cenę
         z momentu, w którym się odbyły.
       </p>
       {timeChanged && (
         <p className="muted" style={{ fontSize: 12 }}>
           Zmiana terminu pominie zajęcia, którym wcześniej ręcznie zmieniono datę
-          lub godzinę — te zostaną tam, gdzie je przesunięto.
+          lub godzinę - te zostaną tam, gdzie je przesunięto.
         </p>
       )}
     </Modal>
