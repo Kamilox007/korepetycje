@@ -122,15 +122,47 @@ export default function Payments({ students, reload }) {
 }
 
 /** Tutors this student actually has lessons with. Offering the full staff list
- *  would invite crediting money to somebody who never taught them. */
+ *  would invite crediting money to somebody who never taught them.
+ *
+ *  Sourced from every lesson (not just completed ones, unlike the summary),
+ *  because that is what the server's own ambiguity check looks at — a
+ *  narrower source here would hide the picker in cases the server still
+ *  refuses to auto-resolve, leaving no way to complete the payment at all.
+ *
+ *  A brand new student can have no lessons at all yet (a parent paying in
+ *  advance, before a series is even set up) — there is no lesson signal to
+ *  narrow from, so this falls back to every tutor in the practice rather
+ *  than leaving the payment with no possible tutor to pick. */
 function useStudentTutors(studentId) {
   const [tutors, setTutors] = useState([]);
   useEffect(() => {
     if (!studentId) { setTutors([]); return; }
-    api.summary()
-      .then((s) => {
-        const row = s.students.find((r) => r.student_id === Number(studentId));
-        setTutors((row?.by_tutor || []).filter((t) => t.tutor_id));
+    Promise.all([
+      api.listLessons({ studentId }),
+      api.summary().catch(() => null),
+      api.listTutors().catch(() => []),
+    ])
+      .then(([lessons, summary, allTutors]) => {
+        const balances = new Map();
+        const row = summary?.students.find((r) => r.student_id === Number(studentId));
+        for (const t of row?.by_tutor || []) {
+          if (t.tutor_id) balances.set(t.tutor_id, t.balance);
+        }
+        const seen = new Map();
+        for (const l of lessons) {
+          if (!l.assigned_tutor_id || seen.has(l.assigned_tutor_id)) continue;
+          seen.set(l.assigned_tutor_id, {
+            tutor_id: l.assigned_tutor_id,
+            tutor_name: l.assigned_tutor_name,
+            balance: balances.get(l.assigned_tutor_id) ?? 0,
+          });
+        }
+        if (seen.size === 0) {
+          for (const t of allTutors) {
+            seen.set(t.id, { tutor_id: t.id, tutor_name: t.display_name, balance: 0 });
+          }
+        }
+        setTutors([...seen.values()]);
       })
       .catch(() => setTutors([]));
   }, [studentId]);
@@ -157,6 +189,14 @@ function PaymentForm({ students, onClose, onSaved }) {
   // Reset the choice whenever the student changes, so a stale tutor id from
   // the previous student never gets submitted for this one.
   useEffect(() => { setTutorId(""); }, [studentId]);
+
+  // A single candidate is sent explicitly rather than left for the server to
+  // infer: with no lesson history yet (see useStudentTutors) the server has
+  // nothing to infer from, so relying on it would leave the payment
+  // unassigned even though the choice was actually unambiguous here.
+  useEffect(() => {
+    if (tutors.length === 1) setTutorId(String(tutors[0].tutor_id));
+  }, [tutors]);
 
   const needsTutorChoice = tutors.length > 1;
 
