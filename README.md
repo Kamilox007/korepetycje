@@ -18,7 +18,7 @@ Wersja produkcyjna: <https://panel.kamilkrzywon.pl>
 | Uwierzytelnianie | JWT (HS256) w ciasteczku httpOnly, hasła haszowane bcryptem |
 | Ochrona logowania | slowapi (limit per IP) + blokada konta w bazie |
 | Frontend | React 18, React Router 7, Vite 6, CSS bez frameworka |
-| Testy | skrypty regresji (backend) + Playwright (end-to-end) |
+| Testy | skrypty regresji (backend) + Vitest (jednostkowe) + Playwright (end-to-end) |
 | Wdrożenie | Docker Compose: `api` + `web` (Caddy) + `litestream` |
 | TLS | Let's Encrypt przez Caddy, odnawiany automatycznie |
 | Backup | Litestream → Backblaze B2, replikacja ciągła |
@@ -212,11 +212,28 @@ python test_password_reset.py     # reset hasła konta personelu
 python test_series_update.py      # edycja serii i reguły propagacji na zajęcia
 python test_payment_edit.py       # korekta wpłaty
 python test_transfer_code.py      # kod QR przelewu (standard 2D ZBP)
+python test_role_isolation.py     # rozdział danych między korepetytorami, bramki ról
+python test_reschedule_flow.py    # prośby o przełożenie: uczeń -> korepetytor/staff
+python test_availability_slots.py # dostępność korepetytora i wolne terminy
 ```
 
 Każdy zestaw pracuje na własnej bazie w katalogu tymczasowym i nie dotyka bazy
 deweloperskiej. Wszystkie to regresje konkretnych błędów - jeśli któryś zacznie
 padać po zmianie, prawdopodobnie ta zmiana cofnęła poprawkę.
+
+### Frontend - testy jednostkowe (Vitest)
+
+```bash
+cd frontend
+npm install
+npm test              # jednorazowy przebieg
+npm run test:watch    # w tle, przy pracy nad kodem
+```
+
+Obejmują moduły bez UI, w których błąd jest cichy: `dates.js` (siatka miesiąca,
+data lokalna zamiast UTC), `password.js` (polityka haseł, ta sama co w
+`backend/app/auth.py`) i `colors.js`. Biegną w kilkaset milisekund, więc nadają
+się do pętli edycja-zapis; scenariusze przez interfejs są w Playwrighcie niżej.
 
 ### Frontend - end-to-end (Playwright)
 

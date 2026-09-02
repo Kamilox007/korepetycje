@@ -12,4 +12,10 @@ export default defineConfig({
       },
     },
   },
+  test: {
+    // Only unit tests under src/. Without this vitest would also pick up
+    // e2e/*.spec.js, which are Playwright tests and use a different runner.
+    include: ["src/**/*.test.js"],
+    environment: "node",
+  },
 });

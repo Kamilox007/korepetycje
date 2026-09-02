@@ -49,6 +49,9 @@ for t in test_*.py; do echo "== $t"; python "$t" || exit 1; done   # everything,
 npm install
 npm run dev          # http://localhost:5173, Vite proxies /api to :8000
 npm run build
+npm test             # Vitest unit tests (src/**/*.test.js) - pure modules only,
+                     # no DOM; the e2e/*.spec.js files belong to Playwright and
+                     # are excluded in vite.config.js
 ```
 
 End-to-end (Playwright — spins up its own backend+frontend against a throwaway `e2e.db`,
@@ -61,8 +64,9 @@ npm run e2e:ui          # interactive, step-through
 npm run e2e:report      # report from the last run (video/screenshots/trace on failure)
 ```
 
-CI (`.github/workflows/`) runs the backend test scripts in a loop and does `npm run build` for
-the frontend — no separate lint step exists.
+CI (`.github/workflows/`) runs the backend test scripts in a loop, then `npm test` and
+`npm run build` for the frontend — no separate lint step exists. Playwright is not run in CI
+(it needs a browser download); run it locally before touching UI flows.
 
 ## Architecture
 
