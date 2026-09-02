@@ -191,6 +191,8 @@ class PaymentOut(BaseModel):
     note: str | None
     created_at: datetime
     student_name: str | None = None
+    assigned_tutor_id: int | None = None
+    tutor_name: str | None = None
 
 
 # ---------- Summary ----------
