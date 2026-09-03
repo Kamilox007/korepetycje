@@ -263,10 +263,11 @@ tbody tr:hover { background: var(--surface-2); }
 .event {
   position: absolute;
   background: var(--accent-soft); border-left: 3px solid var(--accent);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  border-radius: var(--radius-sm);
   padding: 4px 8px; cursor: pointer; overflow: hidden;
   display: flex; flex-direction: column; gap: 1px;
   color: var(--tile-ink, var(--ink));
+  box-shadow: 0 0 0 1px var(--surface);
 }
 .event:hover { filter: brightness(0.97); }
 .event .t { font-weight: 600; font-size: 12px; }

@@ -302,8 +302,11 @@ function DayView({ day, lessons, onPick, onAdd, onDropTime }) {
     const [h, m] = timeStr.split(":").map(Number);
     return (h - DAY_START_HOUR) * HOUR_PX + (m / 60) * HOUR_PX;
   }
+  // Shaved a few px off the bottom so back-to-back lessons (one ending right
+  // where the next starts) show a sliver of the column background between
+  // them, instead of two tiles flush against each other reading as one.
   function heightFor(min) {
-    return Math.max(22, (min / 60) * HOUR_PX);
+    return Math.max(22, (min / 60) * HOUR_PX) - 4;
   }
   // Y position -> time rounded to 15 minutes, clamped to the day
   function timeFromY(y, durationMin) {
