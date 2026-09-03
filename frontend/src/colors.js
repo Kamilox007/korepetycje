@@ -10,6 +10,7 @@ export const TUTOR_COLORS = [
   "#f032e6", // pink
   "#9a6324", // brown
   "#469990", // turquoise
+  "#3ec6f0", // sky blue / cyan
 ];
 
 // neutral colour for lessons with no tutor assigned
