@@ -217,12 +217,13 @@ tbody tr:hover { background: var(--surface-2); }
   margin-bottom: 6px;
   font-size: 12px;
   cursor: pointer;
+  color: var(--tile-ink, var(--ink));
 }
 .lesson-chip:hover { filter: brightness(0.97); }
 .lesson-chip.done { background: var(--done-soft); border-left-color: var(--done); }
 .lesson-chip.cancelled { background: var(--surface-2); border-left-color: var(--border-strong); opacity: 0.6; text-decoration: line-through; }
 .lesson-chip .t { font-weight: 600; }
-.lesson-chip .n { color: var(--ink-soft); }
+.lesson-chip .n { color: var(--tile-ink-soft, var(--ink-soft)); }
 
 /* modal */
 .overlay { position: fixed; inset: 0; background: var(--overlay); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
@@ -265,11 +266,12 @@ tbody tr:hover { background: var(--surface-2); }
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   padding: 4px 8px; cursor: pointer; overflow: hidden;
   display: flex; flex-direction: column; gap: 1px;
+  color: var(--tile-ink, var(--ink));
 }
 .event:hover { filter: brightness(0.97); }
 .event .t { font-weight: 600; font-size: 12px; }
-.event .n { font-size: 12px; color: var(--ink-soft); }
-.event .p { font-size: 11px; color: var(--ink-faint); }
+.event .n { font-size: 12px; color: var(--tile-ink-soft, var(--ink-soft)); }
+.event .p { font-size: 11px; color: var(--tile-ink-faint, var(--ink-faint)); }
 .event.done { background: var(--done-soft); border-left-color: var(--done); }
 .event.cancelled { background: var(--surface-2); border-left-color: var(--border-strong); opacity: 0.6; text-decoration: line-through; }
 
@@ -292,7 +294,7 @@ tbody tr:hover { background: var(--surface-2); }
 .month-day-num { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
 .mini-chip {
   font-size: 11px; padding: 2px 5px; margin-bottom: 2px; border-radius: 4px;
-  background: var(--accent-soft); color: var(--accent);
+  background: var(--accent-soft); color: var(--tile-ink, var(--accent));
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 2px solid var(--accent);
 }
 .mini-chip:hover { filter: brightness(0.96); }
@@ -314,7 +316,7 @@ tbody tr:hover { background: var(--surface-2); }
 .cred-box strong { font-variant-numeric: tabular-nums; }
 
 /* przedmiot na kafelku kalendarza */
-.lesson-chip .subj, .event .subj { font-size: 11px; color: var(--ink-soft); opacity: 0.85; }
+.lesson-chip .subj, .event .subj { font-size: 11px; color: var(--tile-ink-soft, var(--ink-soft)); opacity: 0.85; }
 .event .subj { display: block; }
 
 /* ----- kolory korepetytorów ----- */

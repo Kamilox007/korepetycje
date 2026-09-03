@@ -21,14 +21,26 @@ function lessonStyle(l) {
   if (l.completed || l.cancelled) return null;
   const c = l.assigned_tutor_color;
   if (!c) {
-    // no tutor assigned: neutral background, dashed border
+    // no tutor assigned: neutral background, dashed border. This uses the
+    // theme's own (light-on-dark in dark mode) ink colours, which is correct
+    // here since --surface-2 tracks the theme too.
     return {
       background: "var(--surface-2)",
       borderLeftColor: UNASSIGNED_COLOR,
       border: `1px dashed ${UNASSIGNED_COLOR}`,
     };
   }
-  return { background: tint(c, 0.85), borderLeftColor: c };
+  // tint() always lightens toward white for the background, regardless of
+  // theme, so the theme's own ink colour (light text in dark mode) reads as
+  // washed-out here. These CSS vars pin the tile's text to a fixed dark
+  // scale; styles.css falls back to the theme ink where they aren't set.
+  return {
+    background: tint(c, 0.85),
+    borderLeftColor: c,
+    "--tile-ink": "#1f2430",
+    "--tile-ink-soft": "#4b5160",
+    "--tile-ink-faint": "#6b7280",
+  };
 }
 
 export default function Calendar({ students, onChanged }) {
