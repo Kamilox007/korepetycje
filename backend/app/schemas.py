@@ -72,6 +72,7 @@ class LessonUpdate(BaseModel):
     assigned_tutor_id: int | None = None
     subject_id: int | None = None
     level: str | None = None
+    color: str | None = None
 
 
 class LessonOut(BaseModel):
@@ -93,6 +94,7 @@ class LessonOut(BaseModel):
     assigned_tutor_id: int | None = None
     assigned_tutor_name: str | None = None
     assigned_tutor_color: str | None = None
+    color: str | None = None
     subject_id: int | None = None
     subject_name: str | None = None
     level: str | None = None

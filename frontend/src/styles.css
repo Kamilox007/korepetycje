@@ -332,6 +332,7 @@ tbody tr:hover { background: var(--surface-2); }
   cursor: pointer; padding: 0;
 }
 .color-swatch:hover { transform: scale(1.1); }
+.color-swatch.none { background: var(--surface-2); border: 2px dashed var(--ink-faint); }
 .color-swatch.selected { border-color: var(--ink); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
 
 /* legenda kalendarza */

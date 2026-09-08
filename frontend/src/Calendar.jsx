@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useId } from "react";
 import { api } from "./api";
 import Modal from "./Modal";
+import ColorPicker from "./ColorPicker";
 import { usePersistentState } from "./usePersistentState";
 import { TUTOR_COLORS, UNASSIGNED_COLOR, tint } from "./colors";
 import {
@@ -15,11 +16,12 @@ const VIEWS = [
   { id: "month", label: "Miesiąc" },
 ];
 
-// Lesson tile styling based on the assigned tutor's colour.
+// Lesson tile styling based on the lesson's own colour override, or the
+// assigned tutor's colour when there isn't one.
 // Completed and cancelled lessons keep their own styling (we return null).
 function lessonStyle(l) {
   if (l.completed || l.cancelled) return null;
-  const c = l.assigned_tutor_color;
+  const c = l.color || l.assigned_tutor_color;
   if (!c) {
     // no tutor assigned: neutral background, dashed border. This uses the
     // theme's own (light-on-dark in dark mode) ink colours, which is correct
@@ -528,6 +530,7 @@ function EditLesson({ lesson, onClose, onSaved }) {
   const [subjectId, setSubjectId] = useState(lesson.subject_id || "");
   const [level, setLevel] = useState(lesson.level || "");
   const [subjects, setSubjects] = useState([]);
+  const [color, setColor] = useState(lesson.color || null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -542,6 +545,7 @@ function EditLesson({ lesson, onClose, onSaved }) {
       assigned_tutor_id: tutorId === "" ? null : Number(tutorId),
       subject_id: subjectId === "" ? null : Number(subjectId),
       level: level === "" ? null : level,
+      color,
     });
     onSaved();
   }
@@ -617,6 +621,14 @@ function EditLesson({ lesson, onClose, onSaved }) {
           <option value="">- nieprzypisany -</option>
           {tutors.map((t) => <option key={t.id} value={t.id}>{t.display_name}</option>)}
         </select>
+      </div>
+      <div>
+        <label>Kolor zajęć w kalendarzu</label>
+        <ColorPicker value={color} onChange={setColor} allowNone />
+        <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+          Nadpisuje kolor korepetytora - przydatne np. żeby oznaczyć przełożone
+          zajęcia albo takie, dla których trzeba jeszcze ustalić termin.
+        </p>
       </div>
       <div className="toggle-line">
         <input type="checkbox" id="done" checked={completed}
