@@ -2,6 +2,7 @@ import { useState, useEffect, useId } from "react";
 import { api } from "./api";
 import Modal from "./Modal";
 import { TUTOR_COLORS } from "./colors";
+import ColorPicker from "./ColorPicker";
 import { PASSWORD_HINT, passwordError, genStartPassword } from "./password";
 import { useConfirm } from "./Confirm";
 
@@ -141,21 +142,6 @@ function Section({ title, users, onRemove, onReset, showColor, onColor }) {
   );
 }
 
-function ColorPicker({ value, onChange }) {
-  return (
-    <div className="color-grid">
-      {TUTOR_COLORS.map((c) => (
-        <button
-          key={c}
-          type="button"
-          className={`color-swatch${value === c ? " selected" : ""}`}
-          style={{ background: c }}
-          onClick={() => onChange(c)}
-        />
-      ))}
-    </div>
-  );
-}
 
 function ColorModal({ user, myRole, onClose, onSaved }) {
   const uid = useId();

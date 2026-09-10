@@ -168,6 +168,9 @@ class Lesson(Base):
     cancelled: Mapped[bool] = mapped_column(Boolean, default=False)
     rescheduled: Mapped[bool] = mapped_column(Boolean, default=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Overrides the assigned tutor's color in the calendar when set - a manual
+    # flag (e.g. "still needs a time", or just to spot a moved lesson at a glance).
+    color: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     student: Mapped["Student"] = relationship(back_populates="lessons")
     series: Mapped["LessonSeries"] = relationship(back_populates="lessons")
