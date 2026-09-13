@@ -348,6 +348,10 @@ class UserOut(BaseModel):
     blik_phone: str | None = None
 
 
+class CalendarFeedOut(BaseModel):
+    path: str
+
+
 class UserUpdate(BaseModel):
     display_name: str | None = None
     color: str | None = None

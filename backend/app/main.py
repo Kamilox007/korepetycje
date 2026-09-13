@@ -1,10 +1,13 @@
 import os
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from fastapi import FastAPI, Depends, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
+from icalendar import Calendar, Event
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -1530,6 +1533,74 @@ def tutor_delete_availability(
     db.delete(a)
     db.commit()
     return {"ok": True}
+
+
+# ===================== CALENDAR EXPORT (Google Calendar / iCal) =====================
+@app.get("/api/me/calendar-feed", response_model=schemas.CalendarFeedOut)
+def my_calendar_feed(user: models.User = Depends(auth.require_tutor), db: Session = Depends(get_db)):
+    """This tutor's subscribe-from-URL feed path, generating a token first if
+    there isn't one yet."""
+    if not user.calendar_token:
+        user.calendar_token = secrets.token_urlsafe(32)
+        db.commit()
+    return schemas.CalendarFeedOut(path=f"/api/calendar/{user.calendar_token}.ics")
+
+
+@app.post("/api/me/calendar-feed/regenerate", response_model=schemas.CalendarFeedOut)
+def regenerate_calendar_feed(user: models.User = Depends(auth.require_tutor), db: Session = Depends(get_db)):
+    """Issues a fresh token, so the old feed URL (e.g. if it leaked) stops working."""
+    user.calendar_token = secrets.token_urlsafe(32)
+    db.commit()
+    return schemas.CalendarFeedOut(path=f"/api/calendar/{user.calendar_token}.ics")
+
+
+@app.get("/api/calendar/{token}.ics")
+def calendar_feed(token: str, db: Session = Depends(get_db)):
+    """Public iCal feed of one tutor's lessons, gated by the token in the URL
+    rather than a session cookie -- Google's server fetches this directly, with
+    nobody logged in on that end. The token is a 256-bit secret standing in
+    for auth, not a resource id: treat a match as sufficient authorization.
+    """
+    user = db.query(models.User).filter(models.User.calendar_token == token).first()
+    if not user:
+        raise HTTPException(404, "Nieprawidłowy link kalendarza")
+
+    tz = ZoneInfo("Europe/Warsaw")
+    horizon_start = date.today() - timedelta(days=90)
+    horizon_end = date.today() + timedelta(days=365)
+    lessons = (
+        db.query(models.Lesson)
+        .filter(
+            models.Lesson.assigned_tutor_id == user.id,
+            models.Lesson.cancelled.is_(False),
+            models.Lesson.date >= horizon_start,
+            models.Lesson.date <= horizon_end,
+        )
+        .order_by(models.Lesson.date, models.Lesson.start_time)
+        .all()
+    )
+
+    cal = Calendar()
+    cal.add("prodid", "-//Korepetycje//panel.kamilkrzywon.pl//PL")
+    cal.add("version", "2.0")
+    cal.add("x-wr-calname", f"Korepetycje - {user.display_name or user.username}")
+    for l in lessons:
+        start = datetime.combine(l.date, l.start_time, tzinfo=tz)
+        event = Event()
+        event.add("uid", f"lesson-{l.id}@panel.kamilkrzywon.pl")
+        event.add("summary", l.student.name if l.student else "Zajęcia")
+        event.add("dtstart", start)
+        event.add("dtend", start + timedelta(minutes=l.duration_min))
+        event.add("dtstamp", datetime.now(tz))
+        if l.note:
+            event.add("description", l.note)
+        cal.add_component(event)
+
+    return Response(
+        content=cal.to_ical(),
+        media_type="text/calendar; charset=utf-8",
+        headers={"Content-Disposition": "inline; filename=korepetycje.ics"},
+    )
 
 
 # ===================== STUDENT PANEL =====================
