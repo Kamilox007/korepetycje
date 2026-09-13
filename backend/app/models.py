@@ -42,6 +42,11 @@ class User(Base):
     # Same rationale and same admin-only restriction as bank_account: a BLIK
     # phone number is an alternative way for students to pay this tutor.
     blik_phone: Mapped[str | None] = mapped_column(String(9), nullable=True)
+    # Secret standing in for auth on the public .ics feed URL (below) - Google's
+    # server fetches that URL with no session cookie to check, so the token
+    # itself is what proves it's this tutor's feed. Generated lazily, and
+    # replaceable if the URL ever leaks.
+    calendar_token: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True, index=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
     # Set once, the first time the account clears must_change_password with the
     # checkbox ticked (covers both the Regulamin and the Polityka Prywatności —

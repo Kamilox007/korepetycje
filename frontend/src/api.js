@@ -135,6 +135,8 @@ export const api = {
   tutorSummary: () => req("/tutor/summary"),
   tutorPayments: () => req("/tutor/payments"),
   myQuarterlyLimit: () => req("/me/quarterly-limit"),
+  calendarFeed: () => req("/me/calendar-feed"),
+  regenerateCalendarFeed: () => req("/me/calendar-feed/regenerate", { method: "POST" }),
   tutorLessons: ({ start, end } = {}) => {
     const p = new URLSearchParams();
     if (start) p.set("start", start);

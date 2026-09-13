@@ -15,6 +15,7 @@ import Users from "./Users";
 import Subjects from "./Subjects";
 import TutorPanel from "./TutorPanel";
 import StudentPanel from "./StudentPanel";
+import CalendarExportModal from "./CalendarExportModal";
 
 // Staff tabs (admin + secretary). Users is visible to both, but a secretary
 // will not see staff accounts there; the backend filters them out.
@@ -135,6 +136,7 @@ export default function App() {
 
 function Sidebar({ auth, subtitle, onLogout, onChangePassword, tabs, badge }) {
   const { theme, toggle: toggleTheme } = useTheme();
+  const [showCalExport, setShowCalExport] = useState(false);
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -159,9 +161,15 @@ function Sidebar({ auth, subtitle, onLogout, onChangePassword, tabs, badge }) {
         <button className="nav-item" onClick={toggleTheme}>
           <span>{theme === "dark" ? "Jasny motyw" : "Ciemny motyw"}</span>
         </button>
+        {auth.role === "tutor" && (
+          <button className="nav-item" onClick={() => setShowCalExport(true)}>
+            <span>Eksport do Google Calendar</span>
+          </button>
+        )}
         <button className="nav-item" onClick={onChangePassword}><span>Zmień hasło</span></button>
         <button className="nav-item" onClick={onLogout}><span>Wyloguj</span></button>
       </div>
+      {showCalExport && <CalendarExportModal onClose={() => setShowCalExport(false)} />}
     </aside>
   );
 }
