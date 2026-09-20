@@ -514,3 +514,10 @@ class PageCreate(BaseModel):
 
 class PageUpdate(BaseModel):
     title: str
+
+
+class BoardFileOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    file_id: str
+    mime: str
+    bytes: int

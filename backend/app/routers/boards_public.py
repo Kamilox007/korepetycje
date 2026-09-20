@@ -13,12 +13,13 @@ scanner which tokens exist.
 import json
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from .. import models, schemas, auth, boards_reconcile, boards_rooms
+from .. import models, schemas, auth, boards_reconcile, boards_rooms, boards_files
 from ..database import get_db, SessionLocal
 from ..ratelimit import limiter
 from .boards import is_staff
@@ -29,6 +30,7 @@ router = APIRouter(prefix="/api/t", tags=["boards-public"])
 # per-IP one (see ratelimit.py). A few parallel lessons with images must fit.
 LIMIT_READ = "300/minute"
 LIMIT_WRITE = "120/minute"
+LIMIT_UPLOAD = "30/minute"
 
 # A scene page bigger than this is not a drawing, it is an attack on the
 # database (base64 in disguise, or a runaway client).
@@ -191,6 +193,83 @@ def delete_page(token: str, page_id: int, request: Request, db: Session = Depend
     db.commit()
     boards_rooms.close_pages_threadsafe([page_id])
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- files
+
+@router.post("/{token}/files", response_model=schemas.BoardFileOut)
+@limiter.limit(LIMIT_UPLOAD)
+async def upload_file(
+    token: str, request: Request,
+    file: UploadFile = File(...), file_id: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """An image pasted into the board. Bytes go to disk under their sha256;
+    the scene keeps only `file_id`. Re-uploading the same file_id is a no-op."""
+    board = board_by_token(db, token)
+    if not boards_files.FILE_ID_RE.match(file_id):
+        raise HTTPException(400, "Nieprawidłowy identyfikator pliku")
+    existing = (
+        db.query(models.BoardFile)
+        .filter(models.BoardFile.board_id == board.id, models.BoardFile.file_id == file_id)
+        .first()
+    )
+    if existing:
+        return existing
+
+    data = await file.read(boards_files.MAX_FILE_BYTES + 1)
+    if len(data) > boards_files.MAX_FILE_BYTES:
+        raise HTTPException(413, f"Plik przekracza {boards_files.MAX_FILE_BYTES // (1024 * 1024)} MB")
+    if not data:
+        raise HTTPException(400, "Pusty plik")
+    mime = boards_files.sniff_mime(data)
+    if mime not in boards_files.ALLOWED_MIME:
+        raise HTTPException(415, "Dozwolone są tylko obrazy PNG, JPEG, GIF i WebP")
+    if boards_files.board_usage(db, board.id) + len(data) > boards_files.MAX_TOTAL_BYTES:
+        raise HTTPException(413, "Limit miejsca na pliki tej tablicy został wyczerpany")
+
+    sha = await run_in_threadpool(boards_files.store_bytes, data)
+    record = models.BoardFile(board_id=board.id, file_id=file_id, sha256=sha, mime=mime, bytes=len(data))
+    db.add(record)
+    try:
+        db.commit()
+    except Exception:
+        # Lost a race with an identical upload: the other row is as good as ours.
+        db.rollback()
+        record = (
+            db.query(models.BoardFile)
+            .filter(models.BoardFile.board_id == board.id, models.BoardFile.file_id == file_id)
+            .first()
+        )
+        if not record:
+            raise
+    return record
+
+
+@router.get("/{token}/files/{file_id}")
+@limiter.limit(LIMIT_READ)
+def get_file(token: str, file_id: str, request: Request, db: Session = Depends(get_db)):
+    board = board_by_token(db, token)
+    record = (
+        db.query(models.BoardFile)
+        .filter(models.BoardFile.board_id == board.id, models.BoardFile.file_id == file_id)
+        .first()
+    )
+    if not record:
+        raise HTTPException(404, NOT_FOUND)
+    path = boards_files.path_for(record.sha256)
+    if not path.is_file():
+        raise HTTPException(404, NOT_FOUND)
+    # Content never changes under a file_id, so the browser may keep it for
+    # good; `private` because the URL is behind a secret.
+    return FileResponse(
+        path, media_type=record.mime,
+        headers={
+            "Cache-Control": "private, max-age=31536000, immutable",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Disposition": "inline",
+        },
+    )
 
 
 # ---------------------------------------------------------------- WebSocket
