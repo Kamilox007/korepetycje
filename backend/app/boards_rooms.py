@@ -13,6 +13,7 @@ the life of a connection (SQLite has one writer, and a lesson lasts an hour).
 """
 import asyncio
 import json
+import logging
 import secrets
 from datetime import datetime
 from typing import Any
@@ -22,6 +23,8 @@ from starlette.concurrency import run_in_threadpool
 
 from . import models, auth, boards_reconcile
 from .database import SessionLocal
+
+log = logging.getLogger("uvicorn.error")
 
 # Decision 2.5: a save at most this often per room. A lost 15 s of drawing is
 # nothing; a WAL frame every keystroke to Backblaze is not.
@@ -100,18 +103,27 @@ async def stop() -> None:
         except asyncio.CancelledError:
             pass
     for room in list(rooms.values()):
-        await _save(room, force=True)
+        try:
+            await _save(room, force=True)
+        except Exception as e:  # noqa: BLE001
+            log.warning("tablica: zapis strony %s przy zamykaniu nie powiódł się: %s", room.page_id, e)
     rooms.clear()
 
 
 async def _flush_forever() -> None:
+    """Runs for the life of the process. A failing save (a transient
+    "database is locked", say) must not kill this task - the room stays dirty
+    and the next tick tries again. Nothing here may raise past this loop."""
     while True:
         await asyncio.sleep(FLUSH_TICK_SECONDS)
         now = datetime.utcnow()
         for room in list(rooms.values()):
             if room.dirty and not room.saving and \
                     (now - room.last_saved_at).total_seconds() >= SAVE_INTERVAL_SECONDS:
-                await _save(room)
+                try:
+                    await _save(room)
+                except Exception as e:  # noqa: BLE001 - logged, retried next tick
+                    log.warning("tablica: zapis strony %s nie powiódł się, ponowię: %s", room.page_id, e)
 
 
 # ---------------------------------------------------------------- persistence
@@ -270,7 +282,13 @@ async def leave(room: Room, conn: Connection) -> None:
     # dict is a memory leak that grows with every board ever opened.
     if rooms.get(room.page_id) is room:
         del rooms[room.page_id]
-    await _save(room)
+    try:
+        await _save(room)
+    except Exception as e:  # noqa: BLE001
+        # Last chance for this data: put the room back so the flush loop
+        # retries instead of the work being dropped with the room.
+        log.warning("tablica: zapis strony %s przy wyjściu nie powiódł się, ponowię: %s", room.page_id, e)
+        rooms.setdefault(room.page_id, room)
 
 
 async def apply_update(room: Room, elements: list[dict], sender: Connection | None) -> list[dict]:

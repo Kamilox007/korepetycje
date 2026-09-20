@@ -225,6 +225,27 @@ with TestClient(app) as admin:
     rev_final, _ = page_in_db(p0)
     check("leaving a clean room does not write again", rev_final == rev_after)
 
+    # --- a failing save must not kill the flush loop (shared process!) ---
+    real_write = boards_rooms._write_page
+    calls = {"n": 0}
+    def flaky_write(page_id, elements):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("database is locked")
+        return real_write(page_id, elements)
+    boards_rooms._write_page = flaky_write
+    try:
+        with guest.websocket_connect(f"/api/t/{tok}/ws?page_id={p0}") as a:
+            a.receive_json()
+            a.send_json({"t": "update", "elements": [el("after-fail", 1, 1, index="a4")]})
+            time.sleep(boards_rooms.FLUSH_TICK_SECONDS * 2 + 2)
+            _, elements = page_in_db(p0)
+            check("the flush loop survived a failed write and saved on a later tick",
+                  calls["n"] >= 2 and "after-fail" in {e["id"] for e in elements})
+            check("the room is still registered", p0 in boards_rooms.rooms)
+    finally:
+        boards_rooms._write_page = real_write
+
     # --- last_opened_at is set on connect, not on GET ---
     detail = admin.get(f"/api/boards/{board['id']}").json()
     check("last_opened_at was set by the live connection", detail["last_opened_at"] is not None)
