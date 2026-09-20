@@ -192,6 +192,11 @@ td { padding: 11px 14px; border-bottom: 1px solid var(--border); }
 tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: var(--surface-2); }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
+/* A table row that unfolds detail rows beneath it (payments per student). */
+.row-toggle { cursor: pointer; user-select: none; }
+.row-toggle:hover td { background: var(--surface-2); }
+.row-toggle-chevron { display: inline-block; width: 16px; color: var(--ink-faint); font-size: 11px; }
+.row-detail td { background: var(--surface-2); font-size: 13px; }
 
 /* badges */
 .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 9px; border-radius: 20px; font-weight: 500; }

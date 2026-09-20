@@ -10,6 +10,8 @@ export default function Summary({ refreshKey, tutorView = false, myRole }) {
   const [limits, setLimits] = useState(null);
   const [showLimitManager, setShowLimitManager] = useState(false);
   const [limitsKey, setLimitsKey] = useState(0);
+  // Students whose payment list is unfolded in "Wpłaty wg ucznia".
+  const [openStudents, setOpenStudents] = useState(() => new Set());
 
   useEffect(() => {
     // A tutor gets their own students and their own figures only; the endpoint
@@ -34,11 +36,23 @@ export default function Summary({ refreshKey, tutorView = false, myRole }) {
 
   if (!data) return <div className="empty">Ładowanie…</div>;
 
+  // One line per student with the total; the individual payments unfold on
+  // click. Summing in grosze, not zloty floats - the same reason the backend
+  // stores amounts as integers.
   const byStudent = new Map();
   for (const p of payments || []) {
-    if (!byStudent.has(p.student_id)) byStudent.set(p.student_id, []);
-    byStudent.get(p.student_id).push(p);
+    if (!byStudent.has(p.student_id)) {
+      byStudent.set(p.student_id, { name: p.student_name || "—", rows: [], totalGrosze: 0 });
+    }
+    const g = byStudent.get(p.student_id);
+    g.rows.push(p);
+    g.totalGrosze += Math.round(p.amount * 100);
   }
+  const toggleStudent = (id) => setOpenStudents((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
 
   // Every tutor with their own students and each one's saldo, across the
   // whole practice rather than just the per-student split — a tutor's own
@@ -244,23 +258,35 @@ export default function Summary({ refreshKey, tutorView = false, myRole }) {
           <div className="card">
             <table>
               <thead>
-                <tr><th>Uczeń</th><th>Data</th><th>Od kogo</th><th className="num">Kwota</th></tr>
+                <tr><th>Uczeń</th><th>Wpłat</th><th>Ostatnia</th><th className="num">Razem</th></tr>
               </thead>
               <tbody>
-                {[...byStudent.entries()].map(([studentId, rows]) => (
-                  <Fragment key={studentId}>
-                    {rows.map((p, i) => (
-                      <tr key={p.id}>
-                        <td style={{ fontWeight: i === 0 ? 500 : 400 }}>
-                          {i === 0 ? (rows[0].student_name || "—") : ""}
+                {[...byStudent.entries()].map(([studentId, g]) => {
+                  const open = openStudents.has(studentId);
+                  return (
+                    <Fragment key={studentId}>
+                      <tr className="row-toggle" onClick={() => toggleStudent(studentId)}
+                          aria-expanded={open}>
+                        <td style={{ fontWeight: 500 }}>
+                          <span className="row-toggle-chevron" aria-hidden="true">{open ? "▾" : "▸"}</span>
+                          {g.name}
                         </td>
-                        <td className="muted">{p.date}</td>
-                        <td>{p.payer || "—"}</td>
-                        <td className="num" style={{ fontWeight: 600, color: "var(--done)" }}>{fmtMoney(p.amount)}</td>
+                        <td className="muted">{g.rows.length}</td>
+                        <td className="muted">{g.rows[0].date}</td>
+                        <td className="num" style={{ fontWeight: 600, color: "var(--done)" }}>{fmtMoney(g.totalGrosze / 100)}</td>
                       </tr>
-                    ))}
-                  </Fragment>
-                ))}
+                      {open && g.rows.map((p) => (
+                        <tr key={p.id} className="row-detail">
+                          <td></td>
+                          <td className="muted" colSpan={2}>
+                            {p.date}{p.payer ? ` · ${p.payer}` : ""}{p.note ? ` · ${p.note}` : ""}
+                          </td>
+                          <td className="num">{fmtMoney(p.amount)}</td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
