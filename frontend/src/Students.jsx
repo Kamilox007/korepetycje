@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useId } from "react";
 import { api } from "./api";
+import { Link } from "react-router-dom";
 import Modal from "./Modal";
 import { DAYS_PL, DURATION_OPTIONS, fmtMoney, fmtTime } from "./dates";
 import { PASSWORD_HINT, passwordError, genStartPassword } from "./password";
@@ -214,6 +215,7 @@ export default function Students({ students, reload, myRole }) {
                     )}
                   </td>
                   <td className="num">
+                    <Link className="ghost btn-link" to={`/tablice?uczen=${s.id}`}>Tablice</Link>
                     <button className="ghost" onClick={() => setEditStudent(s)}>Edytuj</button>
                     <button className="ghost" onClick={() => archiveStudent(s)}>Archiwizuj</button>
                   </td>

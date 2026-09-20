@@ -242,6 +242,11 @@ tbody tr:hover { background: var(--surface-2); }
 .section-title { font-size: 13px; font-weight: 600; color: var(--ink-soft); margin: 4px 0 0; text-transform: uppercase; letter-spacing: 0.3px; }
 .muted { color: var(--ink-faint); }
 .err { background: var(--due-soft); color: var(--due); padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: 13px; }
+.notice { background: var(--done-soft); color: var(--done); padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: 13px; }
+/* An <a> that sits among ghost buttons in a table row and should look like one. */
+.btn-link { display: inline-block; text-decoration: none; font-size: 13px; padding: 7px 13px; border-radius: var(--radius-sm); color: var(--ink); border: 1px solid transparent; }
+.btn-link:hover { background: var(--surface-2); }
+.board-actions { white-space: nowrap; }
 
 /* ----- przełącznik widoku ----- */
 .view-switch { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); overflow: hidden; }

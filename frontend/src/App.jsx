@@ -13,6 +13,7 @@ import Summary from "./Summary";
 import Requests from "./Requests";
 import Users from "./Users";
 import Subjects from "./Subjects";
+import Boards from "./Boards";
 import TutorPanel from "./TutorPanel";
 import StudentPanel from "./StudentPanel";
 import CalendarExportModal from "./CalendarExportModal";
@@ -28,6 +29,7 @@ const STAFF_TABS = [
   { path: "/platnosci", label: "Płatności" },
   { path: "/podsumowanie", label: "Podsumowanie" },
   { path: "/prosby", label: "Prośby" },
+  { path: "/tablice", label: "Tablice" },
   { path: "/przedmioty", label: "Przedmioty" },
   { path: "/uzytkownicy", label: "Użytkownicy" },
 ];
@@ -36,6 +38,7 @@ const TUTOR_TABS = [
   { path: "/zajecia", label: "Zajęcia" },
   { path: "/rozliczenia", label: "Rozliczenia" },
   { path: "/prosby", label: "Prośby" },
+  { path: "/tablice", label: "Tablice" },
   { path: "/dyspozycyjnosc", label: "Dyspozycyjność" },
 ];
 
@@ -112,6 +115,7 @@ export default function App() {
             <Route path="/zajecia" element={<TutorPanel section="lessons" />} />
             <Route path="/rozliczenia" element={<Summary tutorView />} />
             <Route path="/prosby" element={<TutorPanel section="requests" />} />
+            <Route path="/tablice" element={<Boards myRole="tutor" />} />
             <Route path="/dyspozycyjnosc" element={<TutorPanel section="availability" />} />
             <Route path="*" element={<Navigate to="/zajecia" replace />} />
           </Routes>
@@ -214,6 +218,7 @@ function StaffShell({ auth, onLogout, onChangePassword }) {
           <Route path="/platnosci" element={<Payments students={students} reload={refresh} />} />
           <Route path="/podsumowanie" element={<Summary refreshKey={refreshKey} myRole={auth.role} />} />
           <Route path="/prosby" element={<Requests reload={refresh} />} />
+          <Route path="/tablice" element={<Boards myRole={auth.role} />} />
           <Route path="/przedmioty" element={<Subjects />} />
           <Route path="/uzytkownicy" element={<Users myRole={auth.role} />} />
           {/* Anything else, including "/", lands on the calendar. */}

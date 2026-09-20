@@ -155,6 +155,54 @@ export const api = {
   tutorRejectReschedule: (id, response) =>
     req(`/tutor/reschedule-requests/${id}/reject`, { method: "POST", body: JSON.stringify({ response: response || null }) }),
 
+  // ----- tablice (panel) -----
+  listBoards: ({ studentId, archived } = {}) => {
+    const p = new URLSearchParams();
+    if (studentId) p.set("student_id", studentId);
+    if (archived) p.set("archived", "true");
+    const q = p.toString();
+    return req(`/boards${q ? `?${q}` : ""}`);
+  },
+  getBoard: (id) => req(`/boards/${id}`),
+  createBoard: (data) => req("/boards", { method: "POST", body: JSON.stringify(data) }),
+  updateBoard: (id, data) => req(`/boards/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  // Nowy link; stary przestaje działać natychmiast, treść zostaje.
+  rotateBoardToken: (id) => req(`/boards/${id}/rotate-token`, { method: "POST" }),
+  archiveBoard: (id) => req(`/boards/${id}`, { method: "DELETE" }),
+  restoreBoard: (id) => req(`/boards/${id}/restore`, { method: "POST" }),
+  // Nieodwracalne. Tylko admin, tylko z archiwum.
+  purgeBoard: (id) => req(`/boards/${id}/purge`, { method: "DELETE" }),
+  listBoardSnapshots: (id) => req(`/boards/${id}/snapshots`),
+  restoreBoardSnapshot: (id, snapshotId) =>
+    req(`/boards/${id}/snapshots/${snapshotId}/restore`, { method: "POST" }),
+
+  // ----- tablica (po linku, bez logowania) -----
+  // Osobna rodzina wywołań: te trasy nie wymagają sesji i nie mogą wylogować
+  // użytkownika przy 401 (gość nie ma sesji, którą dałoby się stracić).
+  board: (token) => req(`/t/${token}`),
+  boardPage: (token, pageId) => req(`/t/${token}/pages/${pageId}`),
+  saveBoardPage: (token, pageId, elements) =>
+    req(`/t/${token}/pages/${pageId}`, { method: "PUT", body: JSON.stringify({ elements }) }),
+  addBoardPage: (token, title) =>
+    req(`/t/${token}/pages`, { method: "POST", body: JSON.stringify({ title: title || null }) }),
+  renameBoardPage: (token, pageId, title) =>
+    req(`/t/${token}/pages/${pageId}`, { method: "PATCH", body: JSON.stringify({ title }) }),
+  deleteBoardPage: (token, pageId) => req(`/t/${token}/pages/${pageId}`, { method: "DELETE" }),
+  uploadBoardFile: async (token, fileId, blob) => {
+    // multipart, więc bez nagłówka JSON - przeglądarka ustawi boundary sama
+    const form = new FormData();
+    form.append("file_id", fileId);
+    form.append("file", blob, fileId);
+    const res = await fetch(`${BASE}/t/${token}/files`, { method: "POST", body: form, credentials: "same-origin" });
+    if (!res.ok) {
+      let d = `${res.status}`;
+      try { d = (await res.json()).detail || d; } catch {}
+      throw new Error(d);
+    }
+    return res.json();
+  },
+  boardFileUrl: (token, fileId) => `${BASE}/t/${token}/files/${fileId}`,
+
   // ----- przedmioty -----
   listSubjects: () => req("/subjects"),
   createSubject: (data) => req("/subjects", { method: "POST", body: JSON.stringify(data) }),
