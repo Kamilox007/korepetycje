@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from . import models, schemas, services, auth, money, transfer_code
 from .database import get_db, SessionLocal
+from .routers import boards as boards_router
 
 
 def seed_admin():
@@ -98,6 +99,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Korepetycje API", version="3.0", lifespan=lifespan)
+app.include_router(boards_router.router)
 
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
@@ -600,6 +602,10 @@ def purge_student(
     db.query(models.RescheduleRequest).filter(
         models.RescheduleRequest.student_id == student.id
     ).delete(synchronize_session=False)
+    # Boards are the tutor's notes, not the student's record: detach, keep.
+    db.query(models.Board).filter(models.Board.student_id == student.id).update(
+        {models.Board.student_id: None}, synchronize_session=False
+    )
     if series_ids:
         db.query(models.SeriesSkip).filter(
             models.SeriesSkip.series_id.in_(series_ids)
