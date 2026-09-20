@@ -8,10 +8,11 @@ import secrets
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from .. import models, schemas, auth, boards_files, boards_rooms
+from .. import models, schemas, auth, boards_files, boards_rooms, boards_reconcile, boards_snapshots
 from ..database import get_db
 
 router = APIRouter(prefix="/api/boards", tags=["boards"])
@@ -259,3 +260,61 @@ def purge_board(
         boards_files.remove_if_orphaned(db, sha)
     db.commit()
     return {"ok": True, "purged": True}
+
+
+# ---------------------------------------------------------------- snapshots
+
+@router.get("/{board_id}/snapshots", response_model=list[schemas.BoardSnapshotOut])
+def list_snapshots(
+    board_id: int,
+    user: models.User = Depends(require_board_manager),
+    db: Session = Depends(get_db),
+):
+    """Newest first, without elements - restoring is the only thing they are for."""
+    board = get_board_for(db, user, board_id)
+    return (
+        db.query(models.BoardSnapshot)
+        .filter(models.BoardSnapshot.board_id == board.id)
+        .order_by(models.BoardSnapshot.created_at.desc(), models.BoardSnapshot.id.desc())
+        .all()
+    )
+
+
+@router.post("/{board_id}/snapshots/{snapshot_id}/restore", response_model=schemas.PublicPageOut)
+async def restore_snapshot(
+    board_id: int,
+    snapshot_id: int,
+    user: models.User = Depends(require_board_manager),
+    db: Session = Depends(get_db),
+):
+    """Put a page back to the way a snapshot has it.
+
+    Not a raw overwrite: the snapshot is turned into an update that wins the
+    merge (boards_reconcile.restore_update) and applied the ordinary way -
+    through the open room, so everybody connected sees it, or straight to
+    the database when nobody is. The pre-restore state is snapshotted first,
+    unconditionally, so a restore is itself reversible.
+    """
+    board = get_board_for(db, user, board_id)
+    snap = db.get(models.BoardSnapshot, snapshot_id)
+    if not snap or snap.board_id != board.id:
+        raise HTTPException(404, "Snapshot nie znaleziony")
+    page = db.get(models.BoardPage, snap.page_id)
+    if not page:
+        raise HTTPException(404, "Strona tego snapshotu już nie istnieje")
+
+    # Bring the database up to date with the room (if any) before keeping a copy.
+    await boards_rooms.flush(page.id)
+    db.refresh(page)
+    boards_snapshots.maybe_snapshot(db, page, force=True)
+    db.commit()
+
+    via_room = await boards_rooms.restore_in_room(page.id, snap.elements)
+    if via_room is not None:
+        rev, elements = via_room
+    else:
+        current = {e["id"]: e for e in page.elements}
+        update = boards_reconcile.restore_update(current, snap.elements)
+        page = await run_in_threadpool(boards_rooms.merge_into_db, db, page, update)
+        rev, elements = page.rev, page.elements
+    return schemas.PublicPageOut(id=page.id, idx=page.idx, title=page.title, rev=rev, elements=elements)

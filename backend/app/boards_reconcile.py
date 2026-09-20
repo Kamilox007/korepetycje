@@ -13,6 +13,7 @@ Elements flagged `isDeleted: true` are kept. Excalidraw deletes by flag, not
 by removal, and the flag rides on a version bump like any other edit: drop
 the element here and the deletion "loses" to whoever still has the old copy.
 """
+import random
 from typing import Any
 
 Element = dict[str, Any]
@@ -80,3 +81,32 @@ def contains_data_url(elements: list[Element]) -> bool:
         return False
 
     return walk(elements)
+
+
+def restore_update(current: dict[str, Element], snapshot: list[Element]) -> list[Element]:
+    """The update that turns `current` into `snapshot` and WINS everywhere.
+
+    A snapshot's elements are older than what everyone holds now, so merging
+    them as-is would lose on `version`. Instead each restored element gets a
+    version above anything seen so far (and a fresh nonce), and every element
+    that exists now but not in the snapshot is re-sent as deleted with the
+    same bump. Applying the result through the normal merge - in the room,
+    on every client, in the database - lands the snapshot state without any
+    special "replace all" path.
+    """
+    top = max((int(e.get("version", 0)) for e in current.values()), default=0)
+    top = max(top, max((int(e.get("version", 0)) for e in snapshot), default=0)) + 1
+    update: list[Element] = []
+    seen: set[str] = set()
+    for el in snapshot:
+        el_id = el.get("id")
+        if not isinstance(el_id, str) or not el_id:
+            continue
+        seen.add(el_id)
+        update.append({**el, "version": top, "versionNonce": random.randrange(1, 2**31)})
+    for el_id, el in current.items():
+        if el_id in seen or el.get("isDeleted"):
+            continue
+        update.append({**el, "isDeleted": True, "version": top,
+                       "versionNonce": random.randrange(1, 2**31)})
+    return update

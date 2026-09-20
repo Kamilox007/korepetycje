@@ -85,26 +85,6 @@ def reject_oversized(request: Request) -> None:
         raise HTTPException(413, "Za duża scena")
 
 
-def merge_into_page(db: Session, page: models.BoardPage, incoming: list[dict]) -> models.BoardPage:
-    """Merge `incoming` into the stored page. Returns the page (refreshed).
-
-    Never a plain overwrite: two people may be saving, and the one with the
-    stale copy must not erase the other's work. When a live room is open for
-    this page (see boards_rooms) the merge goes through the room instead, so
-    the connected clients see it - that is wired in there.
-    """
-    current = {e["id"]: e for e in page.elements}
-    changed = boards_reconcile.reconcile(current, incoming)
-    if changed:
-        page.elements = boards_reconcile.ordered(current)
-        page.rev += 1
-        page.updated_at = auth.utcnow()
-        page.board.updated_at = page.updated_at
-        db.commit()
-        db.refresh(page)
-    return page
-
-
 def _page_out(page: models.BoardPage) -> schemas.PublicPageOut:
     return schemas.PublicPageOut(
         id=page.id, idx=page.idx, title=page.title, rev=page.rev, elements=page.elements,
@@ -152,7 +132,7 @@ async def put_page(
     if via_room is not None:
         rev, elements = via_room
         return schemas.PublicPageOut(id=page.id, idx=page.idx, title=page.title, rev=rev, elements=elements)
-    page = await run_in_threadpool(merge_into_page, db, page, incoming)
+    page = await run_in_threadpool(boards_rooms.merge_into_db, db, page, incoming)
     return _page_out(page)
 
 

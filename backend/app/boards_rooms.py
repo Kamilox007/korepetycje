@@ -175,6 +175,26 @@ async def _save(room: Room, force: bool = False) -> None:
         room.saving = False
 
 
+def merge_into_db(db, page: models.BoardPage, incoming: list[dict]) -> models.BoardPage:
+    """Merge `incoming` into the stored page when NO room is open for it.
+
+    Never a plain overwrite: two people may be saving, and the one with the
+    stale copy must not erase the other's work. Callers check
+    `merge_from_http` first; with a room open the room is the authority.
+    """
+    current = {e["id"]: e for e in page.elements}
+    changed = boards_reconcile.reconcile(current, incoming)
+    if changed:
+        _before_save(db, page)
+        page.elements = boards_reconcile.ordered(current)
+        page.rev += 1
+        page.updated_at = auth.utcnow()
+        page.board.updated_at = page.updated_at
+        db.commit()
+        db.refresh(page)
+    return page
+
+
 def _touch_opened(board_id: int) -> None:
     db = SessionLocal()
     try:
@@ -308,6 +328,28 @@ async def merge_from_http(page_id: int, elements: list[dict]) -> tuple[int, list
         return None
     await apply_update(room, elements, sender=None)
     return room.rev, room.snapshot()
+
+
+async def restore_in_room(page_id: int, snapshot: list[dict]) -> tuple[int, list[dict]] | None:
+    """Apply a snapshot to an open room as a winning update (see
+    boards_reconcile.restore_update). None when there is no room."""
+    room = rooms.get(page_id)
+    if room is None:
+        return None
+    update = boards_reconcile.restore_update(room.elements, snapshot)
+    await apply_update(room, update, sender=None)
+    # Do not wait for the flush tick: a restore is a deliberate act.
+    await _save(room)
+    return room.rev, room.snapshot()
+
+
+async def flush(page_id: int) -> bool:
+    """Persist a room now if it is dirty. False when there is no room."""
+    room = rooms.get(page_id)
+    if room is None:
+        return False
+    await _save(room)
+    return True
 
 
 async def close_pages(page_ids: list[int], code: int = CLOSE_NOT_FOUND) -> None:

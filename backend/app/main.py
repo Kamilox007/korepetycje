@@ -12,7 +12,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy.orm import Session
 
-from . import models, schemas, services, auth, money, transfer_code, boards_rooms
+from . import models, schemas, services, auth, money, transfer_code, boards_rooms, boards_snapshots
 from .database import get_db, SessionLocal
 from .ratelimit import limiter
 from .routers import boards as boards_router, boards_public as boards_public_router
@@ -85,7 +85,10 @@ def _generate_upcoming() -> int:
     """Materialise series occurrences for the coming months."""
     db = SessionLocal()
     try:
-        return services.regenerate_all(db)
+        created = services.regenerate_all(db)
+        # Same daily impulse, second chore: board snapshots past retention.
+        boards_snapshots.purge_old(db)
+        return created
     finally:
         db.close()
 
@@ -849,10 +852,12 @@ def generate_lessons(
     """
     created = services.regenerate_all(db)
     purged = auth.purge_expired_sessions(db)
+    snapshots_purged = boards_snapshots.purge_old(db)
     return {
         "created": created,
         "horizon": services.clamp_horizon(None),
         "sessions_purged": purged,
+        "board_snapshots_purged": snapshots_purged,
     }
 
 
