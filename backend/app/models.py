@@ -338,7 +338,14 @@ class Board(Base):
     # the board on the student's card - NOT a visibility rule (that goes by
     # created_by_user_id, so the two tutor columns on Student cannot be mixed up).
     student_id: Mapped[int | None] = mapped_column(ForeignKey("students.id"), nullable=True, index=True)
+    # Who entered it. Same split as Lesson/Payment: the author is not
+    # necessarily the tutor it belongs to, since staff can set boards up on a
+    # tutor's behalf.
     created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    # Whose board it is: this tutor sees it in their panel and is its owner
+    # under the link. A tutor creating a board is assigned automatically; staff
+    # pick (or leave empty for a staff-only board).
+    assigned_tutor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     # Bumped on every page save.
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

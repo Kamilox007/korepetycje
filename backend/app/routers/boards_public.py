@@ -22,7 +22,7 @@ from starlette.concurrency import run_in_threadpool
 from .. import models, schemas, auth, boards_reconcile, boards_rooms, boards_files
 from ..database import get_db, SessionLocal
 from ..ratelimit import limiter
-from .boards import is_staff
+from .boards import owns_board
 
 router = APIRouter(prefix="/api/t", tags=["boards-public"])
 
@@ -59,10 +59,8 @@ def page_of(db: Session, board: models.Board, page_id: int) -> models.BoardPage:
 
 
 def is_owner(user: models.User | None, board: models.Board) -> bool:
-    """Same rule as the panel router's visibility: staff, or the creator."""
-    if user is None:
-        return False
-    return is_staff(user) or board.created_by_user_id == user.id
+    """Same circle as the panel's visibility: staff, assigned tutor, creator."""
+    return owns_board(user, board)
 
 
 def owner_or_403(request: Request, db: Session, board: models.Board) -> models.User:

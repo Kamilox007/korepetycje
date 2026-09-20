@@ -164,6 +164,38 @@ with TestClient(app) as admin:
     check("but not to another tutor",
           olek.get(f"/api/boards/{no_student['id']}").status_code == 404)
 
+    # Staff sets a board up FOR Olek: it is his - visible in his panel, he is
+    # the owner under the link - and stays invisible to Ewa.
+    for_olek = admin.post("/api/boards", json={"title": "Dla Olka", "assigned_tutor_id": olek_id}).json()
+    check("staff assigns a board to a tutor",
+          for_olek["assigned_tutor_id"] == olek_id and for_olek["assigned_tutor_name"] == "Olek")
+    check("the assigned tutor sees it in their panel",
+          olek.get(f"/api/boards/{for_olek['id']}").status_code == 200)
+    check("and is the owner under the link",
+          olek.get(f"/api/t/{for_olek['path'].removeprefix('/t/')}").json()["is_owner"] is True)
+    check("the other tutor gets 404",
+          ewa.get(f"/api/boards/{for_olek['id']}").status_code == 404)
+    check("and is a guest under the link",
+          ewa.get(f"/api/t/{for_olek['path'].removeprefix('/t/')}").json()["is_owner"] is False)
+    check("a tutor creating a board is assigned automatically",
+          no_student["assigned_tutor_id"] == ewa_id)
+    check("a tutor cannot hand their board to somebody else -> 403",
+          ewa.patch(f"/api/boards/{no_student['id']}", json={"assigned_tutor_id": olek_id}).status_code == 403)
+    check("nor create one for somebody else -> 403",
+          ewa.post("/api/boards", json={"title": "X", "assigned_tutor_id": olek_id}).status_code == 403)
+    check("staff cannot assign to a non-teaching account -> 404",
+          admin.post("/api/boards", json={"title": "X", "assigned_tutor_id": 999999}).status_code == 404)
+    r = admin.patch(f"/api/boards/{for_olek['id']}", json={"assigned_tutor_id": ewa_id})
+    check("staff reassigns", r.json()["assigned_tutor_id"] == ewa_id)
+    check("after reassignment the previous tutor loses it",
+          olek.get(f"/api/boards/{for_olek['id']}").status_code == 404)
+    check("and the new one gains it",
+          ewa.get(f"/api/boards/{for_olek['id']}").status_code == 200)
+    r = admin.patch(f"/api/boards/{for_olek['id']}", json={"assigned_tutor_id": None})
+    check("staff can leave a board unassigned (staff-only)",
+          r.json()["assigned_tutor_id"] is None and
+          ewa.get(f"/api/boards/{for_olek['id']}").status_code == 404)
+
     # --- the student panel is scoped to one student ---
     admin.post(f"/api/students/{ala}/account",
                json={"username": "ala", "password": "StartPass123!"})

@@ -60,7 +60,9 @@ Moduł tablicy interaktywnej (Excalidraw) do prowadzenia korepetycji online.
 
 - Korepetytor lub sekretariat zakłada tablicę w zakładce **Tablice**
   (np. „Kasia - matura rozszerzona"), opcjonalnie przypisując ją do ucznia -
-  wtedy widać ją z poziomu listy uczniów.
+  wtedy widać ją z poziomu listy uczniów. Sekretariat wybiera też, którego
+  korepetytora to tablica; korepetytor zakładający ją sam jest przypisany
+  automatycznie.
 - Tablica dostaje **stały link** `https://<domena>/t/<token>`. Link wysyła się
   uczniowi raz; uczeń **nie loguje się i nie potrzebuje konta** - kto ma
   link, ten rysuje. Przy pierwszym wejściu podaje imię do etykiety przy
@@ -151,6 +153,7 @@ gorliwy przy typach.
 | `0011` | kolor pojedynczych zajęć w kalendarzu |
 | `0012` | token publicznego kanału kalendarza (.ics) |
 | `0013` | tablica: `boards`, `board_pages`, `board_files`, `board_snapshots` |
+| `0014` | tablica: `assigned_tutor_id` - czyja jest tablica, niezależnie od tego, kto ją założył |
 
 ## Konfiguracja
 
@@ -405,12 +408,15 @@ zakład: kto ma link, ten pisze. Link nie wygasa, bo cały pomysł polega na
 wielokrotnym użyciu przez cały kurs; mitygacje to rotacja tokenu i snapshoty.
 Ten sam wzorzec, co publiczny kanał `.ics` kalendarza.
 
-**Tablica: widoczność po twórcy, nie po uczniu.** Korepetytor widzi w panelu
-wyłącznie tablice z `created_by_user_id == on`. Repozytorium ma dwie
-definicje „ucznia korepetytora" (`Student.tutor_id` i
-`Lesson.assigned_tutor_id`), a wybór złej to wyciek notatek między
-korepetytorami. `student_id` na tablicy służy tylko do pokazania jej przy
-uczniu.
+**Tablica: widoczność po przypisaniu, nie po uczniu.** Ten sam podział, co na
+zajęciach i wpłatach: `created_by_user_id` mówi, kto tablicę założył,
+`assigned_tutor_id` - czyja jest. Korepetytor widzi w panelu tablice
+przypisane do siebie (i te, które sam założył); staff wszystkie. Sekretariat
+może założyć tablicę korepetytorowi albo zostawić ją „tylko administracja".
+Repozytorium ma dwie definicje „ucznia korepetytora" (`Student.tutor_id`
+i `Lesson.assigned_tutor_id`), a wybór złej to wyciek notatek między
+korepetytorami - dlatego `student_id` na tablicy nie daje nikomu dostępu
+i służy tylko do pokazania jej przy uczniu.
 
 **Tablica: pliki binarne poza bazą.** Zdjęcie zadania z telefonu ma 3 MB;
 zapisane w SQLite trafiłoby do każdego snapshotu bazy i do strumienia WAL
@@ -475,7 +481,7 @@ nie limit żądań. **TODO:** `FORWARDED_ALLOW_IPS=*` w `docker-compose.yml`
 | `reschedule_requests` | prośby o przesunięcie |
 | `availability` | dostępność korepetytora |
 | `sessions` | wydane tokeny, do unieważniania sesji |
-| `boards` | tablice: token (uprawnienie), tytuł, opcjonalny uczeń, twórca, `archived_at` |
+| `boards` | tablice: token (uprawnienie), tytuł, opcjonalny uczeń, twórca, przypisany korepetytor, `archived_at` |
 | `board_pages` | strony tablicy: elementy Excalidrawa (JSON), `idx` do sortowania, licznik zapisów |
 | `board_files` | metadane obrazków (sha256, typ, rozmiar); bajty na dysku w `BOARD_FILES_PATH` |
 | `board_snapshots` | dobowe kopie stron do odzysku, retencja 30 dni |

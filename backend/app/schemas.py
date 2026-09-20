@@ -438,13 +438,16 @@ class AvailableSlotsOut(BaseModel):
 class BoardCreate(BaseModel):
     title: str
     student_id: int | None = None
+    # Staff only; a tutor is always assigned to themselves.
+    assigned_tutor_id: int | None = None
 
 
 class BoardUpdate(BaseModel):
-    # student_id may be set to null on purpose (detach); "not sent" is told
-    # apart from "sent as null" with model_fields_set in the endpoint.
+    # student_id / assigned_tutor_id may be set to null on purpose (detach);
+    # "not sent" is told apart from "sent as null" with model_fields_set.
     title: str | None = None
     student_id: int | None = None
+    assigned_tutor_id: int | None = None
 
 
 class BoardPageMeta(BaseModel):
@@ -468,6 +471,8 @@ class BoardOut(BaseModel):
     student_name: str | None = None
     created_by_user_id: int
     created_by_name: str | None = None
+    assigned_tutor_id: int | None = None
+    assigned_tutor_name: str | None = None
     created_at: datetime
     updated_at: datetime
     last_opened_at: datetime | None = None

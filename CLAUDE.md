@@ -156,7 +156,8 @@ releases the mouse outside it, silently discarding the form.
 Excalidraw embedded at `/t/:token`; the token in `boards.token` is the whole credential (no
 student accounts, no share table — same pattern as the `.ics` calendar feed). Two physically
 separate routers: `backend/app/routers/boards.py` (`/api/boards`, behind the role gate; tutor
-visibility is `created_by_user_id` only, never derived from `student_id`) and
+visibility is `assigned_tutor_id` / `created_by_user_id` — the same author-vs-owner split
+as lessons — never derived from `student_id`) and
 `backend/app/routers/boards_public.py` (`/api/t/{token}`, no user dependency — the owner is
 detected softly via `auth.optional_active_user`). Pages are identified by `board_pages.id`;
 `idx` is sort order only and may have gaps. `boards_reconcile.py` is the pure merge rule

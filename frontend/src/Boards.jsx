@@ -19,6 +19,7 @@ export default function Boards({ myRole }) {
   const [boards, setBoards] = useState([]);
   const [archived, setArchived] = useState([]);
   const [students, setStudents] = useState([]);
+  const [tutors, setTutors] = useState([]);
   const [showArchive, setShowArchive] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [editBoard, setEditBoard] = useState(null);
@@ -49,7 +50,10 @@ export default function Boards({ myRole }) {
     (async () => {
       try {
         if (isStaff) {
-          setStudents(await api.listStudents());
+          // Staff also pick whose board it is - the same list as for lessons.
+          const [st, tu] = await Promise.all([api.listStudents(), api.listTutors()]);
+          setStudents(st);
+          setTutors(tu);
         } else {
           const s = await api.tutorSummary();
           setStudents(s.students.map((x) => ({ id: x.student_id, name: x.student_name })));
@@ -182,7 +186,7 @@ export default function Boards({ myRole }) {
             <thead>
               <tr>
                 <th>Tablica</th><th>Uczeń</th>
-                {isStaff && <th>Założył(a)</th>}
+                {isStaff && <th>Korepetytor</th>}
                 <th className="num">Strony</th><th>Ostatnio otwarta</th><th></th>
               </tr>
             </thead>
@@ -193,7 +197,11 @@ export default function Boards({ myRole }) {
                     <a href={b.path} target="_blank" rel="noopener">{b.title}</a>
                   </td>
                   <td className="muted">{b.student_name || "-"}</td>
-                  {isStaff && <td className="muted">{b.created_by_name || "-"}</td>}
+                  {isStaff && (
+                    <td className="muted">
+                      {b.assigned_tutor_name || <span title={`założył(a): ${b.created_by_name || "-"}`}>tylko administracja</span>}
+                    </td>
+                  )}
                   <td className="num">{b.page_count}</td>
                   <td className="muted">{fmtWhen(b.last_opened_at)}</td>
                   <td className="num board-actions">
@@ -213,6 +221,7 @@ export default function Boards({ myRole }) {
       {showCreate && (
         <BoardForm
           students={students}
+          tutors={isStaff ? tutors : null}
           initialStudentId={studentFilter}
           onClose={() => setShowCreate(false)}
           onSaved={(b) => { setShowCreate(false); load(); setLinkBoard(b); }}
@@ -222,6 +231,7 @@ export default function Boards({ myRole }) {
         <BoardForm
           board={editBoard}
           students={students}
+          tutors={isStaff ? tutors : null}
           onClose={() => setEditBoard(null)}
           onSaved={() => { setEditBoard(null); load(); }}
         />
@@ -242,10 +252,11 @@ function fmtWhen(iso) {
   return d.toLocaleString("pl-PL", { dateStyle: "short", timeStyle: "short" });
 }
 
-function BoardForm({ board, students, initialStudentId, onClose, onSaved }) {
+function BoardForm({ board, students, tutors, initialStudentId, onClose, onSaved }) {
   const uid = useId();
   const [title, setTitle] = useState(board?.title || "");
   const [studentId, setStudentId] = useState(board?.student_id ?? initialStudentId ?? "");
+  const [tutorId, setTutorId] = useState(board?.assigned_tutor_id ?? "");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -254,6 +265,8 @@ function BoardForm({ board, students, initialStudentId, onClose, onSaved }) {
     setBusy(true); setErr("");
     try {
       const payload = { title: title.trim(), student_id: studentId === "" ? null : Number(studentId) };
+      // Only staff see the picker; a tutor is assigned to themselves server-side.
+      if (tutors) payload.assigned_tutor_id = tutorId === "" ? null : Number(tutorId);
       const saved = board ? await api.updateBoard(board.id, payload) : await api.createBoard(payload);
       onSaved(saved);
     } catch (e) { setErr(e.message); }
@@ -279,6 +292,18 @@ function BoardForm({ board, students, initialStudentId, onClose, onSaved }) {
         <input id={`${uid}-tytul`} autoFocus value={title} onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && save()} placeholder="np. Kasia - matura rozszerzona" />
       </div>
+      {tutors && (
+        <div className="field">
+          <label htmlFor={`${uid}-korepetytor`}>Korepetytor</label>
+          <select id={`${uid}-korepetytor`} value={tutorId} onChange={(e) => setTutorId(e.target.value)}>
+            <option value="">- tylko administracja -</option>
+            {tutors.map((t) => <option key={t.id} value={t.id}>{t.display_name}</option>)}
+          </select>
+          <p className="muted" style={{ fontSize: 12, margin: "6px 0 0" }}>
+            Korepetytor zobaczy tablicę w swojej zakładce i będzie jej właścicielem pod linkiem.
+          </p>
+        </div>
+      )}
       <div className="field">
         <label htmlFor={`${uid}-uczen`}>Uczeń (opcjonalnie)</label>
         <select id={`${uid}-uczen`} value={studentId} onChange={(e) => setStudentId(e.target.value)}>

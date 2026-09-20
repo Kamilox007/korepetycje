@@ -9,7 +9,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
 from starlette.concurrency import run_in_threadpool
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from .. import models, schemas, auth, boards_files, boards_rooms, boards_reconcile, boards_snapshots
@@ -30,17 +30,41 @@ def is_staff(user: models.User) -> bool:
 
 
 def visible_boards(db: Session, user: models.User):
-    """Staff see every board; a tutor only the ones they created.
+    """Staff see every board; a tutor the ones assigned to them (or, for
+    boards from before assignment existed, the ones they created).
 
     Deliberately NOT derived from student_id: the repo has two competing
     notions of "this tutor's student" (Student.tutor_id vs
     Lesson.assigned_tutor_id) and picking the wrong one leaks boards across
-    tutors. One column, no ambiguity.
+    tutors. Assignment is an explicit column, no guessing.
     """
     q = db.query(models.Board)
     if not is_staff(user):
-        q = q.filter(models.Board.created_by_user_id == user.id)
+        q = q.filter(or_(models.Board.assigned_tutor_id == user.id,
+                         models.Board.created_by_user_id == user.id))
     return q
+
+
+def owns_board(user: models.User | None, board: models.Board) -> bool:
+    """The rule behind `is_owner` under the link - same circle as visibility."""
+    if user is None:
+        return False
+    return is_staff(user) or board.assigned_tutor_id == user.id or board.created_by_user_id == user.id
+
+
+def _resolve_assigned_tutor(db: Session, user: models.User, payload) -> int | None:
+    """Who the board is for. A tutor is always themselves; staff choose a
+    teaching account (tutor or admin, as in /api/tutors) or nobody."""
+    if not is_staff(user):
+        if "assigned_tutor_id" in payload.model_fields_set and payload.assigned_tutor_id not in (None, user.id):
+            raise HTTPException(403, "Tylko administracja może przypisać tablicę innemu korepetytorowi")
+        return user.id
+    if payload.assigned_tutor_id is None:
+        return None
+    tutor = db.get(models.User, payload.assigned_tutor_id)
+    if not tutor or tutor.role not in ("tutor", "admin"):
+        raise HTTPException(404, "Korepetytor nie znaleziony")
+    return tutor.id
 
 
 def get_board_for(db: Session, user: models.User, board_id: int) -> models.Board:
@@ -93,12 +117,15 @@ def _page_counts(db: Session, board_ids: list[int]) -> dict[int, int]:
 def _out(board: models.Board, db: Session, page_count: int | None = None,
          detail: bool = False) -> schemas.BoardOut:
     creator = db.get(models.User, board.created_by_user_id)
+    tutor = db.get(models.User, board.assigned_tutor_id) if board.assigned_tutor_id else None
     data = dict(
         id=board.id, title=board.title, path=board_path(board),
         student_id=board.student_id,
         student_name=board.student.name if board.student else None,
         created_by_user_id=board.created_by_user_id,
         created_by_name=(creator.display_name or creator.username) if creator else None,
+        assigned_tutor_id=board.assigned_tutor_id,
+        assigned_tutor_name=(tutor.display_name or tutor.username) if tutor else None,
         created_at=board.created_at, updated_at=board.updated_at,
         last_opened_at=board.last_opened_at, archived_at=board.archived_at,
         page_count=page_count if page_count is not None else len(board.pages),
@@ -142,6 +169,7 @@ def create_board(
     board = models.Board(
         token=new_token(), title=title, student_id=payload.student_id,
         created_by_user_id=user.id,
+        assigned_tutor_id=_resolve_assigned_tutor(db, user, payload),
     )
     # Every board starts with one page: the editor has nothing to show otherwise.
     board.pages.append(models.BoardPage(idx=0, title=date.today().isoformat(), elements=[], rev=0))
@@ -178,6 +206,10 @@ def update_board(
         if payload.student_id is not None:
             _resolve_student(db, user, payload.student_id)
         board.student_id = payload.student_id
+    if "assigned_tutor_id" in payload.model_fields_set and is_staff(user):
+        board.assigned_tutor_id = _resolve_assigned_tutor(db, user, payload)
+    elif "assigned_tutor_id" in payload.model_fields_set:
+        _resolve_assigned_tutor(db, user, payload)   # 403 for anyone but self
     db.commit()
     db.refresh(board)
     return _out(board, db, detail=True)
