@@ -15,3 +15,5 @@ id_*
 .claude/
 # katalog na pliki tablic przy lokalnym uruchomieniu
 backend/dev-board-files/
+# fonty Excalidrawa kopiowane z node_modules (frontend/scripts/copy-excalidraw-assets.mjs)
+frontend/public/excalidraw/

@@ -9,6 +9,9 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:8000",
         changeOrigin: true,
+        // Tablica synchronizuje się przez WebSocket pod /api/t/{token}/ws;
+        // bez tej flagi proxy dev servera przepuszcza tylko HTTP.
+        ws: true,
       },
     },
   },

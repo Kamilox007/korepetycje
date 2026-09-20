@@ -4,7 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/copy-excalidraw-assets.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/copy-excalidraw-assets.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
@@ -14,6 +16,7 @@
     "e2e:report": "playwright show-report"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.1",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

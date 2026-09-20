@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { usePersistentState } from "./usePersistentState";
 import { useTheme } from "./useTheme";
@@ -14,6 +14,11 @@ import Requests from "./Requests";
 import Users from "./Users";
 import Subjects from "./Subjects";
 import Boards from "./Boards";
+
+// Excalidraw waży ok. 1 MB po gzipie. Kalendarz otwierany codziennie nie ma
+// płacić za tablicę otwieraną raz w tygodniu, więc ekran tablicy ładuje się
+// dopiero pod /t/{token}.
+const BoardScreen = lazy(() => import("./tablica/BoardScreen"));
 import TutorPanel from "./TutorPanel";
 import StudentPanel from "./StudentPanel";
 import CalendarExportModal from "./CalendarExportModal";
@@ -49,6 +54,13 @@ const STUDENT_TABS = [
 ];
 
 export default function App() {
+  const location = useLocation();
+  // Tablica pod /t/{token} jest dla gościa bez konta: żadnej sesji, żadnego
+  // ekranu logowania. Ten komponent normalnie pyta api.me() i bez sesji
+  // pokazuje Login, dlatego trasa tablicy wychodzi PRZED tą bramką. Ekran
+  // tablicy sam pyta GET /api/t/{token} i z is_owner wie, kim jesteśmy.
+  const isBoardRoute = location.pathname.startsWith("/t/");
+
   const [auth, setAuth] = useState(null);
   const [loading, setLoading] = useState(true);
   const [forcePw, setForcePw] = useState(false);
@@ -57,6 +69,7 @@ export default function App() {
   const [pending, setPending] = useState(0);
 
   useEffect(() => {
+    if (isBoardRoute) { setLoading(false); return; }
     setUnauthorizedHandler(() => setAuth(null));
     (async () => {
       // An httponly cookie cannot be inspected from JS, so we ask the backend
@@ -68,7 +81,7 @@ export default function App() {
       } catch { /* brak sesji */ }
       setLoading(false);
     })();
-  }, []);
+  }, [isBoardRoute]);
 
   async function handleLogin(username, password) {
     const res = await api.login(username, password);
@@ -93,6 +106,17 @@ export default function App() {
       .then((rs) => setPending(rs.filter((r) => r.status === "pending").length))
       .catch(() => {});
   }, [auth]);
+
+  if (isBoardRoute) {
+    return (
+      <Suspense fallback={<div className="empty" style={{ marginTop: 80 }}>Ładowanie tablicy…</div>}>
+        <Routes>
+          <Route path="/t/:token" element={<BoardScreen />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    );
+  }
 
   if (loading) return <div className="empty" style={{ marginTop: 80 }}>Ładowanie…</div>;
   if (!auth) return <><Login onLogin={handleLogin} /><CookieNotice /></>;
