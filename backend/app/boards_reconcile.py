@@ -19,9 +19,18 @@ from typing import Any
 Element = dict[str, Any]
 
 
+def _num(value: Any) -> int:
+    """Version fields as an int, with anything odd (None, a string, a float
+    from a broken client) counting as 0 rather than blowing up the room."""
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _rank(el: Element) -> tuple[int, int]:
     # Negated nonce so that a plain tuple comparison picks the lower one.
-    return (int(el.get("version", 0)), -int(el.get("versionNonce", 0)))
+    return (_num(el.get("version")), -_num(el.get("versionNonce")))
 
 
 def wins(incoming: Element, current: Element | None) -> bool:
@@ -94,8 +103,8 @@ def restore_update(current: dict[str, Element], snapshot: list[Element]) -> list
     on every client, in the database - lands the snapshot state without any
     special "replace all" path.
     """
-    top = max((int(e.get("version", 0)) for e in current.values()), default=0)
-    top = max(top, max((int(e.get("version", 0)) for e in snapshot), default=0)) + 1
+    top = max((_num(e.get("version")) for e in current.values()), default=0)
+    top = max(top, max((_num(e.get("version")) for e in snapshot), default=0)) + 1
     update: list[Element] = []
     seen: set[str] = set()
     for el in snapshot:

@@ -176,6 +176,11 @@ export const api = {
   restoreBoardSnapshot: (id, snapshotId) =>
     req(`/boards/${id}/snapshots/${snapshotId}/restore`, { method: "POST" }),
 
+  // Biblioteka kształtów tablicy zapisana na koncie (nie per tablica).
+  myBoardLibrary: () => req("/me/board-library"),
+  saveMyBoardLibrary: (items) =>
+    req("/me/board-library", { method: "PUT", body: JSON.stringify({ items }) }),
+
   // ----- tablica (po linku, bez logowania) -----
   // Osobna rodzina wywołań: te trasy nie wymagają sesji i nie mogą wylogować
   // użytkownika przy 401 (gość nie ma sesji, którą dałoby się stracić).

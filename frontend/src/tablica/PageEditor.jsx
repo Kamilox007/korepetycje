@@ -3,6 +3,7 @@ import { Excalidraw, MainMenu, CaptureUpdateAction } from "@excalidraw/excalidra
 import "@excalidraw/excalidraw/index.css";
 import { api } from "../api";
 import { PageSync, fetchFileData } from "./sync";
+import { BUILTIN_LIBRARY, isBuiltin, makeLibrarySaver } from "./library";
 
 /**
  * Jedna strona tablicy w Excalidrawie.
@@ -13,7 +14,7 @@ import { PageSync, fetchFileData } from "./sync";
  * w localStorage; na serwer nie idzie nigdy, bo zoom jednej osoby skakałby
  * drugiej po ekranie.
  */
-export default function PageEditor({ token, pageId, theme, name, onStatus, onPeers, onClosed, onError }) {
+export default function PageEditor({ token, pageId, theme, name, grid, library, onStatus, onPeers, onClosed, onError }) {
   const apiRef = useRef(null);
   const syncRef = useRef(null);
   const [initialData, setInitialData] = useState(null);
@@ -26,6 +27,13 @@ export default function PageEditor({ token, pageId, theme, name, onStatus, onPee
   // ref, so the sync object built once below always sees the latest.
   const latest = useRef({});
   latest.current = { name, onStatus, onPeers, onClosed, onError };
+  // Wbudowane bryły + dodatki użytkownika (z konta albo z przeglądarki);
+  // zmiany odkładane przez store z BoardScreen, żeby nie mnożyć zapisów
+  // przy przełączaniu stron.
+  const saveLibrary = useMemo(
+    () => makeLibrarySaver(library, (m) => latest.current.onError?.(m)),
+    [library],
+  );
 
   // --- wczytanie strony ---
   useEffect(() => {
@@ -79,6 +87,7 @@ export default function PageEditor({ token, pageId, theme, name, onStatus, onPee
           files,
           appState: { ...appState, collaborators: new Map() },
           scrollToContent: !appState.scrollX && page.elements.length > 0,
+          libraryItems: [...BUILTIN_LIBRARY, ...library.items],
         });
       } catch (e) {
         if (!cancelled) setLoadError(e.message);
@@ -134,6 +143,13 @@ export default function PageEditor({ token, pageId, theme, name, onStatus, onPee
       langCode="pl-PL"
       theme={theme}
       name="Tablica"
+      gridModeEnabled={grid}
+      onLibraryChange={(items) => {
+        // Store pamięta bieżący stan, żeby kolejna strona dostała aktualną
+        // listę bez pytania serwera; zapis idzie z opóźnieniem.
+        library.items = items.filter((i) => !isBuiltin(i));
+        saveLibrary(items);
+      }}
       onChange={(elements, appState, files) => {
         syncRef.current?.handleChange(elements, files);
         saveView(appState);

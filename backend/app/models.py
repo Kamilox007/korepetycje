@@ -47,6 +47,9 @@ class User(Base):
     # itself is what proves it's this tutor's feed. Generated lazily, and
     # replaceable if the URL ever leaks.
     calendar_token: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True, index=True)
+    # Whiteboard library items the account added ("dodaj do biblioteki").
+    # Follows the account across devices; the built-in shapes are not stored.
+    board_library: Mapped[list | None] = mapped_column(JSON, nullable=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
     # Set once, the first time the account clears must_change_password with the
     # checkbox ticked (covers both the Regulamin and the Polityka Prywatności —

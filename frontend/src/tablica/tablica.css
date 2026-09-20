@@ -49,6 +49,7 @@
 .tablica-add { font-weight: 600; padding: 5px 9px; }
 .tablica-right { display: flex; align-items: center; gap: 8px; flex: none; }
 .tablica-btn { padding: 5px 10px; font-size: 13px; }
+.tablica-btn.active { background: var(--accent-soft); color: var(--accent); }
 .tablica-link {
   text-decoration: none;
   color: var(--ink);

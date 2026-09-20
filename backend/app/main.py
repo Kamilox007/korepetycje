@@ -106,6 +106,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Korepetycje API", version="3.0", lifespan=lifespan)
 app.include_router(boards_router.router)
+app.include_router(boards_router.library_router)
 app.include_router(boards_public_router.router)
 
 app.state.limiter = limiter

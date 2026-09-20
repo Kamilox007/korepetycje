@@ -5,6 +5,7 @@ import { useConfirm } from "../Confirm";
 import { useTheme } from "../useTheme";
 import Modal from "../Modal";
 import PageEditor from "./PageEditor";
+import { openLibraryStore } from "./library";
 import "./tablica.css";
 
 /**
@@ -28,6 +29,11 @@ export default function BoardScreen() {
   const [status, setStatus] = useState("connecting");
   const [peers, setPeers] = useState([]);
   const [notice, setNotice] = useState("");
+  // Kratka to ustawienie widoku tej przeglądarki, pamiętane per tablica.
+  const [grid, setGrid] = useState(() => read(`tablica:${token}:grid`) === "1");
+  // Biblioteka kształtów: otwierana raz na wejściu (konto albo przeglądarka),
+  // wspólna dla wszystkich stron tej tablicy.
+  const [library, setLibrary] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -45,7 +51,8 @@ export default function BoardScreen() {
   useEffect(() => {
     document.title = "Tablica";
     (async () => {
-      const b = await load();
+      const [b, lib] = await Promise.all([load(), openLibraryStore()]);
+      setLibrary(lib);
       if (!b) return;
       const remembered = Number(read(`tablica:${token}:page`));
       const first = b.pages.find((p) => p.id === remembered) || b.pages[0];
@@ -67,6 +74,10 @@ export default function BoardScreen() {
     const clean = (n || "").trim().slice(0, 40);
     setName(clean);
     write(`tablica:${token}:name`, clean);
+  }
+
+  function toggleGrid() {
+    setGrid((g) => { write(`tablica:${token}:grid`, g ? "0" : "1"); return !g; });
   }
 
   function selectPage(id) {
@@ -158,6 +169,8 @@ export default function BoardScreen() {
               ))}
             </span>
           )}
+          <button className={`ghost tablica-btn${grid ? " active" : ""}`} onClick={toggleGrid}
+                  aria-pressed={grid} title="Kratka (tylko na Twoim ekranie)">Kratka</button>
           <span className={`tablica-status ${status}`}>
             {status === "live" ? "na żywo" : status === "connecting" ? "łączenie…" : "offline - zmiany zapisywane co 15 s"}
           </span>
@@ -180,13 +193,15 @@ export default function BoardScreen() {
       {notice && <div className="tablica-notice" onClick={() => setNotice("")}>{notice}</div>}
 
       <div className="tablica-canvas">
-        {current ? (
+        {current && library ? (
           <PageEditor
             key={current.id}
             token={token}
             pageId={current.id}
             theme={theme}
             name={name}
+            grid={grid}
+            library={library}
             onStatus={setStatus}
             onPeers={(ps, selfId) => setPeers(ps.map((p) => ({ ...p, self: p.peer_id === selfId })))}
             onClosed={onClosed}

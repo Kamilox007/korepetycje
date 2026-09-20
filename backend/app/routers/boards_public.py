@@ -347,5 +347,13 @@ async def board_ws(websocket: WebSocket, token: str, page_id: int):
                 await boards_rooms.set_name(room, conn, msg.get("name"))
     except WebSocketDisconnect:
         pass
+    except Exception as e:  # noqa: BLE001
+        # A payload the handlers did not expect must not surface as an ASGI
+        # error: close this one connection with a code and keep the room.
+        boards_rooms.log.warning("tablica: zamykam połączenie po błędzie: %s", e)
+        try:
+            await websocket.close(code=boards_rooms.CLOSE_BAD_MESSAGE)
+        except Exception:  # noqa: BLE001
+            pass
     finally:
         await boards_rooms.leave(room, conn)
