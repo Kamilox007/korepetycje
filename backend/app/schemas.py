@@ -526,3 +526,7 @@ class BoardFileOut(BaseModel):
     file_id: str
     mime: str
     bytes: int
+
+
+class BoardLibrary(BaseModel):
+    items: list

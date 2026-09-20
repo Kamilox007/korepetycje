@@ -75,6 +75,14 @@ Moduł tablicy interaktywnej (Excalidraw) do prowadzenia korepetycji online.
   jest stanie. Ctrl+Z cofa tylko własne zmiany.
 - Wklejone obrazki (zdjęcie zadania) lądują na dysku serwera, nie w bazie.
   Limity: 10 MB na plik, 200 MB na tablicę.
+- **Biblioteka** (przycisk po prawej): wbudowane bryły w rzucie ukośnym
+  z przerywanymi krawędziami niewidocznymi (prostopadłościan, sześcian,
+  graniastosłup, ostrosłupy, walec, stożek, kula) - te same dla każdego.
+  Własne rysunki dodane przez „dodaj do biblioteki" zapisują się **na
+  koncie** (ta sama biblioteka na każdym urządzeniu), u gościa - w jego
+  przeglądarce.
+- **Kratka** na pasku - ustawienie widoku tylko dla tego, kto ją włączył,
+  pamiętane per tablica w przeglądarce.
 - **Nowy link** w panelu unieważnia stary natychmiast (gdy wyciekł albo
   kurs się skończył); treść zostaje, połączone osoby są rozłączane.
 - **Archiwizacja** wyłącza link i chowa tablicę z listy; przywrócenie włącza
@@ -154,6 +162,7 @@ gorliwy przy typach.
 | `0012` | token publicznego kanału kalendarza (.ics) |
 | `0013` | tablica: `boards`, `board_pages`, `board_files`, `board_snapshots` |
 | `0014` | tablica: `assigned_tutor_id` - czyja jest tablica, niezależnie od tego, kto ją założył |
+| `0015` | tablica: biblioteka kształtów na koncie (`users.board_library`) |
 
 ## Konfiguracja
 
@@ -272,6 +281,7 @@ python test_board_reconcile.py    # tablica: reguła scalania (determinizm, prze
 python test_board_ws.py           # tablica: pokoje, WebSocket, zapis okresowy, PUT przez pokój
 python test_board_snapshots.py    # tablica: reguła 24 h, przywracanie, retencja
 python test_board_files.py        # tablica: obrazki po sygnaturze, dedup, quota, ścieżki
+python test_board_library.py      # tablica: biblioteka kształtów na koncie, izolacja, limit
 ```
 
 Każdy zestaw pracuje na własnej bazie w katalogu tymczasowym i nie dotyka bazy
@@ -485,6 +495,7 @@ nie limit żądań. **TODO:** `FORWARDED_ALLOW_IPS=*` w `docker-compose.yml`
 | `board_pages` | strony tablicy: elementy Excalidrawa (JSON), `idx` do sortowania, licznik zapisów |
 | `board_files` | metadane obrazków (sha256, typ, rozmiar); bajty na dysku w `BOARD_FILES_PATH` |
 | `board_snapshots` | dobowe kopie stron do odzysku, retencja 30 dni |
+| `users.board_library` | własne pozycje biblioteki tablicy (JSON), wbudowane bryły nie są tu zapisywane |
 
 ## Backup
 

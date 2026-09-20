@@ -95,6 +95,10 @@ check("elements without an id are ignored", changed == [] and state == {})
 state = {"v": {"id": "v"}}
 reconcile(state, [{"id": "v", "version": 1, "versionNonce": 1, "ok": True}])
 check("missing version/versionNonce count as 0", state["v"].get("ok") is True)
+state = {"n": el("n", 2, 1)}
+changed = reconcile(state, [{"id": "n", "version": None, "versionNonce": "abc", "x": 1}])
+check("null/garbage version fields do not raise and count as 0",
+      changed == [] and state["n"]["version"] == 2)
 
 # --- data URL guard ---
 check("plain scene has no data URL", not contains_data_url([el("a", 1, 1)]))

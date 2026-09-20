@@ -4,6 +4,7 @@ Physically separate from the public router (boards_public.py) so that nothing
 reachable by a bare link ever has a dependency that resolves a logged-in
 user. This one is the opposite: every endpoint needs a session.
 """
+import json
 import secrets
 from datetime import date
 
@@ -16,6 +17,13 @@ from .. import models, schemas, auth, boards_files, boards_rooms, boards_reconci
 from ..database import get_db
 
 router = APIRouter(prefix="/api/boards", tags=["boards"])
+# The account's own library lives under /api/me so it cannot collide with
+# /api/boards/{board_id}.
+library_router = APIRouter(prefix="/api/me", tags=["boards"])
+
+# A library is a handful of small drawings; anything near this is a mistake
+# (or base64 in disguise).
+MAX_LIBRARY_BYTES = 2 * 1024 * 1024
 
 
 def require_board_manager(user: models.User = Depends(auth.require_active_user)) -> models.User:
@@ -350,3 +358,29 @@ async def restore_snapshot(
         page = await run_in_threadpool(boards_rooms.merge_into_db, db, page, update)
         rev, elements = page.rev, page.elements
     return schemas.PublicPageOut(id=page.id, idx=page.idx, title=page.title, rev=rev, elements=elements)
+
+
+# ---------------------------------------------------------------- biblioteka konta
+
+@library_router.get("/board-library", response_model=schemas.BoardLibrary)
+def get_board_library(user: models.User = Depends(require_board_manager)):
+    """Shapes this account added to the whiteboard library. Built-ins are
+    shipped with the frontend and never stored here."""
+    return schemas.BoardLibrary(items=user.board_library or [])
+
+
+@library_router.put("/board-library", response_model=schemas.BoardLibrary)
+def put_board_library(
+    payload: schemas.BoardLibrary,
+    user: models.User = Depends(require_board_manager),
+    db: Session = Depends(get_db),
+):
+    items = payload.items
+    if not all(isinstance(i, dict) and isinstance(i.get("id"), str) and isinstance(i.get("elements"), list)
+               for i in items):
+        raise HTTPException(400, "Nieprawidłowa pozycja biblioteki")
+    if len(json.dumps(items)) > MAX_LIBRARY_BYTES:
+        raise HTTPException(413, "Biblioteka jest za duża")
+    user.board_library = items
+    db.commit()
+    return schemas.BoardLibrary(items=items)
