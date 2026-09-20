@@ -147,7 +147,7 @@ export default function BoardScreen() {
             </button>
           ))}
           {board.is_owner && (
-            <button className="tablica-page tablica-add" onClick={addPage} title="Nowa strona">+</button>
+            <button className="tablica-page tablica-add" onClick={addPage} aria-label="Nowa strona" title="Nowa strona">+</button>
           )}
         </nav>
         <div className="tablica-right">
