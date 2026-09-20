@@ -4,6 +4,8 @@ import "@excalidraw/excalidraw/index.css";
 import { api } from "../api";
 import { PageSync, fetchFileData } from "./sync";
 
+const REMEMBERED_TOOLS = new Set(["freedraw", "selection", "rectangle", "ellipse", "diamond", "arrow", "line", "text", "hand"]);
+
 /**
  * Jedna strona tablicy w Excalidrawie.
  *
@@ -19,6 +21,8 @@ export default function PageEditor({ token, pageId, theme, name, onStatus, onPee
   const [initialData, setInitialData] = useState(null);
   const [loadError, setLoadError] = useState("");
   const viewKey = `tablica:${token}:${pageId}:view`;
+  // The tool is a habit, not a page property: one key per board.
+  const toolKey = `tablica:${token}:tool`;
   const collaborators = useRef(new Map());
   const peerMeta = useRef(new Map());
 
@@ -74,10 +78,19 @@ export default function PageEditor({ token, pageId, theme, name, onStatus, onPee
         sync.seed(page.elements, files.map((f) => f.id));
         syncRef.current = sync;
         sync.connect();
+        // Tutoring is mostly handwriting, so a board opens with the pen
+        // (freedraw) rather than Excalidraw's default selection tool - with
+        // a stylus and the selection tool active, "drawing" only draws a
+        // selection box, which reads as "the pen does not work".
+        let tool = "freedraw";
+        try { tool = localStorage.getItem(toolKey) || tool; } catch { /* brak */ }
         setInitialData({
           elements: page.elements,
           files,
-          appState: { ...appState, collaborators: new Map() },
+          appState: {
+            ...appState, collaborators: new Map(),
+            activeTool: { type: tool, customType: null, locked: false, lastActiveTool: null },
+          },
           scrollToContent: !appState.scrollX && page.elements.length > 0,
         });
       } catch (e) {
@@ -110,10 +123,14 @@ export default function PageEditor({ token, pageId, theme, name, onStatus, onPee
             scrollX: appState.scrollX, scrollY: appState.scrollY, zoom: appState.zoom,
             viewBackgroundColor: appState.viewBackgroundColor,
           }));
+          // Only the plain drawing tools; "custom"/"eraser" cannot be restored.
+          if (REMEMBERED_TOOLS.has(appState.activeTool?.type)) {
+            localStorage.setItem(toolKey, appState.activeTool.type);
+          }
         } catch { /* prywatne okno */ }
       }, 1000);
     };
-  }, [viewKey]);
+  }, [viewKey, toolKey]);
 
   if (loadError) {
     return <div className="tablica-error">Nie udało się wczytać strony: {loadError}</div>;
