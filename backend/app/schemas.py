@@ -432,3 +432,97 @@ class AvailableSlotsOut(BaseModel):
     has_tutor: bool                 # whether the lesson has a tutor with declared availability
     tutor_name: str | None = None
     days: list[FreeDay] = []
+
+
+# ---------- Tablica ----------
+class BoardCreate(BaseModel):
+    title: str
+    student_id: int | None = None
+    # Staff only; a tutor is always assigned to themselves.
+    assigned_tutor_id: int | None = None
+
+
+class BoardUpdate(BaseModel):
+    # student_id / assigned_tutor_id may be set to null on purpose (detach);
+    # "not sent" is told apart from "sent as null" with model_fields_set.
+    title: str | None = None
+    student_id: int | None = None
+    assigned_tutor_id: int | None = None
+
+
+class BoardPageMeta(BaseModel):
+    """A page without its elements - the list view never needs the drawing."""
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    idx: int
+    title: str
+    rev: int
+    updated_at: datetime
+
+
+class BoardOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    title: str
+    # The SPA route; the frontend prepends window.location.origin. Only the
+    # path, so the same record works on dev and prod.
+    path: str
+    student_id: int | None = None
+    student_name: str | None = None
+    created_by_user_id: int
+    created_by_name: str | None = None
+    assigned_tutor_id: int | None = None
+    assigned_tutor_name: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    last_opened_at: datetime | None = None
+    archived_at: datetime | None = None
+    page_count: int = 0
+
+
+class BoardDetailOut(BoardOut):
+    pages: list[BoardPageMeta] = []
+
+
+class BoardSnapshotOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    page_id: int
+    title: str
+    created_at: datetime
+
+
+# ---------- Tablica: strona publiczna (po tokenie) ----------
+class PublicBoardOut(BaseModel):
+    title: str
+    # True only for a logged-in account that may manage this board in the
+    # panel; the guest UI hides the owner tools on False.
+    is_owner: bool
+    pages: list[BoardPageMeta] = []
+
+
+class PublicPageOut(BaseModel):
+    id: int
+    idx: int
+    title: str
+    rev: int
+    elements: list
+
+
+class PageElementsIn(BaseModel):
+    elements: list
+
+
+class PageCreate(BaseModel):
+    title: str | None = None
+
+
+class PageUpdate(BaseModel):
+    title: str
+
+
+class BoardFileOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    file_id: str
+    mime: str
+    bytes: int

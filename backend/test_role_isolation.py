@@ -139,6 +139,63 @@ with TestClient(app) as admin:
     check("staff blocked from the tutor panel -> 403",
           admin.get("/api/tutor/lessons").status_code == 403)
 
+    # --- boards: visibility goes by creator, never by the student ---
+    # Cyn has lessons with both tutors. A board Ewa makes for Cyn must stay
+    # invisible to Olek: otherwise "shares a student" would leak notes across
+    # tutors, which is exactly the assigned_tutor_id trap this file guards.
+    ewa_board = ewa.post("/api/boards", json={"title": "Cyn u Ewy", "student_id": cyn}).json()
+    check("tutor creates a board for a shared student", "id" in ewa_board)
+    check("the other tutor gets 404 (not 403) on that board",
+          olek.get(f"/api/boards/{ewa_board['id']}").status_code == 404)
+    check("nor can they archive it",
+          olek.delete(f"/api/boards/{ewa_board['id']}").status_code == 404)
+    check("nor rotate its token",
+          olek.post(f"/api/boards/{ewa_board['id']}/rotate-token").status_code == 404)
+    check("the board is absent from the other tutor's list, even filtered by student",
+          olek.get(f"/api/boards?student_id={cyn}").json() == [])
+    check("the creator sees it", ewa.get(f"/api/boards/{ewa_board['id']}").status_code == 200)
+    check("staff sees it too", admin.get(f"/api/boards/{ewa_board['id']}").status_code == 200)
+    check("tutor cannot attach the other tutor's student -> 404",
+          ewa.post("/api/boards", json={"title": "X", "student_id": bob}).status_code == 404)
+    no_student = ewa.post("/api/boards", json={"title": "Bez ucznia"}).json()
+    check("a board without a student is visible to its creator",
+          ewa.get(f"/api/boards/{no_student['id']}").status_code == 200)
+    check("and to staff", admin.get(f"/api/boards/{no_student['id']}").status_code == 200)
+    check("but not to another tutor",
+          olek.get(f"/api/boards/{no_student['id']}").status_code == 404)
+
+    # Staff sets a board up FOR Olek: it is his - visible in his panel, he is
+    # the owner under the link - and stays invisible to Ewa.
+    for_olek = admin.post("/api/boards", json={"title": "Dla Olka", "assigned_tutor_id": olek_id}).json()
+    check("staff assigns a board to a tutor",
+          for_olek["assigned_tutor_id"] == olek_id and for_olek["assigned_tutor_name"] == "Olek")
+    check("the assigned tutor sees it in their panel",
+          olek.get(f"/api/boards/{for_olek['id']}").status_code == 200)
+    check("and is the owner under the link",
+          olek.get(f"/api/t/{for_olek['path'].removeprefix('/t/')}").json()["is_owner"] is True)
+    check("the other tutor gets 404",
+          ewa.get(f"/api/boards/{for_olek['id']}").status_code == 404)
+    check("and is a guest under the link",
+          ewa.get(f"/api/t/{for_olek['path'].removeprefix('/t/')}").json()["is_owner"] is False)
+    check("a tutor creating a board is assigned automatically",
+          no_student["assigned_tutor_id"] == ewa_id)
+    check("a tutor cannot hand their board to somebody else -> 403",
+          ewa.patch(f"/api/boards/{no_student['id']}", json={"assigned_tutor_id": olek_id}).status_code == 403)
+    check("nor create one for somebody else -> 403",
+          ewa.post("/api/boards", json={"title": "X", "assigned_tutor_id": olek_id}).status_code == 403)
+    check("staff cannot assign to a non-teaching account -> 404",
+          admin.post("/api/boards", json={"title": "X", "assigned_tutor_id": 999999}).status_code == 404)
+    r = admin.patch(f"/api/boards/{for_olek['id']}", json={"assigned_tutor_id": ewa_id})
+    check("staff reassigns", r.json()["assigned_tutor_id"] == ewa_id)
+    check("after reassignment the previous tutor loses it",
+          olek.get(f"/api/boards/{for_olek['id']}").status_code == 404)
+    check("and the new one gains it",
+          ewa.get(f"/api/boards/{for_olek['id']}").status_code == 200)
+    r = admin.patch(f"/api/boards/{for_olek['id']}", json={"assigned_tutor_id": None})
+    check("staff can leave a board unassigned (staff-only)",
+          r.json()["assigned_tutor_id"] is None and
+          ewa.get(f"/api/boards/{for_olek['id']}").status_code == 404)
+
     # --- the student panel is scoped to one student ---
     admin.post(f"/api/students/{ala}/account",
                json={"username": "ala", "password": "StartPass123!"})
@@ -157,6 +214,19 @@ with TestClient(app) as admin:
               student.get("/api/tutor/lessons").status_code == 403)
         check("student blocked from staff endpoints -> 403",
               student.get("/api/students").status_code == 403)
+        check("student blocked from the boards panel -> 403",
+              student.get("/api/boards").status_code == 403)
+        check("student cannot create a board -> 403",
+              student.post("/api/boards", json={"title": "X"}).status_code == 403)
+
+    # --- an account still on its starting password owns nothing ---
+    admin.post("/api/users", json={
+        "username": "nowy", "password": "StartPass123!", "role": "tutor", "display_name": "Nowy",
+    })
+    with TestClient(app) as fresh:
+        fresh.post("/api/auth/login", data={"username": "nowy", "password": "StartPass123!"})
+        check("must_change_password blocks the boards panel -> 403",
+              fresh.get("/api/boards").status_code == 403)
 
     ewa.__exit__(None, None, None)
     olek.__exit__(None, None, None)

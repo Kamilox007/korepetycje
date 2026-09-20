@@ -8,13 +8,14 @@ from fastapi import FastAPI, Depends, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from icalendar import Calendar, Event
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
-from . import models, schemas, services, auth, money, transfer_code
+from . import models, schemas, services, auth, money, transfer_code, boards_rooms, boards_snapshots
 from .database import get_db, SessionLocal
+from .ratelimit import limiter
+from .routers import boards as boards_router, boards_public as boards_public_router
 
 
 def seed_admin():
@@ -84,7 +85,10 @@ def _generate_upcoming() -> int:
     """Materialise series occurrences for the coming months."""
     db = SessionLocal()
     try:
-        return services.regenerate_all(db)
+        created = services.regenerate_all(db)
+        # Same daily impulse, second chore: board snapshots past retention.
+        boards_snapshots.purge_old(db)
+        return created
     finally:
         db.close()
 
@@ -94,12 +98,16 @@ async def lifespan(app: FastAPI):
     _require_migrated_db()
     seed_admin()
     _generate_upcoming()
+    boards_rooms.start()
     yield
+    # Flush live board rooms before the process goes away.
+    await boards_rooms.stop()
 
 
 app = FastAPI(title="Korepetycje API", version="3.0", lifespan=lifespan)
+app.include_router(boards_router.router)
+app.include_router(boards_public_router.router)
 
-limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -116,7 +124,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
@@ -600,6 +608,10 @@ def purge_student(
     db.query(models.RescheduleRequest).filter(
         models.RescheduleRequest.student_id == student.id
     ).delete(synchronize_session=False)
+    # Boards are the tutor's notes, not the student's record: detach, keep.
+    db.query(models.Board).filter(models.Board.student_id == student.id).update(
+        {models.Board.student_id: None}, synchronize_session=False
+    )
     if series_ids:
         db.query(models.SeriesSkip).filter(
             models.SeriesSkip.series_id.in_(series_ids)
@@ -840,10 +852,12 @@ def generate_lessons(
     """
     created = services.regenerate_all(db)
     purged = auth.purge_expired_sessions(db)
+    snapshots_purged = boards_snapshots.purge_old(db)
     return {
         "created": created,
         "horizon": services.clamp_horizon(None),
         "sessions_purged": purged,
+        "board_snapshots_purged": snapshots_purged,
     }
 
 

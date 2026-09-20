@@ -23,6 +23,9 @@ setup("login and forced password change", async ({ page }) => {
   await page.getByLabel("Dotychczasowe hasło").fill("admin");
   await page.getByLabel("Nowe hasło", { exact: true }).fill(PASSWORD);
   await page.getByLabel("Powtórz nowe hasło").fill(PASSWORD);
+  // First login also collects consent to the Regulamin and Polityka
+  // Prywatności; the button stays disabled until the box is ticked.
+  await page.locator("#accept-privacy").check();
   await page.getByRole("button", { name: "Zapisz hasło" }).click();
 
   // Once the password is changed the app mounts the real panel.

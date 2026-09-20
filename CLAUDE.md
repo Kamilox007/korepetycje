@@ -151,6 +151,26 @@ Custom `Modal.jsx` closes only on a genuine background click (mousedown+mouseup 
 the backdrop) — a plain `click` listener would fire when a user selects text inside the modal and
 releases the mouse outside it, silently discarding the form.
 
+### Whiteboard ("Tablica")
+
+Excalidraw embedded at `/t/:token`; the token in `boards.token` is the whole credential (no
+student accounts, no share table — same pattern as the `.ics` calendar feed). Two physically
+separate routers: `backend/app/routers/boards.py` (`/api/boards`, behind the role gate; tutor
+visibility is `assigned_tutor_id` / `created_by_user_id` — the same author-vs-owner split
+as lessons — never derived from `student_id`) and
+`backend/app/routers/boards_public.py` (`/api/t/{token}`, no user dependency — the owner is
+detected softly via `auth.optional_active_user`). Pages are identified by `board_pages.id`;
+`idx` is sort order only and may have gaps. `boards_reconcile.py` is the pure merge rule
+(higher `version` wins, ties to the lower `versionNonce`, `isDeleted` elements kept, output
+sorted by fractional `index`) and `frontend/src/tablica/reconcile.js` is its deliberate twin —
+change both or neither. Live sync lives in `boards_rooms.py`: one in-process room per open page,
+periodic save every 15 s, so uvicorn must stay at **one worker**. `PUT` on a page merges (never
+overwrites) and goes through the room when one is open. Image bytes never enter the database
+(`boards_files.py`, sha256-addressed files under `BOARD_FILES_PATH`); SQLite here does not
+enforce foreign keys, so every purge deletes children explicitly. The board route is mounted in
+`App.jsx` **before** the `api.me()` login gate. Playwright reads the canvas through
+`window.__tablicaAPI`, exposed only on the dev server.
+
 ### Data model
 
 See the README's "Model danych" table for the full list of tables. `backend/app/models.py` is
