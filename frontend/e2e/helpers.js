@@ -2,7 +2,9 @@
 // are matched by visible text, the way a user and a screen reader would. Changing
 // the HTML layout then does not break the tests.
 
-export const PASSWORD = "TestPassword123";
+// Has to satisfy the policy in backend/app/auth.py: 10+ chars, upper case,
+// digit and a special character.
+export const PASSWORD = "TestPassword123!";
 
 export function loginField(page) {
   return page.getByLabel("Login", { exact: true });
