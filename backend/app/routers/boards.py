@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from .. import models, schemas, auth, boards_files
+from .. import models, schemas, auth, boards_files, boards_rooms
 from ..database import get_db
 
 router = APIRouter(prefix="/api/boards", tags=["boards"])
@@ -194,6 +194,8 @@ def rotate_token(
     board.token = new_token()
     db.commit()
     db.refresh(board)
+    # Whoever is connected got in on the old link: out they go.
+    boards_rooms.close_pages_threadsafe(boards_rooms.page_ids_of_board(db, board.id))
     return _out(board, db, detail=True)
 
 
@@ -209,6 +211,7 @@ def archive_board(
         raise HTTPException(400, "Tablica jest już zarchiwizowana")
     board.archived_at = auth.utcnow()
     db.commit()
+    boards_rooms.close_pages_threadsafe(boards_rooms.page_ids_of_board(db, board.id))
     return {"ok": True, "archived": True}
 
 

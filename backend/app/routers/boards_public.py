@@ -10,14 +10,16 @@ Every failure to find the board answers the same 404: unknown token,
 archived board, page of another board. A distinct status would tell a
 scanner which tokens exist.
 """
+import json
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
-from .. import models, schemas, auth, boards_reconcile
-from ..database import get_db
+from .. import models, schemas, auth, boards_reconcile, boards_rooms
+from ..database import get_db, SessionLocal
 from ..ratelimit import limiter
 from .boards import is_staff
 
@@ -131,16 +133,27 @@ def get_page(token: str, page_id: int, request: Request, db: Session = Depends(g
 
 @router.put("/{token}/pages/{page_id}", response_model=schemas.PublicPageOut)
 @limiter.limit(LIMIT_WRITE)
-def put_page(
+async def put_page(
     token: str, page_id: int, payload: schemas.PageElementsIn, request: Request,
     db: Session = Depends(get_db),
 ):
-    """Fallback save for when the WebSocket is down. Merges, never overwrites."""
+    """Fallback save for when the WebSocket is down. Merges, never overwrites.
+
+    With a live room open for the page the merge goes through the room, so
+    the people connected see it and their own work is not clobbered on the
+    next periodic save. async because the room lives on the event loop; the
+    database path is pushed to the threadpool like any sync endpoint.
+    """
     reject_oversized(request)
     board = board_by_token(db, token)
     page = page_of(db, board, page_id)
     incoming = validate_elements(payload.elements)
-    return _page_out(merge_into_page(db, page, incoming))
+    via_room = await boards_rooms.merge_from_http(page.id, incoming)
+    if via_room is not None:
+        rev, elements = via_room
+        return schemas.PublicPageOut(id=page.id, idx=page.idx, title=page.title, rev=rev, elements=elements)
+    page = await run_in_threadpool(merge_into_page, db, page, incoming)
+    return _page_out(page)
 
 
 @router.post("/{token}/pages", response_model=schemas.PublicPageOut)
@@ -196,4 +209,86 @@ def delete_page(token: str, page_id: int, request: Request, db: Session = Depend
     db.delete(page)
     board.updated_at = auth.utcnow()
     db.commit()
+    boards_rooms.close_pages_threadsafe([page_id])
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- WebSocket
+
+def _ws_lookup(token: str, page_id: int, cookies: dict) -> tuple[int, int, bool] | None:
+    """Board/page/owner for a handshake, on a short-lived session. None = 4404."""
+    db = SessionLocal()
+    try:
+        board = (
+            db.query(models.Board)
+            .filter(models.Board.token == token, models.Board.archived_at.is_(None))
+            .first()
+        )
+        if not board:
+            return None
+        page = db.get(models.BoardPage, page_id)
+        if not page or page.board_id != board.id:
+            return None
+        user = auth.optional_active_user(cookies, db)
+        return board.id, page.id, is_owner(user, board)
+    finally:
+        db.close()
+
+
+@router.websocket("/{token}/ws")
+async def board_ws(websocket: WebSocket, token: str, page_id: int):
+    """Live sync for one page. Protocol (JSON, field `t`):
+
+    client -> server: update {elements}, pointer {x, y, button}, hello {name}
+    server -> client: init {elements, rev, peer_id, peers}, update {elements},
+                      pointer {peer_id, x, y, button}, peers {peers}
+
+    Authorization is the token in the path, exactly as for the HTTP side;
+    the cookie only decides the owner flag. No `Depends(get_db)` here - a
+    session held open for an hour-long lesson would block SQLite's single
+    writer for everybody else.
+    """
+    found = await run_in_threadpool(_ws_lookup, token, page_id, dict(websocket.cookies))
+    if found is None:
+        # Accept first: a close before accept is reported to the browser as
+        # a failed handshake (1006), not as our code.
+        await websocket.accept()
+        await websocket.close(code=boards_rooms.CLOSE_NOT_FOUND)
+        return
+    board_id, page_id, owner = found
+    await websocket.accept()
+    joined = await boards_rooms.join(page_id, websocket, owner)
+    if joined is None:
+        await websocket.close(code=boards_rooms.CLOSE_NOT_FOUND)
+        return
+    room, conn = joined
+    try:
+        while True:
+            raw = await websocket.receive_text()
+            if len(raw) > boards_rooms.MAX_MESSAGE_BYTES:
+                await websocket.close(code=boards_rooms.CLOSE_TOO_BIG)
+                break
+            try:
+                msg = json.loads(raw)
+            except ValueError:
+                await websocket.close(code=boards_rooms.CLOSE_BAD_MESSAGE)
+                break
+            if not isinstance(msg, dict):
+                continue
+            kind = msg.get("t")
+            if kind == "update":
+                elements = msg.get("elements")
+                if not isinstance(elements, list) or not all(
+                    isinstance(e, dict) and isinstance(e.get("id"), str) and e["id"] for e in elements
+                ) or boards_reconcile.contains_data_url(elements):
+                    await websocket.close(code=boards_rooms.CLOSE_BAD_MESSAGE)
+                    break
+                await boards_rooms.apply_update(room, elements, conn)
+            elif kind == "pointer":
+                await boards_rooms.apply_pointer(room, conn, msg.get("x"), msg.get("y"), msg.get("button"))
+            elif kind == "hello":
+                await boards_rooms.set_name(room, conn, msg.get("name"))
+    except WebSocketDisconnect:
+        pass
+    finally:
+        await boards_rooms.leave(room, conn)

@@ -12,7 +12,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy.orm import Session
 
-from . import models, schemas, services, auth, money, transfer_code
+from . import models, schemas, services, auth, money, transfer_code, boards_rooms
 from .database import get_db, SessionLocal
 from .ratelimit import limiter
 from .routers import boards as boards_router, boards_public as boards_public_router
@@ -95,7 +95,10 @@ async def lifespan(app: FastAPI):
     _require_migrated_db()
     seed_admin()
     _generate_upcoming()
+    boards_rooms.start()
     yield
+    # Flush live board rooms before the process goes away.
+    await boards_rooms.stop()
 
 
 app = FastAPI(title="Korepetycje API", version="3.0", lifespan=lifespan)
