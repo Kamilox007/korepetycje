@@ -68,6 +68,11 @@ export default function App() {
   const [auth, setAuth] = useState(null);
   const [loading, setLoading] = useState(true);
   const [forcePw, setForcePw] = useState(false);
+  // The starting password the user has just typed at login, kept only in
+  // memory and only until the forced change is done - so the forced-change
+  // screen does not ask for it a second time. Gone after a page refresh; the
+  // screen then shows the field again.
+  const [startPassword, setStartPassword] = useState(null);
   const [showPw, setShowPw] = useState(false);
   // Pending reschedule requests, shown as a badge next to the tutor's Prośby tab.
   const [pending, setPending] = useState(0);
@@ -95,6 +100,7 @@ export default function App() {
       display_name: res.display_name, must_change_password: res.must_change_password,
     });
     setForcePw(res.must_change_password);
+    setStartPassword(res.must_change_password ? password : null);
   }
 
   async function logout() {
@@ -130,7 +136,14 @@ export default function App() {
   // While the account sits on its starting password the backend rejects everything
   // but the password change, so do not mount the panels: their requests return 403.
   if (forcePw) {
-    return <><ChangePassword forced onDone={() => setForcePw(false)} onLogout={logout} /><CookieNotice /></>;
+    return (
+      <>
+        <ChangePassword forced knownOldPassword={startPassword}
+                        onDone={() => { setForcePw(false); setStartPassword(null); }}
+                        onLogout={() => { setStartPassword(null); logout(); }} />
+        <CookieNotice />
+      </>
+    );
   }
 
   return (
