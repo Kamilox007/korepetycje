@@ -77,6 +77,9 @@ export default function PageEditor({ token, pageId, theme, name, grid, library, 
             // NEVER: cudze zmiany nie wchodzą do lokalnej historii undo -
             // inaczej Ctrl+Z u korepetytora cofałoby to, co narysował uczeń.
             apiRef.current?.updateScene({ elements, captureUpdate: CaptureUpdateAction.NEVER });
+            // Element obrazka przyszedł po WS, ale jego bajty nie: te idą osobno
+            // (POST .../files u nadawcy). Bez dociągnięcia zostaje placeholder.
+            fetchMissingFiles(elements);
           },
         });
         sync.seed(page.elements, files.map((f) => f.id));
@@ -103,6 +106,43 @@ export default function PageEditor({ token, pageId, theme, name, grid, library, 
 
   function pushCollaborators() {
     apiRef.current?.updateScene({ collaborators: new Map(collaborators.current) });
+  }
+
+  // Obrazki, których bajtów jeszcze nie mamy (wklejone przez kogoś innego,
+  // gdy już byliśmy na stronie). Nadawca wysyła element dopiero po udanym
+  // uploadzie, ale między jego POST a naszym GET może być chwila - stąd
+  // kilka prób z odstępem zamiast jednego strzału.
+  const fetching = useRef(new Set());
+  async function fetchMissingFiles(elements) {
+    const a = apiRef.current;
+    if (!a) return;
+    const have = a.getFiles();
+    const ids = [...new Set(
+      elements
+        .filter((e) => e.type === "image" && e.fileId && !e.isDeleted && !have[e.fileId])
+        .map((e) => e.fileId),
+    )].filter((id) => !fetching.current.has(id));
+    if (!ids.length) return;
+    ids.forEach((id) => fetching.current.add(id));
+    try {
+      for (const id of ids) {
+        let data = null;
+        for (let attempt = 0; attempt < 5 && !data; attempt++) {
+          if (attempt) await new Promise((r) => setTimeout(r, 500 * 2 ** attempt));
+          data = await fetchFileData(token, id);
+        }
+        if (data) {
+          // Najpierw "znany", potem addFiles: onChange po addFiles nie może
+          // wziąć tego pliku za nowy i wysłać go z powrotem na serwer.
+          syncRef.current?.knownFiles.add(id);
+          apiRef.current?.addFiles([data]);
+        } else {
+          latest.current.onError?.("Nie udało się pobrać obrazka z tablicy.");
+        }
+      }
+    } finally {
+      ids.forEach((id) => fetching.current.delete(id));
+    }
   }
 
   // imię zmienione w trakcie: powiedz reszcie
