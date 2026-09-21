@@ -9,6 +9,11 @@ dbs:
         path: db
         endpoint: s3.eu-central-003.backblazeb2.com
         region: eu-central-003
+        # How often accumulated WAL changes are shipped to the bucket. The
+        # default (1s) only multiplies small objects in B2; hourly batches
+        # are a deliberate choice: a server crash costs at most the last
+        # hour of edits. Changes are kept locally in the meantime.
+        sync-interval: 1h
         # How much history to keep. 720h = 30 days.
         retention: 720h
         snapshot-interval: 24h
