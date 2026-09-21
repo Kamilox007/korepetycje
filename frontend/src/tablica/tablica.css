@@ -50,6 +50,12 @@
 .tablica-right { display: flex; align-items: center; gap: 8px; flex: none; }
 .tablica-btn { padding: 5px 10px; font-size: 13px; }
 .tablica-btn.active { background: var(--accent-soft); color: var(--accent); }
+/* Grubość linii: sześć przycisków z podglądem kreski. */
+.tablica-stroke { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.tablica-stroke-btn { width: 30px; height: 26px; padding: 0; border: 1px solid transparent; background: transparent; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; }
+.tablica-stroke-btn:hover { background: var(--surface-2); }
+.tablica-stroke-btn.active { background: var(--accent-soft); border-color: var(--accent); }
+.tablica-stroke-line { display: block; width: 18px; background: var(--ink); border-radius: 6px; }
 .tablica-link {
   text-decoration: none;
   color: var(--ink);
@@ -97,6 +103,7 @@
 .tablica-error { color: var(--due); }
 
 @media (max-width: 600px) {
+  .tablica-stroke-btn { width: 24px; }
   .tablica-title { max-width: 110px; font-size: 13px; }
   .tablica-status { display: none; }
   .tablica-bar { gap: 6px; padding: 0 6px; }
