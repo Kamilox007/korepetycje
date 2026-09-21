@@ -173,7 +173,13 @@ student's files under the same rule as attaching a board to them (`resolve_stude
 student reads only their own under `/api/me/files` and lists their boards under `/api/me/boards`.
 The board route is mounted in
 `App.jsx` **before** the `api.me()` login gate. Playwright reads the canvas through
-`window.__tablicaAPI`, exposed only on the dev server.
+`window.__tablicaAPI`, exposed only on the dev server. Built-in library shapes live in
+`tablica/library.js` and must keep fixed `id`/`versionNonce`/`index` (Excalidraw dedupes on
+them; without that they multiply on every open). The stroke-width slider is injected into
+Excalidraw's properties panel by a `MutationObserver` + portal (`PageEditor.jsx`) — it depends
+on Excalidraw's `data-testid="strokeWidth-*"`; if an upgrade renames them the slider silently
+disappears and the stock buttons return. PDF export (`tablica/pdf.js`) renders pages via
+`exportToBlob` and lazy-loads jsPDF; pass `"FAST"` compression to `addImage` or PDFs balloon.
 
 ### Data model
 
