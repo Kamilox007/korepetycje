@@ -223,6 +223,29 @@ const PageEditor = forwardRef(function PageEditor(
     return () => obs.disconnect();
   }, [initialData]);
 
+  // Kółko myszy nad płótnem przybliża, nie przesuwa. Excalidraw nie ma na to
+  // opcji: zoom robi tylko przy Ctrl/Cmd, a zwykły scroll to pan. Łapiemy więc
+  // event w fazie capture (przed jego nasłuchem na kontenerze) i wysyłamy go
+  // ponownie z ctrlKey - Excalidraw reaguje wyłącznie na cel <canvas>, więc
+  // przewijanie biblioteki i menu nie jest ruszane. Shift (pan poziomy) i
+  // Alt (pan pionowy, Excalidraw nie patrzy na Alt) przechodzą bez zmian.
+  useEffect(() => {
+    const root = wrapRef.current;
+    if (!root) return undefined;
+    const onWheel = (e) => {
+      if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || !(e.target instanceof HTMLCanvasElement)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.target.dispatchEvent(new WheelEvent("wheel", {
+        bubbles: true, cancelable: true, ctrlKey: true,
+        deltaX: e.deltaX, deltaY: e.deltaY, deltaZ: e.deltaZ, deltaMode: e.deltaMode,
+        clientX: e.clientX, clientY: e.clientY,
+      }));
+    };
+    root.addEventListener("wheel", onWheel, { capture: true, passive: false });
+    return () => root.removeEventListener("wheel", onWheel, { capture: true });
+  }, [initialData]);
+
   if (loadError) {
     return <div className="tablica-error">Nie udało się wczytać strony: {loadError}</div>;
   }
