@@ -57,7 +57,12 @@
 .tablica-stroke { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 2px 0 0; }
 .tablica-stroke input[type="range"] { flex: 1; min-width: 0; margin: 0; accent-color: var(--accent); }
 .tablica-stroke-line { display: block; width: 16px; background: var(--color-on-surface, var(--ink)); border-radius: 6px; flex: none; }
-.tablica-stroke-value { width: 26px; text-align: right; font-variant-numeric: tabular-nums; color: var(--color-on-surface, var(--ink)); opacity: 0.7; }
+.tablica-stroke-value {
+  width: 52px; flex: none; padding: 2px 4px; font-size: 12px;
+  text-align: right; font-variant-numeric: tabular-nums;
+  color: var(--color-on-surface, var(--ink)); background: var(--island-bg-color, var(--surface));
+  border: 1px solid var(--color-border-outline, var(--border)); border-radius: 4px;
+}
 .tablica-link {
   text-decoration: none;
   color: var(--ink);
