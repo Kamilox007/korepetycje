@@ -19,7 +19,26 @@ import "./tablica.css";
 export default function BoardScreen() {
   const { token } = useParams();
   const confirm = useConfirm();
-  const { theme } = useTheme();
+  const { theme: panelTheme } = useTheme();
+  // Motyw tablicy jest niezależny od panelu: rysujesz na ciemnym, panel może
+  // zostać jasny. null = jak panel; "light"/"dark" = wybór dla tablic w tej
+  // przeglądarce. Zastosowanie przez data-theme na <html>, jak robi to
+  // useTheme, ale tylko na czas otwartej tablicy - przy wyjściu wraca panel.
+  const [boardTheme, setBoardTheme] = useState(() => read("tablica:theme") || null);
+  const theme = boardTheme || panelTheme;
+  useEffect(() => {
+    const prev = document.documentElement.dataset.theme;
+    document.documentElement.dataset.theme = theme;
+    return () => {
+      if (prev) document.documentElement.dataset.theme = prev;
+      else delete document.documentElement.dataset.theme;
+    };
+  }, [theme]);
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    setBoardTheme(next);
+    write("tablica:theme", next);
+  }
   const [board, setBoard] = useState(null);
   const [gone, setGone] = useState(false);
   const [error, setError] = useState("");
@@ -182,6 +201,10 @@ export default function BoardScreen() {
               ))}
             </span>
           )}
+          <button className="ghost tablica-btn" onClick={() => editorRef.current?.openExport()}
+                  title="Pobierz tę stronę jako PNG lub SVG">Pobierz</button>
+          <button className="ghost tablica-btn" onClick={toggleTheme}
+                  title="Motyw tablicy (niezależny od panelu)">{theme === "dark" ? "Jasny" : "Ciemny"}</button>
           <button className={`ghost tablica-btn${grid ? " active" : ""}`} onClick={toggleGrid}
                   aria-pressed={grid} title="Kratka (tylko na Twoim ekranie)">Kratka</button>
           <span className={`tablica-status ${status}`}>

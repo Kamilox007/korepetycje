@@ -25,6 +25,10 @@ const PageEditor = forwardRef(function PageEditor(
   // przyjmuje dowolną - własny wybór z paska tablicy ustawia grubość
   // zaznaczonych elementów i tego, co będzie rysowane dalej.
   useImperativeHandle(ref, () => ({
+    /** Okno „zapisz jako obraz" Excalidrawa: PNG/SVG, tło, motyw, schowek. */
+    openExport() {
+      apiRef.current?.updateScene({ appState: { openDialog: { name: "imageExport" } } });
+    },
     setStrokeWidth(width) {
       const a = apiRef.current;
       if (!a) return;
