@@ -418,6 +418,13 @@ tbody tr:hover { background: var(--surface-2); }
 /* Okno potwierdzenia otwarte na tle innego modala (np. edycji zajęć)
    musi leżeć wyżej, inaczej zniknie pod spodem. */
 .overlay.overlay-confirm { z-index: 100; }
+/* Wider dialog for tables (student materials): file names are long, and the
+   default 440 px pushed the delete button out of the card. */
+.overlay.overlay-wide .modal { max-width: 760px; }
+/* Long file names wrap inside their cell instead of stretching the row;
+   the action column stays on one line. */
+.student-files td:first-child { word-break: break-word; overflow-wrap: anywhere; }
+.student-files td:last-child { white-space: nowrap; }
 
 /* ----- informacja o plikach cookies ----- */
 .cookie-notice {
