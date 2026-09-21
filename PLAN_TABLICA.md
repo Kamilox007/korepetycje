@@ -1,5 +1,14 @@
 # Plan wdrożenia: moduł tablicy interaktywnej
 
+> **Stan: wykonany (wrzesień 2026).** Etap 1 wszedł na `main` w PR #27,
+> kolejne rzeczy w #31-#41. Dokument zostaje jako zapis decyzji i ich
+> uzasadnień; aktualny opis działania jest w `README.md` (sekcja „Tablica"
+> i „Decyzje projektowe"), a wskazówki dla kodu w `CLAUDE.md`. Odstępstwa
+> od planu w trakcie realizacji: `assigned_tutor_id` wszedł od razu
+> (sekcja 5.2 mówiła „na później"), commity 9 i 10 połączone, `reconcile.js`
+> jest własną implementacją, nie wrapperem na paczkę (Vitest nie uruchomi
+> kodu z DOM), snapshot przed przywróceniem jest wymuszany.
+
 Dokument przeznaczony dla agenta kodującego pracującego w repozytorium
 `Kamilox007/korepetycje`. Opisuje etap 1 w całości oraz zarys etapów dalszych.
 

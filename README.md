@@ -47,7 +47,9 @@ Wersja produkcyjna: <https://panel.kamilkrzywon.pl>
 
 Korepetytor widzi wyłącznie zajęcia przypisane do siebie: własny kalendarz
 z tymi samymi trzema widokami, przenoszenie zajęć na inny dzień i godzinę oraz
-rozpatrywanie próśb swoich uczniów.
+rozpatrywanie próśb swoich uczniów. W Rozliczeniach wpłaty są zgrupowane
+per uczeń (liczba, ostatnia, suma), lista pojedynczych wpłat rozwija się po
+kliknięciu.
 
 ### Uczeń
 - Kalendarz własnych zajęć (dzień, tydzień, miesiąc) i saldo - tylko do odczytu
@@ -90,6 +92,16 @@ Moduł tablicy interaktywnej (Excalidraw) do prowadzenia korepetycji online.
   przeglądarce.
 - **Kratka** na pasku - ustawienie widoku tylko dla tego, kto ją włączył,
   pamiętane per tablica w przeglądarce.
+- **Motyw tablicy** (Ciemny / Jasny na pasku) - niezależny od motywu panelu,
+  pamiętany w przeglądarce; dopóki nic nie wybierzesz, tablica dziedziczy
+  motyw panelu.
+- **Grubość obramowania** - w panelu właściwości Excalidrawa zamiast trzech
+  fabrycznych przycisków jest suwak 0,1-4 (co 0,1) z polem do wpisania
+  liczby; działa na zaznaczone elementy i na kolejne kreski, wybór pamiętany
+  per tablica. Poniżej ~0,5 kreska jest jaśniejsza, nie cieńsza - granica
+  ekranu. Suwak jest wstrzykiwany do panelu Excalidrawa (nie ma tam slotu);
+  gdyby po aktualizacji Excalidrawa się nie pojawił, wracają fabryczne
+  przyciski.
 - **Pobierz** - bieżąca strona jako PNG/SVG (okno eksportu Excalidrawa);
   **PDF** - cała tablica, jedna strona tablicy na stronę PDF, z tytułem,
   zawsze na białym tle niezależnie od motywu. Składany w przeglądarce
@@ -150,6 +162,12 @@ jest ustawiona, każdy endpoint poza `/api/auth/me`
 i `/api/auth/change-password` zwraca 403, a wydany token żyje 30 minut zamiast
 7 dni. Pominięcie interfejsu nic nie daje. Nowe hasło musi mieć co najmniej
 10 znaków i różnić się od dotychczasowego.
+
+Ekran wymuszonej zmiany nie pyta ponownie o hasło startowe - użytkownik
+wpisał je sekundę wcześniej przy logowaniu, więc frontend trzyma je w pamięci
+(tylko do zakończenia zmiany, nic w `localStorage`) i przekazuje w żądaniu.
+Backend weryfikuje stare hasło tak jak zawsze; po odświeżeniu strony pole
+wraca. To samo dotyczy kont uczniów i personelu zakładanych z panelu.
 
 ## Migracje
 
