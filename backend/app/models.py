@@ -443,3 +443,25 @@ class BoardSnapshot(Base):
     elements: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     # Indexed for the retention sweep.
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
+class StudentFile(Base):
+    """A PDF handed to a student (worksheet, solutions, notes).
+
+    Same content-addressed disk store as BoardFile; the row is metadata only.
+    ondelete documents intent - SQLite here does not enforce it, so
+    purge_student removes these rows explicitly.
+    """
+    __tablename__ = "student_files"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    student_id: Mapped[int] = mapped_column(
+        ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    uploaded_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    # Display name; the original filename, cleaned up. Never part of a path.
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    mime: Mapped[str] = mapped_column(String(60), nullable=False)
+    bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

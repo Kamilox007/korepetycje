@@ -14,6 +14,8 @@ import Requests from "./Requests";
 import Users from "./Users";
 import Subjects from "./Subjects";
 import Boards from "./Boards";
+import StudentMaterials from "./StudentMaterials";
+import { TutorMaterials } from "./StudentFiles";
 
 // Excalidraw waży ok. 1 MB po gzipie. Kalendarz otwierany codziennie nie ma
 // płacić za tablicę otwieraną raz w tygodniu, więc ekran tablicy ładuje się
@@ -44,6 +46,7 @@ const TUTOR_TABS = [
   { path: "/rozliczenia", label: "Rozliczenia" },
   { path: "/prosby", label: "Prośby" },
   { path: "/tablice", label: "Tablice" },
+  { path: "/materialy", label: "Materiały" },
   { path: "/dyspozycyjnosc", label: "Dyspozycyjność" },
 ];
 
@@ -51,6 +54,7 @@ const STUDENT_TABS = [
   { path: "/zajecia", label: "Zajęcia" },
   { path: "/platnosci", label: "Płatności" },
   { path: "/prosby", label: "Prośby" },
+  { path: "/materialy", label: "Tablice i materiały" },
 ];
 
 export default function App() {
@@ -140,6 +144,7 @@ export default function App() {
             <Route path="/rozliczenia" element={<Summary tutorView />} />
             <Route path="/prosby" element={<TutorPanel section="requests" />} />
             <Route path="/tablice" element={<Boards myRole="tutor" />} />
+            <Route path="/materialy" element={<TutorMaterials />} />
             <Route path="/dyspozycyjnosc" element={<TutorPanel section="availability" />} />
             <Route path="*" element={<Navigate to="/zajecia" replace />} />
           </Routes>
@@ -152,6 +157,7 @@ export default function App() {
             <Route path="/zajecia" element={<StudentPanel section="lessons" />} />
             <Route path="/platnosci" element={<StudentPanel section="payments" />} />
             <Route path="/prosby" element={<StudentPanel section="requests" />} />
+            <Route path="/materialy" element={<StudentMaterials />} />
             <Route path="*" element={<Navigate to="/zajecia" replace />} />
           </Routes>
         </RoleShell>

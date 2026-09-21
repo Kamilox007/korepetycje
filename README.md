@@ -30,7 +30,7 @@ Wersja produkcyjna: <https://panel.kamilkrzywon.pl>
 | `admin` | pełne zarządzanie, w tym konta użytkowników |
 | `secretary` | wszystko poza zarządzaniem kontami administracyjnymi |
 | `tutor` | własny terminarz i zajęcia przypisane do siebie |
-| `student` | własne zajęcia, saldo, historia wpłat, prośby o przesunięcie |
+| `student` | własne zajęcia, saldo, historia wpłat, prośby o przesunięcie, swoje tablice i materiały |
 
 ### Korepetytor i sekretariat
 - Kalendarz: widok dzienny, tygodniowy i miesięczny, z przenoszeniem zajęć
@@ -43,6 +43,7 @@ Wersja produkcyjna: <https://panel.kamilkrzywon.pl>
 - Archiwizacja uczniów z zachowaniem historii rozliczeń
 - Akceptacja próśb o przesunięcie zajęć
 - Tablica do zajęć online, współdzielona z uczniem przez link (niżej)
+- Materiały dla ucznia: pliki PDF (zadania, rozwiązania) widoczne w jego panelu
 
 Korepetytor widzi wyłącznie zajęcia przypisane do siebie: własny kalendarz
 z tymi samymi trzema widokami, przenoszenie zajęć na inny dzień i godzinę oraz
@@ -53,6 +54,8 @@ rozpatrywanie próśb swoich uczniów.
 - Kod QR przelewu z kwotą do zapłaty i tytułem (standard 2D ZBP)
 - Prośby o przesunięcie - termin zmienia się dopiero po akceptacji
 - Podpowiadane wolne terminy na podstawie dostępności korepetytora
+- Zakładka **Tablice i materiały**: linki do tablic przypisanych do ucznia
+  i pliki PDF od korepetytora - tylko do odczytu
 
 ### Tablica
 
@@ -92,6 +95,17 @@ Moduł tablicy interaktywnej (Excalidraw) do prowadzenia korepetycji online.
   jest jako snapshot (30 dni). Po przypadkowym „zaznacz wszystko + Delete"
   właściciel przywraca stronę z panelu; przywrócenie widać od razu także
   u połączonych osób i samo jest odwracalne.
+
+### Materiały ucznia
+
+Staff (z listy uczniów, przycisk **Materiały**) i korepetytor (zakładka
+**Materiały**, dla uczniów, z którymi ma zajęcia) dodają uczniowi pliki PDF -
+zadania, rozwiązania, notatki. Uczeń z kontem widzi je w zakładce **Tablice
+i materiały**, obok linków do swoich tablic, i otwiera w przeglądarce.
+Tylko PDF, rozpoznawany po zawartości; limity 20 MB na plik i 300 MB na
+ucznia. Bajty leżą w tym samym katalogu co obrazki tablic
+(`BOARD_FILES_PATH`), więc obowiązuje ten sam TODO o backupie. Trwałe
+usunięcie ucznia kasuje jego materiały.
 
 ## Uruchomienie lokalne
 
@@ -163,6 +177,7 @@ gorliwy przy typach.
 | `0013` | tablica: `boards`, `board_pages`, `board_files`, `board_snapshots` |
 | `0014` | tablica: `assigned_tutor_id` - czyja jest tablica, niezależnie od tego, kto ją założył |
 | `0015` | tablica: biblioteka kształtów na koncie (`users.board_library`) |
+| `0016` | materiały ucznia (`student_files`, PDF) |
 
 ## Konfiguracja
 
@@ -180,6 +195,8 @@ Zmienne środowiskowe (`.env`, wzór w `.env.example`):
 | `BOARD_FILES_PATH` | katalog na obrazki wklejone do tablic; domyślnie `/data/board_files` (ten sam wolumen co baza) |
 | `BOARD_MAX_FILE_MB` | limit rozmiaru jednego obrazka na tablicy; domyślnie `10` |
 | `BOARD_MAX_TOTAL_MB` | limit łączny obrazków jednej tablicy; domyślnie `200` |
+| `STUDENT_FILE_MAX_MB` | limit rozmiaru jednego pliku PDF w materiałach ucznia; domyślnie `20` |
+| `STUDENT_FILES_MAX_TOTAL_MB` | limit łączny materiałów jednego ucznia; domyślnie `300` |
 
 `APP_ENV` steruje też flagą `Secure` na ciasteczku sesyjnym - w `dev` jest
 wyłączona, bo po HTTP przeglądarka odrzuciłaby takie ciasteczko.
@@ -282,6 +299,7 @@ python test_board_ws.py           # tablica: pokoje, WebSocket, zapis okresowy, 
 python test_board_snapshots.py    # tablica: reguła 24 h, przywracanie, retencja
 python test_board_files.py        # tablica: obrazki po sygnaturze, dedup, quota, ścieżki
 python test_board_library.py      # tablica: biblioteka kształtów na koncie, izolacja, limit
+python test_student_files.py      # materiały ucznia: zakres korepetytora, PDF po sygnaturze, widok ucznia, purge
 ```
 
 Każdy zestaw pracuje na własnej bazie w katalogu tymczasowym i nie dotyka bazy
@@ -496,6 +514,7 @@ nie limit żądań. **TODO:** `FORWARDED_ALLOW_IPS=*` w `docker-compose.yml`
 | `board_files` | metadane obrazków (sha256, typ, rozmiar); bajty na dysku w `BOARD_FILES_PATH` |
 | `board_snapshots` | dobowe kopie stron do odzysku, retencja 30 dni |
 | `users.board_library` | własne pozycje biblioteki tablicy (JSON), wbudowane bryły nie są tu zapisywane |
+| `student_files` | materiały ucznia (PDF): metadane, bajty na dysku w `BOARD_FILES_PATH` |
 
 ## Backup
 

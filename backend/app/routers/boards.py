@@ -92,7 +92,7 @@ def board_path(board: models.Board) -> str:
     return f"/t/{board.token}"
 
 
-def _resolve_student(db: Session, user: models.User, student_id: int) -> models.Student:
+def resolve_student_for(db: Session, user: models.User, student_id: int) -> models.Student:
     """The student a board may be attached to. For a tutor that is one they
     own or have a lesson with - the same "any lesson" rule as /api/tutor/summary."""
     student = db.get(models.Student, student_id)
@@ -173,7 +173,7 @@ def create_board(
     if not title:
         raise HTTPException(400, "Tytuł tablicy jest wymagany")
     if payload.student_id is not None:
-        _resolve_student(db, user, payload.student_id)
+        resolve_student_for(db, user, payload.student_id)
     board = models.Board(
         token=new_token(), title=title, student_id=payload.student_id,
         created_by_user_id=user.id,
@@ -212,7 +212,7 @@ def update_board(
         board.title = title
     if "student_id" in payload.model_fields_set:
         if payload.student_id is not None:
-            _resolve_student(db, user, payload.student_id)
+            resolve_student_for(db, user, payload.student_id)
         board.student_id = payload.student_id
     if "assigned_tutor_id" in payload.model_fields_set and is_staff(user):
         board.assigned_tutor_id = _resolve_assigned_tutor(db, user, payload)

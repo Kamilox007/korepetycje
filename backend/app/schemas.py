@@ -530,3 +530,25 @@ class BoardFileOut(BaseModel):
 
 class BoardLibrary(BaseModel):
     items: list
+
+
+# ---------- Materiały ucznia ----------
+class StudentFileOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    student_id: int
+    name: str
+    mime: str
+    bytes: int
+    created_at: datetime
+    uploaded_by_name: str | None = None
+
+
+class MyBoardOut(BaseModel):
+    """A board as the student sees it: title and the link, nothing about
+    who made it or which tutor it belongs to."""
+    id: int
+    title: str
+    path: str
+    page_count: int
+    updated_at: datetime
