@@ -31,7 +31,10 @@ export default function BoardScreen() {
   const [notice, setNotice] = useState("");
   const editorRef = useRef(null);
   // Grubość linii: własna kontrolka, bo Excalidraw daje tylko 1/2/4.
-  const [strokeWidth, setStrokeWidth] = useState(() => Number(read(`tablica:${token}:stroke`)) || 2);
+  const [strokeWidth, setStrokeWidth] = useState(() => {
+    const saved = Number(read(`tablica:${token}:stroke`));
+    return saved >= STROKE_MIN && saved <= STROKE_MAX ? saved : 2;
+  });
   // Kratka to ustawienie widoku tej przeglądarki, pamiętane per tablica.
   const [grid, setGrid] = useState(() => read(`tablica:${token}:grid`) === "1");
   // Biblioteka kształtów: otwierana raz na wejściu (konto albo przeglądarka),
@@ -178,14 +181,13 @@ export default function BoardScreen() {
               ))}
             </span>
           )}
-          <span className="tablica-stroke" role="group" aria-label="Grubość linii" title="Grubość linii - zaznaczonych i kolejnych">
-            {STROKE_WIDTHS.map((w) => (
-              <button key={w} className={`tablica-stroke-btn${w === strokeWidth ? " active" : ""}`}
-                      onClick={() => pickStrokeWidth(w)} aria-pressed={w === strokeWidth} aria-label={`Grubość ${String(w).replace(".", ",")}`}>
-                <span className="tablica-stroke-line" style={{ height: Math.max(1, Math.min(w, 10)), opacity: w < 1 ? 0.5 : 1 }} />
-              </button>
-            ))}
-          </span>
+          <label className="tablica-stroke" title="Grubość linii - zaznaczonych i kolejnych">
+            <span className="tablica-stroke-line" style={{ height: Math.max(1, strokeWidth * 2), opacity: strokeWidth < 0.5 ? 0.5 : 1 }} />
+            <input type="range" min={STROKE_MIN} max={STROKE_MAX} step={0.1} value={strokeWidth}
+                   aria-label="Grubość linii"
+                   onChange={(e) => pickStrokeWidth(Number(e.target.value))} />
+            <span className="tablica-stroke-value">{strokeWidth.toFixed(1).replace(".", ",")}</span>
+          </label>
           <button className={`ghost tablica-btn${grid ? " active" : ""}`} onClick={toggleGrid}
                   aria-pressed={grid} title="Kratka (tylko na Twoim ekranie)">Kratka</button>
           <span className={`tablica-status ${status}`}>
@@ -245,9 +247,11 @@ export default function BoardScreen() {
   );
 }
 
-// 0,5 rysuje się jako półpiksel (wygładzona, jaśniejsza kreska) - na tyle
-// cienko, na ile pozwala ekran; jeszcze niżej wygląda już jak przerywana.
-const STROKE_WIDTHS = [0.5, 1, 2, 4, 6, 8, 12];
+// Suwak zamiast przycisków: 0,1-4 co 0,1. Poniżej ~0,5 kreska rysuje się
+// jako wygładzony półpiksel (jaśniejsza, nie cieńsza) - to granica ekranu,
+// nie Excalidrawa.
+const STROKE_MIN = 0.1;
+const STROKE_MAX = 4;
 
 function initials(n) {
   return (n || "?").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
