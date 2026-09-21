@@ -9,6 +9,11 @@ dbs:
         path: db
         endpoint: s3.eu-central-003.backblazeb2.com
         region: eu-central-003
+        # How often WAL changes are shipped. The default (1s) is overkill
+        # here: it only multiplies the number of small objects in the bucket,
+        # and the board writes every 15s anyway. 30s bounds the loss on a
+        # server crash to half a minute.
+        sync-interval: 30s
         # How much history to keep. 720h = 30 days.
         retention: 720h
         snapshot-interval: 24h

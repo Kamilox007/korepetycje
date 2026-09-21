@@ -526,8 +526,10 @@ nie limit żądań. **TODO:** `FORWARDED_ALLOW_IPS=*` w `docker-compose.yml`
 
 ## Backup
 
-Litestream replikuje bazę do Backblaze B2 na bieżąco (interwał 1 s), ze
-snapshotem dobowym i retencją 30 dni.
+Litestream replikuje bazę do Backblaze B2 co 30 s (tylko gdy coś się
+zmieniło), ze snapshotem dobowym i retencją 30 dni. Okno ewentualnej straty
+przy awarii serwera to pół minuty; domyślna 1 s tylko mnożyła liczbę małych
+obiektów w buckecie.
 
 Odtworzenie - **przetestuj, zanim będzie potrzebne**:
 
