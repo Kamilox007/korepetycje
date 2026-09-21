@@ -181,8 +181,8 @@ export default function BoardScreen() {
           <span className="tablica-stroke" role="group" aria-label="Grubość linii" title="Grubość linii - zaznaczonych i kolejnych">
             {STROKE_WIDTHS.map((w) => (
               <button key={w} className={`tablica-stroke-btn${w === strokeWidth ? " active" : ""}`}
-                      onClick={() => pickStrokeWidth(w)} aria-pressed={w === strokeWidth} aria-label={`Grubość ${w}`}>
-                <span className="tablica-stroke-line" style={{ height: Math.min(w, 10) }} />
+                      onClick={() => pickStrokeWidth(w)} aria-pressed={w === strokeWidth} aria-label={`Grubość ${String(w).replace(".", ",")}`}>
+                <span className="tablica-stroke-line" style={{ height: Math.max(1, Math.min(w, 10)), opacity: w < 1 ? 0.5 : 1 }} />
               </button>
             ))}
           </span>
@@ -245,7 +245,9 @@ export default function BoardScreen() {
   );
 }
 
-const STROKE_WIDTHS = [1, 2, 4, 6, 8, 12];
+// 0,5 rysuje się jako półpiksel (wygładzona, jaśniejsza kreska) - na tyle
+// cienko, na ile pozwala ekran; jeszcze niżej wygląda już jak przerywana.
+const STROKE_WIDTHS = [0.5, 1, 2, 4, 6, 8, 12];
 
 function initials(n) {
   return (n || "?").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
