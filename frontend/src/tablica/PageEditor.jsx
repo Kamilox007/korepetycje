@@ -1,9 +1,11 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Excalidraw, MainMenu, CaptureUpdateAction } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import { api } from "../api";
 import { PageSync, fetchFileData } from "./sync";
 import { BUILTIN_LIBRARY, isBuiltin, makeLibrarySaver } from "./library";
+import { STROKE_MIN, STROKE_MAX } from "./stroke";
 
 /**
  * Jedna strona tablicy w Excalidrawie.
@@ -15,7 +17,7 @@ import { BUILTIN_LIBRARY, isBuiltin, makeLibrarySaver } from "./library";
  * drugiej po ekranie.
  */
 const PageEditor = forwardRef(function PageEditor(
-  { token, pageId, theme, name, grid, library, strokeWidth, onStatus, onPeers, onClosed, onError }, ref,
+  { token, pageId, theme, name, grid, library, strokeWidth, onStrokeWidthChange, onStatus, onPeers, onClosed, onError }, ref,
 ) {
   const apiRef = useRef(null);
 
@@ -188,6 +190,35 @@ const PageEditor = forwardRef(function PageEditor(
     };
   }, [viewKey]);
 
+  // Suwak grubości w panelu właściwości Excalidrawa. Excalidraw nie ma na to
+  // slotu, więc: obserwujemy DOM edytora, a gdy pojawi się sekcja „Grubość
+  // obramowania" (fieldset z przyciskami strokeWidth-*), dokładamy do niej
+  // własny kontener i renderujemy w nim suwak przez portal. Panel znika i
+  // wraca z każdą zmianą zaznaczenia, stąd obserwator, nie jednorazowe
+  // wyszukanie. Fabryczne trzy przyciski chowa CSS.
+  const wrapRef = useRef(null);
+  const [strokeSlot, setStrokeSlot] = useState(null);
+  useEffect(() => {
+    const root = wrapRef.current;
+    if (!root) return undefined;
+    const sync = () => {
+      const button = root.querySelector('[data-testid="strokeWidth-thin"]');
+      const fieldset = button?.closest("fieldset") || null;
+      if (!fieldset) { setStrokeSlot((s) => (s ? null : s)); return; }
+      let slot = fieldset.querySelector(".tablica-stroke");
+      if (!slot) {
+        slot = document.createElement("div");
+        slot.className = "tablica-stroke";
+        fieldset.appendChild(slot);
+      }
+      setStrokeSlot((s) => (s === slot ? s : slot));
+    };
+    const obs = new MutationObserver(sync);
+    obs.observe(root, { childList: true, subtree: true });
+    sync();
+    return () => obs.disconnect();
+  }, [initialData]);
+
   if (loadError) {
     return <div className="tablica-error">Nie udało się wczytać strony: {loadError}</div>;
   }
@@ -196,6 +227,17 @@ const PageEditor = forwardRef(function PageEditor(
   }
 
   return (
+    <div ref={wrapRef} className="tablica-editor">
+    {strokeSlot && createPortal(
+      <>
+        <span className="tablica-stroke-line" style={{ height: Math.max(1, strokeWidth * 2), opacity: strokeWidth < 0.5 ? 0.5 : 1 }} />
+        <input type="range" min={STROKE_MIN} max={STROKE_MAX} step={0.1} value={strokeWidth}
+               aria-label="Grubość obramowania"
+               onChange={(e) => onStrokeWidthChange?.(Number(e.target.value))} />
+        <span className="tablica-stroke-value">{strokeWidth.toFixed(1).replace(".", ",")}</span>
+      </>,
+      strokeSlot,
+    )}
     <Excalidraw
       excalidrawAPI={(a) => {
         apiRef.current = a;
@@ -242,6 +284,7 @@ const PageEditor = forwardRef(function PageEditor(
         <MainMenu.DefaultItems.ChangeCanvasBackground />
       </MainMenu>
     </Excalidraw>
+    </div>
   );
 });
 
