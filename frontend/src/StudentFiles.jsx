@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { api } from "./api";
 import { useConfirm } from "./Confirm";
 import Modal from "./Modal";
+import { fmtDate } from "./dates";
 
 /**
  * Materiały ucznia (PDF): lista, wysyłka, usuwanie.
@@ -14,12 +15,6 @@ export function fmtBytes(n) {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
-
-export function fmtWhen(iso) {
-  if (!iso) return "";
-  const d = new Date(iso.endsWith("Z") ? iso : iso + "Z");
-  return d.toLocaleDateString("pl-PL");
 }
 
 export default function StudentFiles({ student }) {
@@ -84,7 +79,7 @@ export default function StudentFiles({ student }) {
                   <a href={api.studentFileUrl(student.id, f.id)} target="_blank" rel="noopener">{f.name}</a>
                   {f.uploaded_by_name && <span className="muted" style={{ fontSize: 12 }}> · {f.uploaded_by_name}</span>}
                 </td>
-                <td className="muted">{fmtWhen(f.created_at)}</td>
+                <td className="muted">{fmtDate(f.created_at)}</td>
                 <td className="num muted">{fmtBytes(f.bytes)}</td>
                 <td className="num"><button className="ghost danger" onClick={() => remove(f)}>Usuń</button></td>
               </tr>
@@ -112,9 +107,8 @@ export function TutorMaterials() {
   const [students, setStudents] = useState(null);
   const [studentId, setStudentId] = useState("");
   useEffect(() => {
-    api.tutorSummary()
-      .then((s) => {
-        const list = s.students.map((x) => ({ id: x.student_id, name: x.student_name }));
+    api.tutorStudents()
+      .then((list) => {
         setStudents(list);
         if (list.length && !studentId) setStudentId(String(list[0].id));
       })

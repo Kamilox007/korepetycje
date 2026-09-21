@@ -53,6 +53,22 @@ export function fmtTime(t) {
   return (t || "").slice(0, 5);
 }
 
+// Backend timestamps are naive UTC without a "Z"; the browser would otherwise
+// read them as local time and show everything a couple of hours off.
+function parseUTC(iso) {
+  return new Date(iso.endsWith("Z") ? iso : iso + "Z");
+}
+
+// "2026-09-21T14:03:00" -> "21.09.2026, 16:03" (local time); "" when empty.
+export function fmtDateTime(iso) {
+  return iso ? parseUTC(iso).toLocaleString("pl-PL", { dateStyle: "short", timeStyle: "short" }) : "";
+}
+
+// "2026-09-21T14:03:00" -> "21.09.2026"; "" when empty.
+export function fmtDate(iso) {
+  return iso ? parseUTC(iso).toLocaleDateString("pl-PL") : "";
+}
+
 export function startOfMonth(d) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }

@@ -35,7 +35,9 @@ alembic check                               # do models match the current DB?
 ```
 
 Regression tests (plain scripts, not pytest — each bootstraps its own temp SQLite DB via
-`testing_utils.bootstrap()`, migrated to head, isolated from the dev DB):
+`testing_utils.bootstrap()`, migrated to head, isolated from the dev DB; the same module has
+`login_admin` / `make_user` / `client_for` / `first_login` for the account setup every script
+starts with — don't re-inline the login + forced-password-change dance):
 
 ```bash
 pip install -r requirements-dev.txt

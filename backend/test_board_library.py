@@ -7,7 +7,7 @@ and guests, and a runaway payload must be refused rather than stored.
 import sys, pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from testing_utils import bootstrap
+from testing_utils import bootstrap, login_admin, make_user, first_login, START_PASSWORD
 bootstrap()
 
 from fastapi.testclient import TestClient
@@ -22,30 +22,14 @@ def check(label, cond):
         FAILS.append(label)
 
 
-def make_user(admin, username, role, password):
-    admin.post("/api/users", json={
-        "username": username, "password": "StartPass123!", "role": role, "display_name": username,
-    })
-    c = TestClient(app)
-    c.__enter__()
-    c.post("/api/auth/login", data={"username": username, "password": "StartPass123!"})
-    c.post("/api/auth/change-password", json={
-        "old_password": "StartPass123!", "new_password": password, "accept_privacy": True,
-    })
-    return c
-
-
 ITEM = {"id": "moja-brylka", "status": "unpublished", "created": 1, "name": "Bryłka",
         "elements": [{"id": "e1", "type": "line", "x": 0, "y": 0, "width": 10, "height": 10,
                       "points": [[0, 0], [10, 10]]}]}
 
 with TestClient(app) as admin:
-    admin.post("/api/auth/login", data={"username": "admin", "password": "admin"})
-    admin.post("/api/auth/change-password", json={
-        "old_password": "admin", "new_password": "AdminPass123!", "accept_privacy": True,
-    })
-    ewa = make_user(admin, "ewa", "tutor", "EwaPass123!")
-    olek = make_user(admin, "olek", "tutor", "OlekPass123!")
+    login_admin(admin)
+    ewa = make_user(admin, "ewa", "tutor", "EwaPass123!", display_name="ewa")
+    olek = make_user(admin, "olek", "tutor", "OlekPass123!", display_name="olek")
 
     check("a fresh account has an empty library", ewa.get("/api/me/board-library").json() == {"items": []})
     r = ewa.put("/api/me/board-library", json={"items": [ITEM]})
@@ -78,10 +62,7 @@ with TestClient(app) as admin:
     student_id = admin.post("/api/students", json={"name": "Ala", "default_price": 80}).json()["id"]
     admin.post(f"/api/students/{student_id}/account", json={"username": "ala", "password": "StartPass123!"})
     with TestClient(app) as student:
-        student.post("/api/auth/login", data={"username": "ala", "password": "StartPass123!"})
-        student.post("/api/auth/change-password", json={
-            "old_password": "StartPass123!", "new_password": "AlaPass123!", "accept_privacy": True,
-        })
+        first_login(student, "ala", START_PASSWORD, "AlaPass123!")
         check("student -> 403", student.get("/api/me/board-library").status_code == 403)
 
     ewa.__exit__(None, None, None)

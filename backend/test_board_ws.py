@@ -5,10 +5,10 @@ echo, a stale copy must lose to the newer one and be corrected, a fallback
 PUT must go through the open room (not straight to the database), and the
 room must be written out and forgotten once the last person leaves.
 """
-import sys, pathlib, json
+import sys, pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from testing_utils import bootstrap
+from testing_utils import bootstrap, login_admin
 bootstrap()
 
 from fastapi.testclient import TestClient
@@ -50,10 +50,7 @@ def page_in_db(page_id):
 
 
 with TestClient(app) as admin:
-    admin.post("/api/auth/login", data={"username": "admin", "password": "admin"})
-    admin.post("/api/auth/change-password", json={
-        "old_password": "admin", "new_password": "AdminPass123!", "accept_privacy": True,
-    })
+    login_admin(admin)
     board = admin.post("/api/boards", json={"title": "Live"}).json()
     tok = board["path"].removeprefix("/t/")
     p0 = board["pages"][0]["id"]

@@ -6,7 +6,7 @@ entering it again, which left a hole in the history for no good reason.
 import sys, pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from testing_utils import bootstrap
+from testing_utils import bootstrap, login_admin
 bootstrap()
 
 from datetime import date, timedelta
@@ -25,9 +25,7 @@ def check(label, cond):
 
 
 with TestClient(app) as c:
-    c.post("/api/auth/login", data={"username": "admin", "password": "admin"})
-    c.post("/api/auth/change-password",
-           json={"old_password": "admin", "new_password": "PaymentTest123!", "accept_privacy": True})
+    login_admin(c, "PaymentTest123!")
 
     sid = c.post("/api/students", json={"name": "Payer Student", "default_price": 80}).json()["id"]
     pay = c.post("/api/payments", json={

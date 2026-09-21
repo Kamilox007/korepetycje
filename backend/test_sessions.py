@@ -6,7 +6,7 @@ change left sessions open on other devices alive for up to seven days.
 import sys, pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from testing_utils import bootstrap
+from testing_utils import bootstrap, login_admin
 bootstrap()
 
 from fastapi.testclient import TestClient
@@ -36,9 +36,7 @@ PASSWORD = "SessionTest123!"
 
 with TestClient(app) as c:
     # --- get past the forced password change ---
-    c.post("/api/auth/login", data={"username": "admin", "password": "admin"})
-    c.post("/api/auth/change-password",
-           json={"old_password": "admin", "new_password": PASSWORD, "accept_privacy": True})
+    login_admin(c, PASSWORD)
 
     # --- every token carries a jti and is recorded ---
     tok = token_of(c)

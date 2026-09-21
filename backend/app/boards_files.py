@@ -12,6 +12,7 @@ import re
 import tempfile
 from pathlib import Path
 
+from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -82,6 +83,23 @@ def sniff_mime(data: bytes) -> str | None:
     if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
         return "image/webp"
     return None
+
+
+async def read_upload(file, *, max_bytes: int, allowed: set[str], wrong_type: str) -> tuple[bytes, str]:
+    """Read an UploadFile within a size limit and check its type by content.
+
+    Returns (bytes, mime). Raises the same HTTP errors for every upload
+    endpoint, so a board image and a student PDF fail the same way.
+    """
+    data = await file.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise HTTPException(413, f"Plik przekracza {max_bytes // (1024 * 1024)} MB")
+    if not data:
+        raise HTTPException(400, "Pusty plik")
+    mime = sniff_mime(data)
+    if mime not in allowed:
+        raise HTTPException(415, wrong_type)
+    return data, mime
 
 
 def board_usage(db: Session, board_id: int) -> int:

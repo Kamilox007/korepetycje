@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { api } from "./api";
 import { useConfirm } from "./Confirm";
 import Modal from "./Modal";
+import { fmtDateTime } from "./dates";
 
 /**
  * Lista tablic w panelu (staff i korepetytor).
@@ -55,8 +56,7 @@ export default function Boards({ myRole }) {
           setStudents(st);
           setTutors(tu);
         } else {
-          const s = await api.tutorSummary();
-          setStudents(s.students.map((x) => ({ id: x.student_id, name: x.student_name })));
+          setStudents(await api.tutorStudents());
         }
       } catch { setStudents([]); }
     })();
@@ -203,7 +203,7 @@ export default function Boards({ myRole }) {
                     </td>
                   )}
                   <td className="num">{b.page_count}</td>
-                  <td className="muted">{fmtWhen(b.last_opened_at)}</td>
+                  <td className="muted">{fmtDateTime(b.last_opened_at) || "nigdy"}</td>
                   <td className="num board-actions">
                     <button className="ghost" onClick={() => copyLink(b)}>Kopiuj link</button>
                     <button className="ghost" onClick={() => setHistoryBoard(b)}>Historia</button>
@@ -244,12 +244,6 @@ export default function Boards({ myRole }) {
       )}
     </div>
   );
-}
-
-function fmtWhen(iso) {
-  if (!iso) return "nigdy";
-  const d = new Date(iso.endsWith("Z") ? iso : iso + "Z");
-  return d.toLocaleString("pl-PL", { dateStyle: "short", timeStyle: "short" });
 }
 
 function BoardForm({ board, students, tutors, initialStudentId, onClose, onSaved }) {
@@ -359,7 +353,7 @@ function HistoryModal({ board, onClose }) {
   async function restore(s) {
     const ok = await confirm({
       title: "Przywrócić stan strony?",
-      message: `Strona „${s.title}" wróci do stanu z ${fmtWhen(s.created_at)}.`,
+      message: `Strona „${s.title}" wróci do stanu z ${fmtDateTime(s.created_at)}.`,
       consequence: "Obecny stan strony zostanie najpierw zapisany jako snapshot, więc tę operację da się cofnąć. Osoby połączone na żywo zobaczą zmianę od razu.",
       confirmLabel: "Przywróć",
       danger: false,
@@ -367,7 +361,7 @@ function HistoryModal({ board, onClose }) {
     if (!ok) return;
     try {
       await api.restoreBoardSnapshot(board.id, s.id);
-      setDone(`Przywrócono stan z ${fmtWhen(s.created_at)}.`);
+      setDone(`Przywrócono stan z ${fmtDateTime(s.created_at)}.`);
       setSnaps(await api.listBoardSnapshots(board.id));
     } catch (e) { setErr(e.message); }
   }
@@ -399,7 +393,7 @@ function HistoryModal({ board, onClose }) {
                     <span className="muted" style={{ fontSize: 12 }}> (teraz: {pageTitle(s.page_id)})</span>
                   )}
                 </td>
-                <td className="muted">{fmtWhen(s.created_at)}</td>
+                <td className="muted">{fmtDateTime(s.created_at)}</td>
                 <td className="num"><button className="ghost" onClick={() => restore(s)}>Przywróć</button></td>
               </tr>
             ))}

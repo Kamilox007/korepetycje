@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
-import { fmtBytes, fmtWhen } from "./StudentFiles";
+import { fmtBytes } from "./StudentFiles";
+import { fmtDate } from "./dates";
 
 /**
  * Panel ucznia: tablice przypisane do niego i materiały (PDF) od korepetytora.
@@ -39,7 +40,7 @@ export default function StudentMaterials() {
                 <tr key={b.id}>
                   <td style={{ fontWeight: 500 }}>{b.title}</td>
                   <td className="num muted">{b.page_count}</td>
-                  <td className="muted">{fmtWhen(b.updated_at)}</td>
+                  <td className="muted">{fmtDate(b.updated_at)}</td>
                   <td className="num">
                     <a className="btn-link" href={b.path} target="_blank" rel="noopener">Otwórz</a>
                   </td>
@@ -61,7 +62,7 @@ export default function StudentMaterials() {
               {files.map((f) => (
                 <tr key={f.id}>
                   <td style={{ fontWeight: 500 }}>{f.name}</td>
-                  <td className="muted">{fmtWhen(f.created_at)}{f.uploaded_by_name ? ` · ${f.uploaded_by_name}` : ""}</td>
+                  <td className="muted">{fmtDate(f.created_at)}{f.uploaded_by_name ? ` · ${f.uploaded_by_name}` : ""}</td>
                   <td className="num muted">{fmtBytes(f.bytes)}</td>
                   <td className="num">
                     <a className="btn-link" href={api.myFileUrl(f.id)} target="_blank" rel="noopener">Otwórz</a>

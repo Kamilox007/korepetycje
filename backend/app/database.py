@@ -2,7 +2,6 @@ import os
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from .models import Base
 
 # SQLite na dev, Postgres na produkcji:
 #   DATABASE_URL="postgresql+psycopg://user:haslo@db:5432/korepetycje"

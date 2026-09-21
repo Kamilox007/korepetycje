@@ -8,7 +8,7 @@ unless shared).
 import sys, pathlib, tempfile
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from testing_utils import bootstrap
+from testing_utils import bootstrap, make_user, login_admin, first_login, START_PASSWORD
 
 FILES_DIR = tempfile.mkdtemp(prefix="student-files-")
 bootstrap(BOARD_FILES_PATH=FILES_DIR, STUDENT_FILE_MAX_MB="1", STUDENT_FILES_MAX_TOTAL_MB="2")
@@ -35,25 +35,12 @@ def upload(client, student_id, data, filename="zadania.pdf", content_type="appli
     return client.post(f"/api/students/{student_id}/files", files={"file": (filename, data, content_type)})
 
 
-def make_user(admin, username, role, password):
-    admin.post("/api/users", json={"username": username, "password": "StartPass123!", "role": role,
-                                   "display_name": username.title()})
-    c = TestClient(app)
-    c.__enter__()
-    c.post("/api/auth/login", data={"username": username, "password": "StartPass123!"})
-    c.post("/api/auth/change-password", json={"old_password": "StartPass123!", "new_password": password,
-                                              "accept_privacy": True})
-    return c
-
-
 def files_on_disk():
     return sorted(p for p in pathlib.Path(FILES_DIR).rglob("*") if p.is_file())
 
 
 with TestClient(app) as admin:
-    admin.post("/api/auth/login", data={"username": "admin", "password": "admin"})
-    admin.post("/api/auth/change-password", json={"old_password": "admin", "new_password": "AdminPass123!",
-                                                  "accept_privacy": True})
+    login_admin(admin)
     ewa = make_user(admin, "ewa", "tutor", "EwaPass123!")
     olek = make_user(admin, "olek", "tutor", "OlekPass123!")
     ewa_id = ewa.get("/api/auth/me").json()["id"]
@@ -110,9 +97,7 @@ with TestClient(app) as admin:
     archived = ewa.post("/api/boards", json={"title": "Stara", "student_id": ala}).json()
     ewa.delete(f"/api/boards/{archived['id']}")
     with TestClient(app) as student:
-        student.post("/api/auth/login", data={"username": "ala", "password": "StartPass123!"})
-        student.post("/api/auth/change-password", json={"old_password": "StartPass123!",
-                                                        "new_password": "AlaPass123!", "accept_privacy": True})
+        first_login(student, "ala", START_PASSWORD, "AlaPass123!")
         mine = student.get("/api/me/files").json()
         check("student sees their own files", sorted(f["id"] for f in mine) == sorted([f1, f2, mine[0]["id"]])
               if len(mine) == 3 else False)

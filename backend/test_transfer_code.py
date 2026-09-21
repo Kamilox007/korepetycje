@@ -7,7 +7,7 @@ itself rather than against my reading of the prose.
 import sys, pathlib, os
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from testing_utils import bootstrap
+from testing_utils import bootstrap, login_admin, first_login
 bootstrap()
 
 from app import transfer_code as tc
@@ -104,9 +104,7 @@ from app.database import SessionLocal
 from app import models
 
 with TestClient(app) as c:
-    c.post("/api/auth/login", data={"username": "admin", "password": "admin"})
-    c.post("/api/auth/change-password",
-           json={"old_password": "admin", "new_password": "TransferTest1!", "accept_privacy": True})
+    login_admin(c, "TransferTest1!")
 
     me = c.get("/api/auth/me").json()
     sid = c.post("/api/students", json={"name": "Jan Kowalski", "default_price": 80}).json()["id"]
@@ -135,9 +133,7 @@ with TestClient(app) as c:
            json={"username": "jan", "password": "StartPassword1!"})
 
 with TestClient(app) as s:
-    s.post("/api/auth/login", data={"username": "jan", "password": "StartPassword1!"})
-    s.post("/api/auth/change-password",
-           json={"old_password": "StartPassword1!", "new_password": "StudentPass1!", "accept_privacy": True})
+    first_login(s, "jan", "StartPassword1!", "StudentPass1!")
 
     data = s.get("/api/me/transfer").json()
     check("student sees one transfer target", len(data["targets"]) == 1)
@@ -195,9 +191,7 @@ with TestClient(app) as s:
 
 # --- a tutor only sees their own students ---
 with TestClient(app) as t:
-    t.post("/api/auth/login", data={"username": "ewa", "password": "TutorPass123!"})
-    t.post("/api/auth/change-password",
-           json={"old_password": "TutorPass123!", "new_password": "EwaOwnPass1!", "accept_privacy": True})
+    first_login(t, "ewa", "TutorPass123!", "EwaOwnPass1!")
     rows = t.get("/api/tutor/summary").json()["students"]
     check("tutor sees the shared student", len(rows) == 1)
     check("but only their own figures", rows[0]["amount_due"] == 120.0)

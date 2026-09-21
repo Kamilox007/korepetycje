@@ -14,7 +14,6 @@ so the payload starts with a separator.
 """
 import os
 import re
-import unicodedata
 
 # The recommendation lists the permitted characters; hyphens and colons are not
 # among them, so anything outside this set is dropped rather than passed through
