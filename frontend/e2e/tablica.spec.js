@@ -144,6 +144,47 @@ test.describe("tablica", () => {
     await fresh.close();
   });
 
+  test("obrazek wklejony przez jedną osobę pojawia się u drugiej, która już jest na tablicy", async ({ page, browser }) => {
+    const { path } = await createBoard(page, "Obrazek E2E");
+    const guestCtx = await guestContext(browser);
+    const guest = await guestCtx.newPage();
+    await page.goto(path);
+    await waitForBoard(page);
+    await guest.goto(path);
+    await guest.getByRole("button", { name: "Gotowe" }).click();
+    await waitForBoard(guest);
+
+    // 1x1 PNG. Właściciel "wkleja": plik do Excalidrawa + element obrazka,
+    // dokładnie tak, jak robi to sam edytor po Ctrl+V.
+    const PNG_1PX = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+    const fileId = "e2e-plik-obrazka-0001";
+    await page.evaluate(({ fileId, PNG_1PX }) => {
+      const a = window.__tablicaAPI;
+      a.addFiles([{ id: fileId, dataURL: "data:image/png;base64," + PNG_1PX, mimeType: "image/png", created: Date.now() }]);
+      a.updateScene({
+        elements: [...a.getSceneElementsIncludingDeleted(), {
+          id: "obrazek-1", type: "image", fileId, status: "saved", scale: [1, 1],
+          x: 50, y: 50, width: 100, height: 100, angle: 0, strokeColor: "transparent",
+          backgroundColor: "transparent", fillStyle: "solid", strokeWidth: 1, strokeStyle: "solid",
+          roughness: 0, opacity: 100, groupIds: [], frameId: null, index: "a0", roundness: null,
+          seed: 9, version: 1, versionNonce: 1, isDeleted: false, boundElements: null,
+          updated: Date.now(), link: null, locked: false, crop: null,
+        }],
+        captureUpdate: "IMMEDIATELY",
+      });
+    }, { fileId, PNG_1PX });
+
+    // Element dociera po WS, a bajty gość dociąga sam z serwera.
+    await expect.poll(() => visibleIds(guest), { timeout: 15_000 }).toContain("obrazek-1");
+    await expect.poll(
+      () => guest.evaluate((id) => Boolean(window.__tablicaAPI.getFiles()[id]), fileId),
+      { timeout: 15_000 },
+    ).toBe(true);
+    const mime = await guest.evaluate((id) => window.__tablicaAPI.getFiles()[id].mimeType, fileId);
+    expect(mime).toBe("image/png");
+    await guestCtx.close();
+  });
+
   test("Ctrl+Z nie cofa cudzej pracy", async ({ page, browser }) => {
     const { path } = await createBoard(page, "Undo E2E");
     const guestCtx = await guestContext(browser);
