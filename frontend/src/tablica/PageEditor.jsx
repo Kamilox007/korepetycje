@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Excalidraw, MainMenu, CaptureUpdateAction } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import { api } from "../api";
@@ -14,8 +14,32 @@ import { BUILTIN_LIBRARY, isBuiltin, makeLibrarySaver } from "./library";
  * w localStorage; na serwer nie idzie nigdy, bo zoom jednej osoby skakałby
  * drugiej po ekranie.
  */
-export default function PageEditor({ token, pageId, theme, name, grid, library, onStatus, onPeers, onClosed, onError }) {
+const PageEditor = forwardRef(function PageEditor(
+  { token, pageId, theme, name, grid, library, strokeWidth, onStatus, onPeers, onClosed, onError }, ref,
+) {
   const apiRef = useRef(null);
+
+  // Excalidraw ma trzy grubości linii na sztywno (1, 2, 4), ale sam element
+  // przyjmuje dowolną - własny wybór z paska tablicy ustawia grubość
+  // zaznaczonych elementów i tego, co będzie rysowane dalej.
+  useImperativeHandle(ref, () => ({
+    setStrokeWidth(width) {
+      const a = apiRef.current;
+      if (!a) return;
+      const selected = a.getAppState().selectedElementIds || {};
+      const elements = a.getSceneElementsIncludingDeleted().map((e) =>
+        selected[e.id] && !e.isDeleted && "strokeWidth" in e
+          ? { ...e, strokeWidth: width, version: e.version + 1,
+              versionNonce: Math.floor(Math.random() * 2 ** 31), updated: Date.now() }
+          : e,
+      );
+      a.updateScene({
+        elements,
+        appState: { currentItemStrokeWidth: width },
+        captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+      });
+    },
+  }));
   const syncRef = useRef(null);
   const [initialData, setInitialData] = useState(null);
   const [loadError, setLoadError] = useState("");
@@ -88,7 +112,7 @@ export default function PageEditor({ token, pageId, theme, name, grid, library, 
         setInitialData({
           elements: page.elements,
           files,
-          appState: { ...appState, collaborators: new Map() },
+          appState: { ...appState, collaborators: new Map(), currentItemStrokeWidth: strokeWidth || 2 },
           scrollToContent: !appState.scrollX && page.elements.length > 0,
           libraryItems: [...BUILTIN_LIBRARY, ...library.items],
         });
@@ -219,4 +243,6 @@ export default function PageEditor({ token, pageId, theme, name, grid, library, 
       </MainMenu>
     </Excalidraw>
   );
-}
+});
+
+export default PageEditor;

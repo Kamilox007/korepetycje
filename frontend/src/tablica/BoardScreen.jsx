@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import { useConfirm } from "../Confirm";
@@ -29,6 +29,9 @@ export default function BoardScreen() {
   const [status, setStatus] = useState("connecting");
   const [peers, setPeers] = useState([]);
   const [notice, setNotice] = useState("");
+  const editorRef = useRef(null);
+  // Grubość linii: własna kontrolka, bo Excalidraw daje tylko 1/2/4.
+  const [strokeWidth, setStrokeWidth] = useState(() => Number(read(`tablica:${token}:stroke`)) || 2);
   // Kratka to ustawienie widoku tej przeglądarki, pamiętane per tablica.
   const [grid, setGrid] = useState(() => read(`tablica:${token}:grid`) === "1");
   // Biblioteka kształtów: otwierana raz na wejściu (konto albo przeglądarka),
@@ -74,6 +77,12 @@ export default function BoardScreen() {
     const clean = (n || "").trim().slice(0, 40);
     setName(clean);
     write(`tablica:${token}:name`, clean);
+  }
+
+  function pickStrokeWidth(w) {
+    setStrokeWidth(w);
+    write(`tablica:${token}:stroke`, String(w));
+    editorRef.current?.setStrokeWidth(w);
   }
 
   function toggleGrid() {
@@ -169,6 +178,14 @@ export default function BoardScreen() {
               ))}
             </span>
           )}
+          <span className="tablica-stroke" role="group" aria-label="Grubość linii" title="Grubość linii - zaznaczonych i kolejnych">
+            {STROKE_WIDTHS.map((w) => (
+              <button key={w} className={`tablica-stroke-btn${w === strokeWidth ? " active" : ""}`}
+                      onClick={() => pickStrokeWidth(w)} aria-pressed={w === strokeWidth} aria-label={`Grubość ${w}`}>
+                <span className="tablica-stroke-line" style={{ height: Math.min(w, 10) }} />
+              </button>
+            ))}
+          </span>
           <button className={`ghost tablica-btn${grid ? " active" : ""}`} onClick={toggleGrid}
                   aria-pressed={grid} title="Kratka (tylko na Twoim ekranie)">Kratka</button>
           <span className={`tablica-status ${status}`}>
@@ -195,6 +212,7 @@ export default function BoardScreen() {
       <div className="tablica-canvas">
         {current && library ? (
           <PageEditor
+            ref={editorRef}
             key={current.id}
             token={token}
             pageId={current.id}
@@ -202,6 +220,7 @@ export default function BoardScreen() {
             name={name}
             grid={grid}
             library={library}
+            strokeWidth={strokeWidth}
             onStatus={setStatus}
             onPeers={(ps, selfId) => setPeers(ps.map((p) => ({ ...p, self: p.peer_id === selfId })))}
             onClosed={onClosed}
@@ -225,6 +244,8 @@ export default function BoardScreen() {
     </div>
   );
 }
+
+const STROKE_WIDTHS = [1, 2, 4, 6, 8, 12];
 
 function initials(n) {
   return (n || "?").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
