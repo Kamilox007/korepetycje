@@ -185,6 +185,30 @@ test.describe("tablica", () => {
     await guestCtx.close();
   });
 
+  test("eksport całej tablicy do PDF: jedna strona tablicy = jedna strona PDF", async ({ page }) => {
+    const { path, token } = await createBoard(page, "PDF E2E");
+    await page.goto(path);
+    await waitForBoard(page);
+    await draw(page, rect("do-pdf"));
+    await page.getByRole("button", { name: "Nowa strona" }).click();
+    await expect(page.locator(".tablica-page")).toHaveCount(3);
+
+    // Bez pobierania (Playwright nie ma gdzie zapisać): moduł zwraca Blob.
+    const info = await page.evaluate(async ({ token }) => {
+      const { exportBoardPdf } = await import("/src/tablica/pdf.js");
+      const board = await fetch(`/api/t/${token}`).then((r) => r.json());
+      const blob = await exportBoardPdf({ token, title: board.title, pages: board.pages, save: false });
+      const head = new TextDecoder().decode(new Uint8Array(await blob.slice(0, 5).arrayBuffer()));
+      const text = await blob.text();
+      return { size: blob.size, type: blob.type, head, pages: (text.match(/\/Type\s*\/Page[^s]/g) || []).length };
+    }, { token });
+    expect(info.type).toBe("application/pdf");
+    expect(info.head).toBe("%PDF-");
+    expect(info.pages).toBe(2);
+    expect(info.size).toBeGreaterThan(1000);
+    expect(info.size).toBeLessThan(2_000_000);
+  });
+
   test("Ctrl+Z nie cofa cudzej pracy", async ({ page, browser }) => {
     const { path } = await createBoard(page, "Undo E2E");
     const guestCtx = await guestContext(browser);
