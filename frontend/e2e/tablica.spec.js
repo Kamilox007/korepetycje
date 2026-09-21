@@ -209,6 +209,35 @@ test.describe("tablica", () => {
     expect(info.size).toBeLessThan(2_000_000);
   });
 
+  test("kółko myszy nad płótnem przybliża, z Shift/Alt przesuwa", async ({ page }) => {
+    const { path } = await createBoard(page, "Zoom E2E");
+    await page.goto(path);
+    await waitForBoard(page);
+    const view = () => page.evaluate(() => {
+      const s = window.__tablicaAPI.getAppState();
+      return { zoom: s.zoom.value, x: s.scrollX, y: s.scrollY };
+    });
+    const canvas = page.locator(".excalidraw__canvas.interactive");
+    await canvas.hover();
+    const start = await view();
+
+    await page.mouse.wheel(0, -300);
+    await expect.poll(async () => (await view()).zoom).toBeGreaterThan(start.zoom);
+    await page.mouse.wheel(0, 300);
+    await expect.poll(async () => (await view()).zoom).toBeLessThan(start.zoom + 0.001);
+
+    const beforePan = await view();
+    await page.keyboard.down("Alt");
+    await page.mouse.wheel(0, 200);
+    await page.keyboard.up("Alt");
+    await expect.poll(async () => (await view()).y).not.toBe(beforePan.y);
+    await page.keyboard.down("Shift");
+    await page.mouse.wheel(0, 200);
+    await page.keyboard.up("Shift");
+    await expect.poll(async () => (await view()).x).not.toBe(beforePan.x);
+    expect((await view()).zoom).toBe(beforePan.zoom);
+  });
+
   test("Ctrl+Z nie cofa cudzej pracy", async ({ page, browser }) => {
     const { path } = await createBoard(page, "Undo E2E");
     const guestCtx = await guestContext(browser);
