@@ -231,10 +231,22 @@ const PageEditor = forwardRef(function PageEditor(
     {strokeSlot && createPortal(
       <>
         <span className="tablica-stroke-line" style={{ height: Math.max(1, strokeWidth * 2), opacity: strokeWidth < 0.5 ? 0.5 : 1 }} />
-        <input type="range" min={STROKE_MIN} max={STROKE_MAX} step={0.1} value={strokeWidth}
+        {/* Skala całkowita 1-40 zamiast 0,1-4 co 0,1: przeglądarka liczy kroki
+            od min, a 0,1 + 39 × 0,1 wychodzi o ułamek ponad 4, więc suwak nie
+            dojeżdżał do prawego końca (ostatni legalny krok to 3,9). */}
+        <input type="range" min={Math.round(STROKE_MIN * 10)} max={Math.round(STROKE_MAX * 10)} step={1}
+               value={Math.round(strokeWidth * 10)}
                aria-label="Grubość obramowania"
-               onChange={(e) => onStrokeWidthChange?.(Number(e.target.value))} />
-        <span className="tablica-stroke-value">{strokeWidth.toFixed(1).replace(".", ",")}</span>
+               onChange={(e) => onStrokeWidthChange?.(Number(e.target.value) / 10)} />
+        {/* Pole liczbowe obok suwaka: wpisanie wartości ręcznie, przycięte do
+            zakresu i zaokrąglone do 0,1. */}
+        <input type="number" className="tablica-stroke-value" min={STROKE_MIN} max={STROKE_MAX} step={0.1}
+               value={strokeWidth} aria-label="Grubość obramowania (liczba)"
+               onChange={(e) => {
+                 const n = Number(e.target.value);
+                 if (!Number.isFinite(n)) return;
+                 onStrokeWidthChange?.(Math.round(Math.min(STROKE_MAX, Math.max(STROKE_MIN, n)) * 10) / 10);
+               }} />
       </>,
       strokeSlot,
     )}
