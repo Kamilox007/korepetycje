@@ -12,10 +12,10 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy.orm import Session
 
-from . import models, schemas, services, auth, money, transfer_code, boards_rooms, boards_snapshots
+from . import models, schemas, services, auth, money, transfer_code, boards_rooms, boards_snapshots, boards_files
 from .database import get_db, SessionLocal
 from .ratelimit import limiter
-from .routers import boards as boards_router, boards_public as boards_public_router
+from .routers import boards as boards_router, boards_public as boards_public_router, student_files as student_files_router
 
 
 def seed_admin():
@@ -107,6 +107,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Korepetycje API", version="3.0", lifespan=lifespan)
 app.include_router(boards_router.router)
 app.include_router(boards_router.library_router)
+app.include_router(student_files_router.router)
 app.include_router(boards_public_router.router)
 
 app.state.limiter = limiter
@@ -613,6 +614,16 @@ def purge_student(
     db.query(models.Board).filter(models.Board.student_id == student.id).update(
         {models.Board.student_id: None}, synchronize_session=False
     )
+    # Materials handed to the student are the student's data: gone with them,
+    # and the disk file too unless another record still shares it.
+    hashes = {row[0] for row in db.query(models.StudentFile.sha256)
+              .filter(models.StudentFile.student_id == student.id)}
+    db.query(models.StudentFile).filter(models.StudentFile.student_id == student.id).delete(
+        synchronize_session=False
+    )
+    db.flush()
+    for sha in hashes:
+        boards_files.remove_if_orphaned(db, sha)
     if series_ids:
         db.query(models.SeriesSkip).filter(
             models.SeriesSkip.series_id.in_(series_ids)

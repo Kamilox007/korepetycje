@@ -208,6 +208,24 @@ export const api = {
   },
   boardFileUrl: (token, fileId) => `${BASE}/t/${token}/files/${fileId}`,
 
+  // ----- materiały ucznia (PDF) -----
+  listStudentFiles: (studentId) => req(`/students/${studentId}/files`),
+  uploadStudentFile: async (studentId, file) => {
+    // multipart - bez nagłówka JSON, przeglądarka ustawi boundary sama
+    const form = new FormData();
+    form.append("file", file, file.name);
+    const res = await fetch(`${BASE}/students/${studentId}/files`, { method: "POST", body: form, credentials: "same-origin" });
+    if (res.status === 401 && onUnauthorized) onUnauthorized();
+    if (!res.ok) {
+      let d = `${res.status}`;
+      try { d = (await res.json()).detail || d; } catch {}
+      throw new Error(d);
+    }
+    return res.json();
+  },
+  deleteStudentFile: (studentId, fileId) => req(`/students/${studentId}/files/${fileId}`, { method: "DELETE" }),
+  studentFileUrl: (studentId, fileId) => `${BASE}/students/${studentId}/files/${fileId}/content`,
+
   // ----- przedmioty -----
   listSubjects: () => req("/subjects"),
   createSubject: (data) => req("/subjects", { method: "POST", body: JSON.stringify(data) }),
@@ -227,4 +245,8 @@ export const api = {
   myLessonSlots: (lessonId) => req(`/me/lessons/${lessonId}/available-slots`),
   requestReschedule: (data) =>
     req("/me/reschedule-requests", { method: "POST", body: JSON.stringify(data) }),
+  // Tablice przypisane do ucznia (z linkami) i jego materiały.
+  myBoards: () => req("/me/boards"),
+  myFiles: () => req("/me/files"),
+  myFileUrl: (fileId) => `${BASE}/me/files/${fileId}/content`,
 };

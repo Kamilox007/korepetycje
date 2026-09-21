@@ -167,7 +167,11 @@ change both or neither. Live sync lives in `boards_rooms.py`: one in-process roo
 periodic save every 15 s, so uvicorn must stay at **one worker**. `PUT` on a page merges (never
 overwrites) and goes through the room when one is open. Image bytes never enter the database
 (`boards_files.py`, sha256-addressed files under `BOARD_FILES_PATH`); SQLite here does not
-enforce foreign keys, so every purge deletes children explicitly. The board route is mounted in
+enforce foreign keys, so every purge deletes children explicitly. Student materials (PDF,
+`routers/student_files.py`, table `student_files`) share that file store; a tutor reaches a
+student's files under the same rule as attaching a board to them (`resolve_student_for`), a
+student reads only their own under `/api/me/files` and lists their boards under `/api/me/boards`.
+The board route is mounted in
 `App.jsx` **before** the `api.me()` login gate. Playwright reads the canvas through
 `window.__tablicaAPI`, exposed only on the dev server.
 

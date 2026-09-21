@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useId } from "react";
 import { api } from "./api";
 import { Link } from "react-router-dom";
 import Modal from "./Modal";
+import { StudentFilesModal } from "./StudentFiles";
 import { DAYS_PL, DURATION_OPTIONS, fmtMoney, fmtTime } from "./dates";
 import { PASSWORD_HINT, passwordError, genStartPassword } from "./password";
 import { useConfirm } from "./Confirm";
@@ -9,6 +10,7 @@ import { useConfirm } from "./Confirm";
 export default function Students({ students, reload, myRole }) {
   const confirm = useConfirm();
   const [series, setSeries] = useState([]);
+  const [filesFor, setFilesFor] = useState(null);
   const [showStudent, setShowStudent] = useState(false);
   const [showSeries, setShowSeries] = useState(false);
   const [accountFor, setAccountFor] = useState(null);
@@ -216,6 +218,7 @@ export default function Students({ students, reload, myRole }) {
                   </td>
                   <td className="num">
                     <Link className="ghost btn-link" to={`/tablice?uczen=${s.id}`}>Tablice</Link>
+                    <button className="ghost" onClick={() => setFilesFor(s)}>Materiały</button>
                     <button className="ghost" onClick={() => setEditStudent(s)}>Edytuj</button>
                     <button className="ghost" onClick={() => archiveStudent(s)}>Archiwizuj</button>
                   </td>
@@ -303,6 +306,9 @@ export default function Students({ students, reload, myRole }) {
           onClose={() => setShowSeries(false)}
           onSaved={() => { setShowSeries(false); refresh(); }}
         />
+      )}
+      {filesFor && (
+        <StudentFilesModal student={filesFor} onClose={() => setFilesFor(null)} />
       )}
       {accountFor && (
         <AccountForm

@@ -1,8 +1,10 @@
-"""Pasted board images on disk.
+"""Content-addressed file store on disk: board images and student materials.
 
 Bytes never go into the database (see README, "Decyzje projektowe"): the path
 is derived from the sha256 of the content, so nothing supplied by a client
-ever becomes part of a filesystem path, and identical uploads share one file.
+ever becomes part of a filesystem path, and identical uploads share one file
+- across boards and students alike, which is why the orphan check below
+looks at every table that references the store.
 """
 import hashlib
 import os
@@ -35,7 +37,10 @@ def remove_if_orphaned(db: Session, sha256: str) -> bool:
     Call after the owning BoardFile rows are deleted (and flushed), otherwise
     the caller's own rows keep the file alive.
     """
-    still_used = db.query(models.BoardFile.id).filter(models.BoardFile.sha256 == sha256).first()
+    still_used = (
+        db.query(models.BoardFile.id).filter(models.BoardFile.sha256 == sha256).first()
+        or db.query(models.StudentFile.id).filter(models.StudentFile.sha256 == sha256).first()
+    )
     if still_used:
         return False
     try:
@@ -57,8 +62,17 @@ FILE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,120}$")
 ALLOWED_MIME = {"image/png", "image/jpeg", "image/gif", "image/webp"}
 
 
+# Student materials: PDF only for now (worksheets, solutions). Generous per-file
+# limit - a scanned worksheet can be a few MB - and a quota per student.
+STUDENT_FILE_MAX_BYTES = int(os.environ.get("STUDENT_FILE_MAX_MB", "20")) * 1024 * 1024
+STUDENT_FILES_MAX_TOTAL_BYTES = int(os.environ.get("STUDENT_FILES_MAX_TOTAL_MB", "300")) * 1024 * 1024
+PDF_MAGIC = b"%PDF-"
+
+
 def sniff_mime(data: bytes) -> str | None:
     """MIME from the bytes themselves, never from the client's header."""
+    if data.startswith(PDF_MAGIC):
+        return "application/pdf"
     if data.startswith(PNG_MAGIC):
         return "image/png"
     if data.startswith(JPEG_MAGIC):
