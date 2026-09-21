@@ -78,9 +78,13 @@ Moduł tablicy interaktywnej (Excalidraw) do prowadzenia korepetycji online.
   jest stanie. Ctrl+Z cofa tylko własne zmiany.
 - Wklejone obrazki (zdjęcie zadania) lądują na dysku serwera, nie w bazie.
   Limity: 10 MB na plik, 200 MB na tablicę.
-- **Biblioteka** (przycisk po prawej): wbudowane bryły w rzucie ukośnym
-  z przerywanymi krawędziami niewidocznymi (prostopadłościan, sześcian,
-  graniastosłup, ostrosłupy, walec, stożek, kula) - te same dla każdego.
+- **Biblioteka** (przycisk po prawej): wbudowane kształty, te same dla
+  każdego - bryły w rzucie ukośnym z przerywanymi krawędziami niewidocznymi
+  (prostopadłościan, sześcian, graniastosłup, ostrosłupy, walec, stożek,
+  kula), matematyka (układ współrzędnych, oś liczbowa, okrąg
+  trygonometryczny, trójkąty, kąt, parabola, sinusoida) i chemia (pierścień
+  benzenowy, cykloheksan, łańcuch, wiązania, strzałki reakcji i równowagi,
+  cząsteczka wody, klatki orbitalne, probówka, zlewka, kolba).
   Własne rysunki dodane przez „dodaj do biblioteki" zapisują się **na
   koncie** (ta sama biblioteka na każdym urządzeniu), u gościa - w jego
   przeglądarce.
