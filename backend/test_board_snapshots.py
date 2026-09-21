@@ -10,7 +10,7 @@ import sys, pathlib
 from datetime import timedelta
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from testing_utils import bootstrap
+from testing_utils import bootstrap, login_admin
 bootstrap()
 
 from fastapi.testclient import TestClient
@@ -68,10 +68,7 @@ check("restore_update: already-deleted elements are left alone",
       all(u["id"] != "gone" for u in update))
 
 with TestClient(app) as admin:
-    admin.post("/api/auth/login", data={"username": "admin", "password": "admin"})
-    admin.post("/api/auth/change-password", json={
-        "old_password": "admin", "new_password": "AdminPass123!", "accept_privacy": True,
-    })
+    login_admin(admin)
     board = admin.post("/api/boards", json={"title": "Snap"}).json()
     tok = board["path"].removeprefix("/t/")
     p0 = board["pages"][0]["id"]

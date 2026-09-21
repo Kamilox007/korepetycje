@@ -10,7 +10,7 @@ disk.
 import sys, pathlib, tempfile, hashlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from testing_utils import bootstrap
+from testing_utils import bootstrap, login_admin
 
 FILES_DIR = tempfile.mkdtemp(prefix="board-files-")
 bootstrap(BOARD_FILES_PATH=FILES_DIR, BOARD_MAX_FILE_MB="1", BOARD_MAX_TOTAL_MB="2")
@@ -47,10 +47,7 @@ def files_on_disk():
 
 
 with TestClient(app) as admin:
-    admin.post("/api/auth/login", data={"username": "admin", "password": "admin"})
-    admin.post("/api/auth/change-password", json={
-        "old_password": "admin", "new_password": "AdminPass123!", "accept_privacy": True,
-    })
+    login_admin(admin)
     board = admin.post("/api/boards", json={"title": "Pliki"}).json()
     tok = board["path"].removeprefix("/t/")
     other = admin.post("/api/boards", json={"title": "Inna"}).json()

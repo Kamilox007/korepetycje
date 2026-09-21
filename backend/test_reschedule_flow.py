@@ -9,7 +9,7 @@ import sys, pathlib
 from datetime import date, timedelta
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from testing_utils import bootstrap
+from testing_utils import bootstrap, login_admin, client_for
 bootstrap()
 
 from fastapi.testclient import TestClient
@@ -24,33 +24,19 @@ def check(label, cond):
         FAILS.append(label)
 
 
-def account(username, password):
-    """Client logged in and past the forced password change."""
-    c = TestClient(app)
-    c.__enter__()
-    c.post("/api/auth/login", data={"username": username, "password": "StartPass123!"})
-    c.post("/api/auth/change-password", json={
-        "old_password": "StartPass123!", "new_password": password, "accept_privacy": True,
-    })
-    return c
-
-
 DAY = date.today() + timedelta(days=5)
 NEW_DAY = date.today() + timedelta(days=7)
 
 with TestClient(app) as admin:
-    admin.post("/api/auth/login", data={"username": "admin", "password": "admin"})
-    admin.post("/api/auth/change-password", json={
-        "old_password": "admin", "new_password": "AdminPass123!", "accept_privacy": True,
-    })
+    login_admin(admin)
 
     for username, name in (("ewa", "Ewa"), ("olek", "Olek")):
         admin.post("/api/users", json={
             "username": username, "password": "StartPass123!", "role": "tutor",
             "display_name": name,
         })
-    ewa = account("ewa", "EwaPass123!")
-    olek = account("olek", "OlekPass123!")
+    ewa = client_for("ewa", "EwaPass123!")
+    olek = client_for("olek", "OlekPass123!")
     ewa_id = ewa.get("/api/auth/me").json()["id"]
     olek_id = olek.get("/api/auth/me").json()["id"]
 
@@ -70,7 +56,7 @@ with TestClient(app) as admin:
 
     admin.post(f"/api/students/{ala}/account",
                json={"username": "ala", "password": "StartPass123!"})
-    student = account("ala", "AlaPass123!")
+    student = client_for("ala", "AlaPass123!")
 
     # --- creating a request ---
     r = student.post("/api/me/reschedule-requests", json={

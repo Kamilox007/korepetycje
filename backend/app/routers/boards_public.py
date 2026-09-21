@@ -71,8 +71,22 @@ def owner_or_403(request: Request, db: Session, board: models.Board) -> models.U
     return user
 
 
+def _well_formed(elements: list) -> bool:
+    return all(isinstance(e, dict) and isinstance(e.get("id"), str) and e["id"] for e in elements)
+
+
+def elements_ok(elements) -> bool:
+    """The WebSocket's yes/no version of validate_elements: a list of dicts
+    with non-empty string ids, and no base64 payload hiding in any of them."""
+    return (
+        isinstance(elements, list)
+        and _well_formed(elements)
+        and not boards_reconcile.contains_data_url(elements)
+    )
+
+
 def validate_elements(elements: list) -> list[dict]:
-    if not all(isinstance(e, dict) and isinstance(e.get("id"), str) and e["id"] for e in elements):
+    if not _well_formed(elements):
         raise HTTPException(400, "Nieprawidłowy element sceny")
     if boards_reconcile.contains_data_url(elements):
         raise HTTPException(400, "Scena nie może zawierać danych binarnych (data:)")
@@ -215,14 +229,10 @@ async def upload_file(
     if existing:
         return existing
 
-    data = await file.read(boards_files.MAX_FILE_BYTES + 1)
-    if len(data) > boards_files.MAX_FILE_BYTES:
-        raise HTTPException(413, f"Plik przekracza {boards_files.MAX_FILE_BYTES // (1024 * 1024)} MB")
-    if not data:
-        raise HTTPException(400, "Pusty plik")
-    mime = boards_files.sniff_mime(data)
-    if mime not in boards_files.ALLOWED_MIME:
-        raise HTTPException(415, "Dozwolone są tylko obrazy PNG, JPEG, GIF i WebP")
+    data, mime = await boards_files.read_upload(
+        file, max_bytes=boards_files.MAX_FILE_BYTES, allowed=boards_files.ALLOWED_MIME,
+        wrong_type="Dozwolone są tylko obrazy PNG, JPEG, GIF i WebP",
+    )
     if boards_files.board_usage(db, board.id) + len(data) > boards_files.MAX_TOTAL_BYTES:
         raise HTTPException(413, "Limit miejsca na pliki tej tablicy został wyczerpany")
 
@@ -276,15 +286,10 @@ def _ws_lookup(token: str, page_id: int, cookies: dict) -> tuple[int, int, bool]
     """Board/page/owner for a handshake, on a short-lived session. None = 4404."""
     db = SessionLocal()
     try:
-        board = (
-            db.query(models.Board)
-            .filter(models.Board.token == token, models.Board.archived_at.is_(None))
-            .first()
-        )
-        if not board:
-            return None
-        page = db.get(models.BoardPage, page_id)
-        if not page or page.board_id != board.id:
+        try:
+            board = board_by_token(db, token)
+            page = page_of(db, board, page_id)
+        except HTTPException:
             return None
         user = auth.optional_active_user(cookies, db)
         return board.id, page.id, is_owner(user, board)
@@ -335,9 +340,7 @@ async def board_ws(websocket: WebSocket, token: str, page_id: int):
             kind = msg.get("t")
             if kind == "update":
                 elements = msg.get("elements")
-                if not isinstance(elements, list) or not all(
-                    isinstance(e, dict) and isinstance(e.get("id"), str) and e["id"] for e in elements
-                ) or boards_reconcile.contains_data_url(elements):
+                if not elements_ok(elements):
                     await websocket.close(code=boards_rooms.CLOSE_BAD_MESSAGE)
                     break
                 await boards_rooms.apply_update(room, elements, conn)

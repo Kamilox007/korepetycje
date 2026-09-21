@@ -7,7 +7,7 @@ never 403 - a 403 confirms the id is taken).
 import sys, pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from testing_utils import bootstrap
+from testing_utils import bootstrap, login_admin, make_user
 bootstrap()
 
 from fastapi.testclient import TestClient
@@ -22,25 +22,8 @@ def check(label, cond):
         FAILS.append(label)
 
 
-def make_user(admin, username, role, password):
-    admin.post("/api/users", json={
-        "username": username, "password": "StartPass123!", "role": role,
-        "display_name": username.title(),
-    })
-    c = TestClient(app)
-    c.__enter__()
-    c.post("/api/auth/login", data={"username": username, "password": "StartPass123!"})
-    c.post("/api/auth/change-password", json={
-        "old_password": "StartPass123!", "new_password": password, "accept_privacy": True,
-    })
-    return c
-
-
 with TestClient(app) as admin:
-    admin.post("/api/auth/login", data={"username": "admin", "password": "admin"})
-    admin.post("/api/auth/change-password", json={
-        "old_password": "admin", "new_password": "AdminPass123!", "accept_privacy": True,
-    })
+    login_admin(admin)
     ewa = make_user(admin, "ewa", "tutor", "EwaPass123!")
 
     # --- creation ---

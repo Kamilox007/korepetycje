@@ -9,7 +9,7 @@ import sys, pathlib
 from datetime import date, timedelta
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from testing_utils import bootstrap
+from testing_utils import bootstrap, login_admin, make_user, first_login, START_PASSWORD
 bootstrap()
 
 from fastapi.testclient import TestClient
@@ -24,31 +24,13 @@ def check(label, cond):
         FAILS.append(label)
 
 
-def make_tutor(admin, username, display_name, password):
-    """Create a tutor and hand back a client already past the forced change."""
-    admin.post("/api/users", json={
-        "username": username, "password": "StartPass123!", "role": "tutor",
-        "display_name": display_name,
-    })
-    c = TestClient(app)
-    c.__enter__()
-    c.post("/api/auth/login", data={"username": username, "password": "StartPass123!"})
-    c.post("/api/auth/change-password", json={
-        "old_password": "StartPass123!", "new_password": password, "accept_privacy": True,
-    })
-    return c
-
-
 DAY = date.today() + timedelta(days=2)
 
 with TestClient(app) as admin:
-    admin.post("/api/auth/login", data={"username": "admin", "password": "admin"})
-    admin.post("/api/auth/change-password", json={
-        "old_password": "admin", "new_password": "AdminPass123!", "accept_privacy": True,
-    })
+    login_admin(admin)
 
-    ewa = make_tutor(admin, "ewa", "Ewa", "EwaPass123!")
-    olek = make_tutor(admin, "olek", "Olek", "OlekPass123!")
+    ewa = make_user(admin, "ewa", "tutor", "EwaPass123!")
+    olek = make_user(admin, "olek", "tutor", "OlekPass123!")
     ewa_id = ewa.get("/api/auth/me").json()["id"]
     olek_id = olek.get("/api/auth/me").json()["id"]
 
@@ -200,10 +182,7 @@ with TestClient(app) as admin:
     admin.post(f"/api/students/{ala}/account",
                json={"username": "ala", "password": "StartPass123!"})
     with TestClient(app) as student:
-        student.post("/api/auth/login", data={"username": "ala", "password": "StartPass123!"})
-        student.post("/api/auth/change-password", json={
-            "old_password": "StartPass123!", "new_password": "AlaPass123!", "accept_privacy": True,
-        })
+        first_login(student, "ala", START_PASSWORD, "AlaPass123!")
         mine = student.get("/api/me/lessons").json()
         check("student sees only their own lessons", [l["id"] for l in mine] == [ala_lesson])
         check("student sees only their own payments",

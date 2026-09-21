@@ -110,7 +110,15 @@ def resolve_student_for(db: Session, user: models.User, student_id: int) -> mode
     return student
 
 
-def _page_counts(db: Session, board_ids: list[int]) -> dict[int, int]:
+def student_for_user(db: Session, user: models.User) -> models.Student:
+    """The student record behind a student account."""
+    s = db.query(models.Student).filter(models.Student.user_id == user.id).first()
+    if not s:
+        raise HTTPException(404, "Brak powiązanego profilu ucznia")
+    return s
+
+
+def page_counts(db: Session, board_ids: list[int]) -> dict[int, int]:
     if not board_ids:
         return {}
     rows = (
@@ -131,9 +139,9 @@ def _out(board: models.Board, db: Session, page_count: int | None = None,
         student_id=board.student_id,
         student_name=board.student.name if board.student else None,
         created_by_user_id=board.created_by_user_id,
-        created_by_name=(creator.display_name or creator.username) if creator else None,
+        created_by_name=creator.label if creator else None,
         assigned_tutor_id=board.assigned_tutor_id,
-        assigned_tutor_name=(tutor.display_name or tutor.username) if tutor else None,
+        assigned_tutor_name=tutor.label if tutor else None,
         created_at=board.created_at, updated_at=board.updated_at,
         last_opened_at=board.last_opened_at, archived_at=board.archived_at,
         page_count=page_count if page_count is not None else len(board.pages),
@@ -159,7 +167,7 @@ def list_boards(
     if student_id is not None:
         q = q.filter(models.Board.student_id == student_id)
     boards = q.order_by(models.Board.updated_at.desc()).all()
-    counts = _page_counts(db, [b.id for b in boards])
+    counts = page_counts(db, [b.id for b in boards])
     return [_out(b, db, counts.get(b.id, 0)) for b in boards]
 
 

@@ -10,7 +10,7 @@ URL, and that a wrong token is refused.
 import sys, pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from testing_utils import bootstrap
+from testing_utils import bootstrap, login_admin, first_login
 bootstrap()
 
 from datetime import date, timedelta
@@ -33,9 +33,7 @@ TUTOR2_PW = "FeedTutor2123!"
 today = date.today()
 
 with TestClient(app) as admin:
-    admin.post("/api/auth/login", data={"username": "admin", "password": "admin"})
-    admin.post("/api/auth/change-password",
-               json={"old_password": "admin", "new_password": ADMIN_PW, "accept_privacy": True})
+    login_admin(admin, ADMIN_PW)
 
     r = admin.post("/api/users", json={
         "username": "feedtutor", "password": TUTOR_PW, "role": "tutor", "display_name": "Feed Tutor",
@@ -70,9 +68,7 @@ with TestClient(app) as admin:
     }).json()
 
     with TestClient(app) as tutor:
-        tutor.post("/api/auth/login", data={"username": "feedtutor", "password": TUTOR_PW})
-        tutor.post("/api/auth/change-password",
-                   json={"old_password": TUTOR_PW, "new_password": "FeedTutorOwn1!", "accept_privacy": True})
+        first_login(tutor, "feedtutor", TUTOR_PW, "FeedTutorOwn1!")
 
         r = tutor.get("/api/me/calendar-feed")
         check("tutor gets a feed path -> 200", r.status_code == 200)

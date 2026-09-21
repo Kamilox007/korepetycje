@@ -9,7 +9,7 @@ the same effective_from twice corrects it instead of duplicating it.
 import sys, pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from testing_utils import bootstrap
+from testing_utils import bootstrap, login_admin, first_login
 bootstrap()
 
 from datetime import date, timedelta
@@ -43,9 +43,7 @@ q_start, q_end = quarter_bounds(today)
 prev_quarter_day = q_start - timedelta(days=1)
 
 with TestClient(app) as admin:
-    admin.post("/api/auth/login", data={"username": "admin", "password": "admin"})
-    admin.post("/api/auth/change-password",
-               json={"old_password": "admin", "new_password": ADMIN_PW, "accept_privacy": True})
+    login_admin(admin, ADMIN_PW)
     admin_id = admin.get("/api/auth/me").json()["id"]
 
     r = admin.post("/api/users", json={
@@ -57,12 +55,8 @@ with TestClient(app) as admin:
     })
 
     with TestClient(app) as tutor, TestClient(app) as sec:
-        tutor.post("/api/auth/login", data={"username": "qtutor", "password": TUTOR_PW})
-        tutor.post("/api/auth/change-password",
-                   json={"old_password": TUTOR_PW, "new_password": "TutorOwn123!", "accept_privacy": True})
-        sec.post("/api/auth/login", data={"username": "qsec", "password": SEC_PW})
-        sec.post("/api/auth/change-password",
-                 json={"old_password": SEC_PW, "new_password": "SecOwn123!", "accept_privacy": True})
+        first_login(tutor, "qtutor", TUTOR_PW, "TutorOwn123!")
+        first_login(sec, "qsec", SEC_PW, "SecOwn123!")
 
         # --- setting the limit: admin only ---
         check("secretary cannot set the limit",

@@ -4,10 +4,10 @@ Guards the things a bare link must and must not be able to do: read and
 merge-save any page of its own board, nothing of any other board, and no
 owner operations (add / rename / delete a page) without the owner's cookie.
 """
-import sys, pathlib, sqlite3
+import sys, pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from testing_utils import bootstrap
+from testing_utils import bootstrap, login_admin, make_user
 bootstrap()
 
 from fastapi.testclient import TestClient
@@ -29,27 +29,10 @@ def el(id, version, nonce, index="a0", **extra):
             "index": index, "isDeleted": False, **extra}
 
 
-def make_tutor(admin, username, password):
-    admin.post("/api/users", json={
-        "username": username, "password": "StartPass123!", "role": "tutor",
-        "display_name": username.title(),
-    })
-    c = TestClient(app)
-    c.__enter__()
-    c.post("/api/auth/login", data={"username": username, "password": "StartPass123!"})
-    c.post("/api/auth/change-password", json={
-        "old_password": "StartPass123!", "new_password": password, "accept_privacy": True,
-    })
-    return c
-
-
 with TestClient(app) as admin:
-    admin.post("/api/auth/login", data={"username": "admin", "password": "admin"})
-    admin.post("/api/auth/change-password", json={
-        "old_password": "admin", "new_password": "AdminPass123!", "accept_privacy": True,
-    })
-    ewa = make_tutor(admin, "ewa", "EwaPass123!")
-    olek = make_tutor(admin, "olek", "OlekPass123!")
+    login_admin(admin)
+    ewa = make_user(admin, "ewa", "tutor", "EwaPass123!")
+    olek = make_user(admin, "olek", "tutor", "OlekPass123!")
     guest = TestClient(app)  # no cookie at all
 
     board = ewa.post("/api/boards", json={"title": "Kasia"}).json()

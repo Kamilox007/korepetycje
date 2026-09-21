@@ -152,9 +152,6 @@ def free_windows_for_tutor(db, tutor_id: int, start_date, days_ahead: int = 14,
       (start + duration must fit inside a free interval).
     `exclude_lesson_id` skips one specific lesson when computing busy time
     (the one currently being rescheduled)."""
-    from datetime import timedelta
-    from . import models
-
     availability = (
         db.query(models.Availability)
         .filter(models.Availability.tutor_id == tutor_id)

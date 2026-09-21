@@ -1,7 +1,7 @@
 from datetime import datetime, date, time
 from sqlalchemy import (
     MetaData,
-    Integer, String, Float, Boolean, Date, Time, DateTime, ForeignKey, Text,
+    Integer, String, Boolean, Date, Time, DateTime, ForeignKey, Text,
     UniqueConstraint, JSON,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -26,13 +26,13 @@ class Base(DeclarativeBase):
 
 
 class User(Base):
-    """Login account. Role: 'tutor' or 'student'."""
+    """Login account. Role: 'admin', 'secretary', 'tutor' or 'student'."""
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     username: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    role: Mapped[str] = mapped_column(String(20), nullable=False)  # tutor | student
+    role: Mapped[str] = mapped_column(String(20), nullable=False)  # admin | secretary | tutor | student
     display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     color: Mapped[str | None] = mapped_column(String(20), nullable=True)  # kolor korepetytora w kalendarzu
     # Where this tutor's students send their transfers. Admin-only to edit:
@@ -65,6 +65,12 @@ class User(Base):
     student_profile: Mapped["Student"] = relationship(
         back_populates="user", foreign_keys="Student.user_id", uselist=False
     )
+
+    @property
+    def label(self) -> str:
+        """What the UI calls this account: the display name, or the login
+        for accounts created without one."""
+        return self.display_name or self.username
 
 
 class Student(Base):
@@ -380,7 +386,7 @@ class BoardPage(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     # ondelete documents intent; SQLite here does not enforce FKs, so purge
-    # deletes children explicitly (see purge_board in main.py).
+    # deletes children explicitly (see purge_board in routers/boards.py).
     board_id: Mapped[int] = mapped_column(
         ForeignKey("boards.id", ondelete="CASCADE"), nullable=False, index=True
     )

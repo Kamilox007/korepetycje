@@ -20,7 +20,7 @@ from starlette.concurrency import run_in_threadpool
 
 from .. import models, schemas, auth, boards_files
 from ..database import get_db
-from .boards import require_board_manager, resolve_student_for, board_path
+from .boards import require_board_manager, resolve_student_for, board_path, page_counts, student_for_user
 
 router = APIRouter(prefix="/api", tags=["student-files"])
 
@@ -46,8 +46,18 @@ def _usage(db: Session, student_id: int) -> int:
 def _out(f: models.StudentFile, db: Session) -> schemas.StudentFileOut:
     by = db.get(models.User, f.uploaded_by_user_id)
     item = schemas.StudentFileOut.model_validate(f)
-    item.uploaded_by_name = (by.display_name or by.username) if by else None
+    item.uploaded_by_name = by.label if by else None
     return item
+
+
+def _files_of(db: Session, student: models.Student) -> list[schemas.StudentFileOut]:
+    rows = (
+        db.query(models.StudentFile)
+        .filter(models.StudentFile.student_id == student.id)
+        .order_by(models.StudentFile.created_at.desc(), models.StudentFile.id.desc())
+        .all()
+    )
+    return [_out(f, db) for f in rows]
 
 
 def _serve(f: models.StudentFile) -> FileResponse:
@@ -72,14 +82,7 @@ def list_student_files(
     user: models.User = Depends(require_board_manager),
     db: Session = Depends(get_db),
 ):
-    student = resolve_student_for(db, user, student_id)
-    rows = (
-        db.query(models.StudentFile)
-        .filter(models.StudentFile.student_id == student.id)
-        .order_by(models.StudentFile.created_at.desc(), models.StudentFile.id.desc())
-        .all()
-    )
-    return [_out(f, db) for f in rows]
+    return _files_of(db, resolve_student_for(db, user, student_id))
 
 
 @router.post("/students/{student_id}/files", response_model=schemas.StudentFileOut)
@@ -90,14 +93,10 @@ async def upload_student_file(
     db: Session = Depends(get_db),
 ):
     student = resolve_student_for(db, user, student_id)
-    data = await file.read(boards_files.STUDENT_FILE_MAX_BYTES + 1)
-    if len(data) > boards_files.STUDENT_FILE_MAX_BYTES:
-        raise HTTPException(413, f"Plik przekracza {boards_files.STUDENT_FILE_MAX_BYTES // (1024 * 1024)} MB")
-    if not data:
-        raise HTTPException(400, "Pusty plik")
-    mime = boards_files.sniff_mime(data)
-    if mime not in ALLOWED_MIME:
-        raise HTTPException(415, "Dozwolone są tylko pliki PDF")
+    data, mime = await boards_files.read_upload(
+        file, max_bytes=boards_files.STUDENT_FILE_MAX_BYTES, allowed=ALLOWED_MIME,
+        wrong_type="Dozwolone są tylko pliki PDF",
+    )
     if _usage(db, student.id) + len(data) > boards_files.STUDENT_FILES_MAX_TOTAL_BYTES:
         raise HTTPException(413, "Limit miejsca na materiały tego ucznia został wyczerpany")
 
@@ -147,30 +146,16 @@ def delete_student_file(
 
 # ---------------------------------------------------------------- student
 
-def _my_student(db: Session, user: models.User) -> models.Student:
-    s = db.query(models.Student).filter(models.Student.user_id == user.id).first()
-    if not s:
-        raise HTTPException(404, "Brak powiązanego profilu ucznia")
-    return s
-
-
 @router.get("/me/files", response_model=list[schemas.StudentFileOut])
 def my_files(user: models.User = Depends(auth.require_student), db: Session = Depends(get_db)):
-    student = _my_student(db, user)
-    rows = (
-        db.query(models.StudentFile)
-        .filter(models.StudentFile.student_id == student.id)
-        .order_by(models.StudentFile.created_at.desc(), models.StudentFile.id.desc())
-        .all()
-    )
-    return [_out(f, db) for f in rows]
+    return _files_of(db, student_for_user(db, user))
 
 
 @router.get("/me/files/{file_id}/content")
 def my_file_content(
     file_id: int, user: models.User = Depends(auth.require_student), db: Session = Depends(get_db),
 ):
-    student = _my_student(db, user)
+    student = student_for_user(db, user)
     return _serve(_file_for(db, student, file_id))
 
 
@@ -179,19 +164,14 @@ def my_boards(user: models.User = Depends(auth.require_student), db: Session = D
     """Boards attached to this student, with their links. Access to a board is
     still the token in the link - this only saves the student the search
     through old messages for it. Archived boards stay out: their links are dead."""
-    student = _my_student(db, user)
+    student = student_for_user(db, user)
     boards = (
         db.query(models.Board)
         .filter(models.Board.student_id == student.id, models.Board.archived_at.is_(None))
         .order_by(models.Board.updated_at.desc())
         .all()
     )
-    counts = dict(
-        db.query(models.BoardPage.board_id, func.count(models.BoardPage.id))
-        .filter(models.BoardPage.board_id.in_([b.id for b in boards]))
-        .group_by(models.BoardPage.board_id)
-        .all()
-    ) if boards else {}
+    counts = page_counts(db, [b.id for b in boards])
     return [
         schemas.MyBoardOut(id=b.id, title=b.title, path=board_path(b),
                            page_count=counts.get(b.id, 0), updated_at=b.updated_at)
