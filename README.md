@@ -90,6 +90,10 @@ Moduł tablicy interaktywnej (Excalidraw) do prowadzenia korepetycji online.
   przeglądarce.
 - **Kratka** na pasku - ustawienie widoku tylko dla tego, kto ją włączył,
   pamiętane per tablica w przeglądarce.
+- **Pobierz** - bieżąca strona jako PNG/SVG (okno eksportu Excalidrawa);
+  **PDF** - cała tablica, jedna strona tablicy na stronę PDF, z tytułem,
+  zawsze na białym tle niezależnie od motywu. Składany w przeglądarce
+  (jsPDF ładowany dopiero przy kliknięciu), nic nie idzie przez serwer.
 - **Nowy link** w panelu unieważnia stary natychmiast (gdy wyciekł albo
   kurs się skończył); treść zostaje, połączone osoby są rozłączane.
 - **Archiwizacja** wyłącza link i chowa tablicę z listy; przywrócenie włącza

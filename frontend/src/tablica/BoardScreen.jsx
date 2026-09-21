@@ -49,6 +49,21 @@ export default function BoardScreen() {
   const [status, setStatus] = useState("connecting");
   const [peers, setPeers] = useState([]);
   const [notice, setNotice] = useState("");
+  // Eksport całej tablicy do PDF: pdf.js (z jsPDF) ładuje się dopiero przy
+  // pierwszym kliknięciu, żeby nie obciążać wejścia na tablicę.
+  const [pdfBusy, setPdfBusy] = useState(null);
+  async function downloadPdf() {
+    if (pdfBusy || !board) return;
+    setPdfBusy("Przygotowuję PDF…");
+    try {
+      const { exportBoardPdf } = await import("./pdf");
+      await exportBoardPdf({
+        token, title: board.title, pages: board.pages,
+        onProgress: (done, total) => setPdfBusy(`PDF: strona ${Math.min(done + 1, total)} z ${total}…`),
+      });
+    } catch (e) { setError("Nie udało się wygenerować PDF: " + e.message); }
+    setPdfBusy(null);
+  }
   const editorRef = useRef(null);
   // Grubość linii: własna kontrolka, bo Excalidraw daje tylko 1/2/4.
   const [strokeWidth, setStrokeWidth] = useState(() => {
@@ -203,6 +218,8 @@ export default function BoardScreen() {
           )}
           <button className="ghost tablica-btn" onClick={() => editorRef.current?.openExport()}
                   title="Pobierz tę stronę jako PNG lub SVG">Pobierz</button>
+          <button className="ghost tablica-btn" onClick={downloadPdf} disabled={!!pdfBusy}
+                  title="Cała tablica jako PDF - jedna strona tablicy na stronę">{pdfBusy || "PDF"}</button>
           <button className="ghost tablica-btn" onClick={toggleTheme}
                   title="Motyw tablicy (niezależny od panelu)">{theme === "dark" ? "Jasny" : "Ciemny"}</button>
           <button className={`ghost tablica-btn${grid ? " active" : ""}`} onClick={toggleGrid}
