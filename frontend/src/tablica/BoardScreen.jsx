@@ -6,6 +6,7 @@ import { useTheme } from "../useTheme";
 import Modal from "../Modal";
 import PageEditor from "./PageEditor";
 import { openLibraryStore } from "./library";
+import { STROKE_MIN, STROKE_MAX, STROKE_DEFAULT } from "./stroke";
 import "./tablica.css";
 
 /**
@@ -31,7 +32,10 @@ export default function BoardScreen() {
   const [notice, setNotice] = useState("");
   const editorRef = useRef(null);
   // Grubość linii: własna kontrolka, bo Excalidraw daje tylko 1/2/4.
-  const [strokeWidth, setStrokeWidth] = useState(() => Number(read(`tablica:${token}:stroke`)) || 2);
+  const [strokeWidth, setStrokeWidth] = useState(() => {
+    const saved = Number(read(`tablica:${token}:stroke`));
+    return saved >= STROKE_MIN && saved <= STROKE_MAX ? saved : STROKE_DEFAULT;
+  });
   // Kratka to ustawienie widoku tej przeglądarki, pamiętane per tablica.
   const [grid, setGrid] = useState(() => read(`tablica:${token}:grid`) === "1");
   // Biblioteka kształtów: otwierana raz na wejściu (konto albo przeglądarka),
@@ -178,14 +182,6 @@ export default function BoardScreen() {
               ))}
             </span>
           )}
-          <span className="tablica-stroke" role="group" aria-label="Grubość linii" title="Grubość linii - zaznaczonych i kolejnych">
-            {STROKE_WIDTHS.map((w) => (
-              <button key={w} className={`tablica-stroke-btn${w === strokeWidth ? " active" : ""}`}
-                      onClick={() => pickStrokeWidth(w)} aria-pressed={w === strokeWidth} aria-label={`Grubość ${w}`}>
-                <span className="tablica-stroke-line" style={{ height: Math.min(w, 10) }} />
-              </button>
-            ))}
-          </span>
           <button className={`ghost tablica-btn${grid ? " active" : ""}`} onClick={toggleGrid}
                   aria-pressed={grid} title="Kratka (tylko na Twoim ekranie)">Kratka</button>
           <span className={`tablica-status ${status}`}>
@@ -221,6 +217,7 @@ export default function BoardScreen() {
             grid={grid}
             library={library}
             strokeWidth={strokeWidth}
+            onStrokeWidthChange={pickStrokeWidth}
             onStatus={setStatus}
             onPeers={(ps, selfId) => setPeers(ps.map((p) => ({ ...p, self: p.peer_id === selfId })))}
             onClosed={onClosed}
@@ -245,7 +242,7 @@ export default function BoardScreen() {
   );
 }
 
-const STROKE_WIDTHS = [1, 2, 4, 6, 8, 12];
+
 
 function initials(n) {
   return (n || "?").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
