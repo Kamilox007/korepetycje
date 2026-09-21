@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { usePersistentState } from "./usePersistentState";
 import { useTheme } from "./useTheme";
 import { api, setUnauthorizedHandler } from "./api";
 import Login from "./Login";
@@ -221,7 +220,7 @@ function Sidebar({ auth, subtitle, onLogout, onChangePassword, tabs, badge }) {
   );
 }
 
-// Simple shell for roles without tabs (tutor, student)
+// Shell for the single-role panels (tutor, student): sidebar plus routes.
 function RoleShell({ auth, subtitle, onLogout, onChangePassword, tabs = [], badge = 0, children }) {
   return (
     <div className="app">

@@ -9,6 +9,17 @@ const BASE = "/api";
 let onUnauthorized = null;
 export function setUnauthorizedHandler(fn) { onUnauthorized = fn; }
 
+// The backend answers errors with {"detail": "..."} (FastAPI); anything else
+// falls back to the status code so the user still sees *something*.
+async function errorFrom(res, fallback = `${res.status}`) {
+  let detail = fallback;
+  try {
+    const j = await res.json();
+    detail = j.detail || JSON.stringify(j);
+  } catch { /* not JSON */ }
+  return new Error(detail);
+}
+
 async function req(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
 
@@ -21,17 +32,36 @@ async function req(path, options = {}) {
     if (onUnauthorized) onUnauthorized();
     throw new Error("401: sesja wygasła");
   }
-  if (!res.ok) {
-    let detail = `${res.status}`;
-    try {
-      const j = await res.json();
-      detail = j.detail || JSON.stringify(j);
-    } catch { detail = await res.text(); }
-    throw new Error(detail);
-  }
+  if (!res.ok) throw await errorFrom(res);
   if (res.status === 204) return null;
   const ct = res.headers.get("content-type") || "";
   return ct.includes("application/json") ? res.json() : null;
+}
+
+// A state-changing call with a JSON body. `data` may be omitted for endpoints
+// that take none (POST /x/restore etc.).
+const send = (method, path, data) =>
+  req(path, { method, ...(data !== undefined && { body: JSON.stringify(data) }) });
+const post = (path, data) => send("POST", path, data);
+const put = (path, data) => send("PUT", path, data);
+const patch = (path, data) => send("PATCH", path, data);
+const del = (path) => send("DELETE", path);
+
+// Query string from an object; empty values are left out, and so is the "?"
+// when nothing remains.
+function query(params = {}) {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v) p.set(k, v);
+  const q = p.toString();
+  return q ? `?${q}` : "";
+}
+
+// Multipart upload: no JSON header, the browser sets the boundary itself.
+async function upload(path, form) {
+  const res = await fetch(BASE + path, { method: "POST", body: form, credentials: "same-origin" });
+  if (res.status === 401 && onUnauthorized) onUnauthorized();
+  if (!res.ok) throw await errorFrom(res);
+  return res.json();
 }
 
 export const api = {
@@ -45,141 +75,122 @@ export const api = {
       body,
       credentials: "same-origin",
     });
-    if (!res.ok) {
-      let d = "Błąd logowania";
-      try { d = (await res.json()).detail || d; } catch {}
-      throw new Error(d);
-    }
+    if (!res.ok) throw await errorFrom(res, "Błąd logowania");
     return res.json();
   },
   me: () => req("/auth/me"),
   changePassword: (oldP, newP, acceptPrivacy = false) =>
     // The backend refreshes the cookie in its response, so there is nothing to
     // store here. The old token was short-lived, the new one is full length.
-    req("/auth/change-password", {
-      method: "POST",
-      body: JSON.stringify({ old_password: oldP, new_password: newP, accept_privacy: acceptPrivacy }),
-    }),
+    post("/auth/change-password", { old_password: oldP, new_password: newP, accept_privacy: acceptPrivacy }),
 
-  logout: () => req("/auth/logout", { method: "POST" }),
+  logout: () => post("/auth/logout"),
 
   // ----- students (korepetytor) -----
-  listStudents: (archived = false) =>
-    req(`/students${archived ? "?archived=true" : ""}`),
-  createStudent: (data) => req("/students", { method: "POST", body: JSON.stringify(data) }),
-  updateStudent: (id, data) => req(`/students/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  listStudents: (archived = false) => req(`/students${query({ archived: archived ? "true" : "" })}`),
+  createStudent: (data) => post("/students", data),
+  updateStudent: (id, data) => patch(`/students/${id}`, data),
   // Archiwizuje: uczeń znika z list, historia zostaje.
-  archiveStudent: (id) => req(`/students/${id}`, { method: "DELETE" }),
-  restoreStudent: (id) => req(`/students/${id}/restore`, { method: "POST" }),
+  archiveStudent: (id) => del(`/students/${id}`),
+  restoreStudent: (id) => post(`/students/${id}/restore`),
   // Nieodwracalne usunięcie danych (RODO art. 17). Tylko admin, tylko z archiwum.
-  purgeStudent: (id) => req(`/students/${id}/purge`, { method: "DELETE" }),
+  purgeStudent: (id) => del(`/students/${id}/purge`),
   createStudentAccount: (id, data) =>
-    req(`/students/${id}/account`, { method: "POST", body: JSON.stringify(data) }),
-  deleteStudentAccount: (id) => req(`/students/${id}/account`, { method: "DELETE" }),
+    post(`/students/${id}/account`, data),
+  deleteStudentAccount: (id) => del(`/students/${id}/account`),
 
   // ----- series -----
   listSeries: () => req("/series"),
-  createSeries: (data) => req("/series", { method: "POST", body: JSON.stringify(data) }),
+  createSeries: (data) => post("/series", data),
   // Zmiany metadanych trafiają na przyszłe zajęcia, godziny - tylko na te,
   // których nikt ręcznie nie przesunął. Szczegóły w docstringu endpointu.
   updateSeries: (id, data) =>
-    req(`/series/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-  deleteSeries: (id) => req(`/series/${id}`, { method: "DELETE" }),
+    patch(`/series/${id}`, data),
+  deleteSeries: (id) => del(`/series/${id}`),
 
   // ----- lessons -----
-  listLessons: ({ start, end, studentId } = {}) => {
-    const p = new URLSearchParams();
-    if (start) p.set("start", start);
-    if (end) p.set("end", end);
-    if (studentId) p.set("student_id", studentId);
-    return req(`/lessons?${p.toString()}`);
-  },
-  createLesson: (data) => req("/lessons", { method: "POST", body: JSON.stringify(data) }),
-  updateLesson: (id, data) => req(`/lessons/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-  deleteLesson: (id) => req(`/lessons/${id}`, { method: "DELETE" }),
+  listLessons: ({ start, end, studentId } = {}) =>
+    req(`/lessons${query({ start, end, student_id: studentId })}`),
+  createLesson: (data) => post("/lessons", data),
+  updateLesson: (id, data) => patch(`/lessons/${id}`, data),
+  deleteLesson: (id) => del(`/lessons/${id}`),
 
   // ----- payments -----
-  listPayments: (studentId) => req(`/payments${studentId ? `?student_id=${studentId}` : ""}`),
-  createPayment: (data) => req("/payments", { method: "POST", body: JSON.stringify(data) }),
+  listPayments: (studentId) => req(`/payments${query({ student_id: studentId })}`),
+  createPayment: (data) => post("/payments", data),
   updatePayment: (id, data) =>
-    req(`/payments/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-  deletePayment: (id) => req(`/payments/${id}`, { method: "DELETE" }),
+    patch(`/payments/${id}`, data),
+  deletePayment: (id) => del(`/payments/${id}`),
 
   // ----- summary -----
   summary: () => req("/summary"),
   quarterlyLimits: () => req("/summary/quarterly-limits"),
   incomeLimits: () => req("/income-limits"),
-  addIncomeLimit: (data) => req("/income-limits", { method: "POST", body: JSON.stringify(data) }),
-  deleteIncomeLimit: (id) => req(`/income-limits/${id}`, { method: "DELETE" }),
+  addIncomeLimit: (data) => post("/income-limits", data),
+  deleteIncomeLimit: (id) => del(`/income-limits/${id}`),
 
   // ----- reschedule (administracja) -----
   listReschedule: () => req("/reschedule-requests"),
   approveReschedule: (id, response) =>
-    req(`/reschedule-requests/${id}/approve`, { method: "POST", body: JSON.stringify({ response: response || null }) }),
+    post(`/reschedule-requests/${id}/approve`, { response: response || null }),
   rejectReschedule: (id, response) =>
-    req(`/reschedule-requests/${id}/reject`, { method: "POST", body: JSON.stringify({ response: response || null }) }),
+    post(`/reschedule-requests/${id}/reject`, { response: response || null }),
 
   // ----- user management (admin / secretary) -----
   listUsers: () => req("/users"),
   listTutors: () => req("/tutors"),
-  createUser: (data) => req("/users", { method: "POST", body: JSON.stringify(data) }),
-  updateUser: (id, data) => req(`/users/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-  deleteUser: (id) => req(`/users/${id}`, { method: "DELETE" }),
+  createUser: (data) => post("/users", data),
+  updateUser: (id, data) => patch(`/users/${id}`, data),
+  deleteUser: (id) => del(`/users/${id}`),
   // Zwraca nowe hasło startowe - pokazywane raz, nigdzie nie przechowywane.
   resetUserPassword: (id) =>
-    req(`/users/${id}/reset-password`, { method: "POST", body: JSON.stringify({}) }),
+    post(`/users/${id}/reset-password`, {}),
   assignTutor: (lessonId, tutorId) =>
-    req(`/lessons/${lessonId}/assign${tutorId ? `?tutor_id=${tutorId}` : ""}`, { method: "POST" }),
+    post(`/lessons/${lessonId}/assign${tutorId ? `?tutor_id=${tutorId}` : ""}`),
 
   // ----- korepetytor -----
   tutorSummary: () => req("/tutor/summary"),
+  // A tutor has no /students endpoint: the students they teach are the ones in
+  // their summary (the same "any lesson" rule the backend applies everywhere).
+  tutorStudents: () =>
+    req("/tutor/summary").then((s) => s.students.map((x) => ({ id: x.student_id, name: x.student_name }))),
   tutorPayments: () => req("/tutor/payments"),
   myQuarterlyLimit: () => req("/me/quarterly-limit"),
   calendarFeed: () => req("/me/calendar-feed"),
-  regenerateCalendarFeed: () => req("/me/calendar-feed/regenerate", { method: "POST" }),
-  tutorLessons: ({ start, end } = {}) => {
-    const p = new URLSearchParams();
-    if (start) p.set("start", start);
-    if (end) p.set("end", end);
-    return req(`/tutor/lessons?${p.toString()}`);
-  },
+  regenerateCalendarFeed: () => post("/me/calendar-feed/regenerate"),
+  tutorLessons: (range) => req(`/tutor/lessons${query(range)}`),
   tutorUpdateLesson: (id, data) =>
-    req(`/tutor/lessons/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    patch(`/tutor/lessons/${id}`, data),
   tutorAvailability: () => req("/tutor/availability"),
   tutorAddAvailability: (data) =>
-    req("/tutor/availability", { method: "POST", body: JSON.stringify(data) }),
-  tutorDeleteAvailability: (id) => req(`/tutor/availability/${id}`, { method: "DELETE" }),
+    post("/tutor/availability", data),
+  tutorDeleteAvailability: (id) => del(`/tutor/availability/${id}`),
   tutorReschedule: () => req("/tutor/reschedule-requests"),
   tutorApproveReschedule: (id, response) =>
-    req(`/tutor/reschedule-requests/${id}/approve`, { method: "POST", body: JSON.stringify({ response: response || null }) }),
+    post(`/tutor/reschedule-requests/${id}/approve`, { response: response || null }),
   tutorRejectReschedule: (id, response) =>
-    req(`/tutor/reschedule-requests/${id}/reject`, { method: "POST", body: JSON.stringify({ response: response || null }) }),
+    post(`/tutor/reschedule-requests/${id}/reject`, { response: response || null }),
 
   // ----- tablice (panel) -----
-  listBoards: ({ studentId, archived } = {}) => {
-    const p = new URLSearchParams();
-    if (studentId) p.set("student_id", studentId);
-    if (archived) p.set("archived", "true");
-    const q = p.toString();
-    return req(`/boards${q ? `?${q}` : ""}`);
-  },
+  listBoards: ({ studentId, archived } = {}) =>
+    req(`/boards${query({ student_id: studentId, archived: archived ? "true" : "" })}`),
   getBoard: (id) => req(`/boards/${id}`),
-  createBoard: (data) => req("/boards", { method: "POST", body: JSON.stringify(data) }),
-  updateBoard: (id, data) => req(`/boards/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  createBoard: (data) => post("/boards", data),
+  updateBoard: (id, data) => patch(`/boards/${id}`, data),
   // Nowy link; stary przestaje działać natychmiast, treść zostaje.
-  rotateBoardToken: (id) => req(`/boards/${id}/rotate-token`, { method: "POST" }),
-  archiveBoard: (id) => req(`/boards/${id}`, { method: "DELETE" }),
-  restoreBoard: (id) => req(`/boards/${id}/restore`, { method: "POST" }),
+  rotateBoardToken: (id) => post(`/boards/${id}/rotate-token`),
+  archiveBoard: (id) => del(`/boards/${id}`),
+  restoreBoard: (id) => post(`/boards/${id}/restore`),
   // Nieodwracalne. Tylko admin, tylko z archiwum.
-  purgeBoard: (id) => req(`/boards/${id}/purge`, { method: "DELETE" }),
+  purgeBoard: (id) => del(`/boards/${id}/purge`),
   listBoardSnapshots: (id) => req(`/boards/${id}/snapshots`),
   restoreBoardSnapshot: (id, snapshotId) =>
-    req(`/boards/${id}/snapshots/${snapshotId}/restore`, { method: "POST" }),
+    post(`/boards/${id}/snapshots/${snapshotId}/restore`),
 
   // Biblioteka kształtów tablicy zapisana na koncie (nie per tablica).
   myBoardLibrary: () => req("/me/board-library"),
   saveMyBoardLibrary: (items) =>
-    req("/me/board-library", { method: "PUT", body: JSON.stringify({ items }) }),
+    put("/me/board-library", { items }),
 
   // ----- tablica (po linku, bez logowania) -----
   // Osobna rodzina wywołań: te trasy nie wymagają sesji i nie mogą wylogować
@@ -187,64 +198,44 @@ export const api = {
   board: (token) => req(`/t/${token}`),
   boardPage: (token, pageId) => req(`/t/${token}/pages/${pageId}`),
   saveBoardPage: (token, pageId, elements) =>
-    req(`/t/${token}/pages/${pageId}`, { method: "PUT", body: JSON.stringify({ elements }) }),
+    put(`/t/${token}/pages/${pageId}`, { elements }),
   addBoardPage: (token, title) =>
-    req(`/t/${token}/pages`, { method: "POST", body: JSON.stringify({ title: title || null }) }),
+    post(`/t/${token}/pages`, { title: title || null }),
   renameBoardPage: (token, pageId, title) =>
-    req(`/t/${token}/pages/${pageId}`, { method: "PATCH", body: JSON.stringify({ title }) }),
-  deleteBoardPage: (token, pageId) => req(`/t/${token}/pages/${pageId}`, { method: "DELETE" }),
-  uploadBoardFile: async (token, fileId, blob) => {
-    // multipart, więc bez nagłówka JSON - przeglądarka ustawi boundary sama
+    patch(`/t/${token}/pages/${pageId}`, { title }),
+  deleteBoardPage: (token, pageId) => del(`/t/${token}/pages/${pageId}`),
+  uploadBoardFile: (token, fileId, blob) => {
     const form = new FormData();
     form.append("file_id", fileId);
     form.append("file", blob, fileId);
-    const res = await fetch(`${BASE}/t/${token}/files`, { method: "POST", body: form, credentials: "same-origin" });
-    if (!res.ok) {
-      let d = `${res.status}`;
-      try { d = (await res.json()).detail || d; } catch {}
-      throw new Error(d);
-    }
-    return res.json();
+    return upload(`/t/${token}/files`, form);
   },
   boardFileUrl: (token, fileId) => `${BASE}/t/${token}/files/${fileId}`,
 
   // ----- materiały ucznia (PDF) -----
   listStudentFiles: (studentId) => req(`/students/${studentId}/files`),
-  uploadStudentFile: async (studentId, file) => {
-    // multipart - bez nagłówka JSON, przeglądarka ustawi boundary sama
+  uploadStudentFile: (studentId, file) => {
     const form = new FormData();
     form.append("file", file, file.name);
-    const res = await fetch(`${BASE}/students/${studentId}/files`, { method: "POST", body: form, credentials: "same-origin" });
-    if (res.status === 401 && onUnauthorized) onUnauthorized();
-    if (!res.ok) {
-      let d = `${res.status}`;
-      try { d = (await res.json()).detail || d; } catch {}
-      throw new Error(d);
-    }
-    return res.json();
+    return upload(`/students/${studentId}/files`, form);
   },
-  deleteStudentFile: (studentId, fileId) => req(`/students/${studentId}/files/${fileId}`, { method: "DELETE" }),
+  deleteStudentFile: (studentId, fileId) => del(`/students/${studentId}/files/${fileId}`),
   studentFileUrl: (studentId, fileId) => `${BASE}/students/${studentId}/files/${fileId}/content`,
 
   // ----- przedmioty -----
   listSubjects: () => req("/subjects"),
-  createSubject: (data) => req("/subjects", { method: "POST", body: JSON.stringify(data) }),
-  deleteSubject: (id) => req(`/subjects/${id}`, { method: "DELETE" }),
+  createSubject: (data) => post("/subjects", data),
+  deleteSubject: (id) => del(`/subjects/${id}`),
 
   // ----- panel ucznia -----
-  myLessons: ({ start, end } = {}) => {
-    const p = new URLSearchParams();
-    if (start) p.set("start", start);
-    if (end) p.set("end", end);
-    return req(`/me/lessons?${p.toString()}`);
-  },
+  myLessons: (range) => req(`/me/lessons${query(range)}`),
   mySummary: () => req("/me/summary"),
   myTransferInfo: () => req("/me/transfer"),
   myPayments: () => req("/me/payments"),
   myReschedule: () => req("/me/reschedule-requests"),
   myLessonSlots: (lessonId) => req(`/me/lessons/${lessonId}/available-slots`),
   requestReschedule: (data) =>
-    req("/me/reschedule-requests", { method: "POST", body: JSON.stringify(data) }),
+    post("/me/reschedule-requests", data),
   // Tablice przypisane do ucznia (z linkami) i jego materiały.
   myBoards: () => req("/me/boards"),
   myFiles: () => req("/me/files"),

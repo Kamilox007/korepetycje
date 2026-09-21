@@ -3,9 +3,11 @@ import { api } from "./api";
 import { Link } from "react-router-dom";
 import Modal from "./Modal";
 import { StudentFilesModal } from "./StudentFiles";
-import { DAYS_PL, DURATION_OPTIONS, fmtMoney, fmtTime } from "./dates";
-import { PASSWORD_HINT, passwordError, genStartPassword } from "./password";
+import { DAYS_PL, DURATION_OPTIONS, fmtMoney, fmtTime, toISODate } from "./dates";
+import { passwordError, genStartPassword } from "./password";
+import { StartPasswordField, CredentialsModal } from "./Credentials";
 import { useConfirm } from "./Confirm";
+import { useTutors, useSubjects } from "./useLists";
 
 export default function Students({ students, reload, myRole }) {
   const confirm = useConfirm();
@@ -36,6 +38,17 @@ export default function Students({ students, reload, myRole }) {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  // Every mutation on this page ends the same way: reload, or show why not.
+  async function run(action) {
+    setErr("");
+    try {
+      await action();
+      refresh();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+
   async function archiveStudent(s) {
     const ok = await confirm({
       title: "Zarchiwizować ucznia?",
@@ -47,23 +60,11 @@ export default function Students({ students, reload, myRole }) {
       danger: false,
     });
     if (!ok) return;
-    setErr("");
-    try {
-      await api.archiveStudent(s.id);
-      refresh();
-    } catch (e) {
-      setErr(e.message);
-    }
+    await run(() => api.archiveStudent(s.id));
   }
 
   async function restoreStudent(s) {
-    setErr("");
-    try {
-      await api.restoreStudent(s.id);
-      refresh();
-    } catch (e) {
-      setErr(e.message);
-    }
+    await run(() => api.restoreStudent(s.id));
   }
 
   async function removeAccount(s) {
@@ -75,13 +76,7 @@ export default function Students({ students, reload, myRole }) {
       confirmLabel: "Usuń konto",
     });
     if (!ok) return;
-    setErr("");
-    try {
-      await api.deleteStudentAccount(s.id);
-      refresh();
-    } catch (e) {
-      setErr(e.message);
-    }
+    await run(() => api.deleteStudentAccount(s.id));
   }
 
   async function purgeStudent(s) {
@@ -95,13 +90,7 @@ export default function Students({ students, reload, myRole }) {
       confirmLabel: "Usuń trwale",
     });
     if (!ok) return;
-    setErr("");
-    try {
-      await api.purgeStudent(s.id);
-      refresh();
-    } catch (e) {
-      setErr(e.message);
-    }
+    await run(() => api.purgeStudent(s.id));
   }
 
   async function removeSeries(srs) {
@@ -114,13 +103,7 @@ export default function Students({ students, reload, myRole }) {
       confirmLabel: "Zakończ serię",
     });
     if (!ok) return;
-    setErr("");
-    try {
-      await api.deleteSeries(srs.id);
-      refresh();
-    } catch (e) {
-      setErr(e.message);
-    }
+    await run(() => api.deleteSeries(srs.id));
   }
 
   function studentName(id) {
@@ -286,14 +269,15 @@ export default function Students({ students, reload, myRole }) {
         />
       )}
       {editSeries && (
-        <SeriesEditForm
+        <SeriesForm
           series={editSeries}
+          students={students}
           onClose={() => setEditSeries(null)}
           onSaved={() => { setEditSeries(null); refresh(); }}
         />
       )}
       {editStudent && (
-        <StudentEditForm
+        <StudentForm
           student={editStudent}
           onClose={() => setEditStudent(null)}
           onSaved={() => { setEditStudent(null); refresh(); }}
@@ -359,17 +343,14 @@ function AccountForm({ student, onClose, onSaved }) {
 
   if (created) {
     return (
-      <Modal title="Konto utworzone" onClose={onSaved}
-        footer={<button className="primary" onClick={onSaved}>Gotowe</button>}>
-        <p style={{ margin: 0 }}>Przekaż uczniowi te dane logowania. Hasło widać tylko teraz:</p>
-        <div className="cred-box">
-          <div><span className="muted">Login:</span> <strong>{created.username}</strong></div>
-          <div><span className="muted">Hasło:</span> <strong>{created.password}</strong></div>
-        </div>
-        <p className="muted" style={{ fontSize: 12, margin: 0 }}>
-          Uczeń zostanie poproszony o zmianę hasła przy pierwszym logowaniu.
-        </p>
-      </Modal>
+      <CredentialsModal
+        title="Konto utworzone"
+        intro="Przekaż uczniowi te dane logowania. Hasło widać tylko teraz:"
+        username={created.username}
+        password={created.password}
+        note="Uczeń zostanie poproszony o zmianę hasła przy pierwszym logowaniu."
+        onDone={onSaved}
+      />
     );
   }
 
@@ -385,13 +366,7 @@ function AccountForm({ student, onClose, onSaved }) {
       {err && <div className="err">{err}</div>}
       <div><label htmlFor={`${uid}-login-ucznia-1`}>Login ucznia</label>
         <input id={`${uid}-login-ucznia-1`} value={username} onChange={(e) => setUsername(e.target.value)} /></div>
-      <div><label htmlFor={`${uid}-haso-startowe-2`}>Hasło startowe</label>
-        <div className="row">
-          <input id={`${uid}-haso-startowe-2`} value={password} onChange={(e) => setPassword(e.target.value)} />
-          <button onClick={() => setPassword(genStartPassword())} title="Wygeneruj">↻</button>
-        </div>
-        <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>{PASSWORD_HINT}</p>
-      </div>
+      <StartPasswordField id={`${uid}-haso-startowe-2`} value={password} onChange={setPassword} />
       <p className="muted" style={{ fontSize: 12, margin: 0 }}>
         Uczeń zaloguje się tymi danymi i zobaczy swój terminarz oraz saldo. Hasło zmieni przy pierwszym wejściu.
       </p>
@@ -399,27 +374,30 @@ function AccountForm({ student, onClose, onSaved }) {
   );
 }
 
-function StudentForm({ onClose, onSaved }) {
+/** New student when `student` is missing, edit of an existing one otherwise. */
+function StudentForm({ student, onClose, onSaved }) {
   const uid = useId();
-  const [name, setName] = useState("");
-  const [contact, setContact] = useState("");
-  const [price, setPrice] = useState(0);
+  const [name, setName] = useState(student?.name || "");
+  const [contact, setContact] = useState(student?.contact || "");
+  const [price, setPrice] = useState(student?.default_price ?? 0);
   const [busy, setBusy] = useState(false);
 
   async function save() {
     if (!name.trim()) return;
     setBusy(true);
-    await api.createStudent({ name: name.trim(), contact, default_price: Number(price) });
+    const data = { name: name.trim(), contact, default_price: Number(price) };
+    if (student) await api.updateStudent(student.id, data);
+    else await api.createStudent(data);
     onSaved();
   }
 
   return (
     <Modal
-      title="Nowy uczeń"
+      title={student ? "Edycja ucznia" : "Nowy uczeń"}
       onClose={onClose}
       footer={<>
         <button onClick={onClose}>Anuluj</button>
-        <button className="primary" onClick={save} disabled={busy || !name.trim()}>Dodaj</button>
+        <button className="primary" onClick={save} disabled={busy || !name.trim()}>{student ? "Zapisz" : "Dodaj"}</button>
       </>}
     >
       <div>
@@ -438,70 +416,57 @@ function StudentForm({ onClose, onSaved }) {
   );
 }
 
-function StudentEditForm({ student, onClose, onSaved }) {
+/** New weekly series when `series` is missing, edit of an existing one
+ *  otherwise. Editing cannot move the series to another student or change
+ *  its start date - those define which occurrences exist; end a series and
+ *  start a new one instead. */
+function SeriesForm({ series, students, onClose, onSaved }) {
   const uid = useId();
-  const [name, setName] = useState(student.name);
-  const [contact, setContact] = useState(student.contact || "");
-  const [price, setPrice] = useState(student.default_price);
+  const editing = Boolean(series);
+  const [studentId, setStudentId] = useState(students[0]?.id || "");
+  const [weekday, setWeekday] = useState(series?.weekday ?? 0);
+  const [time, setTime] = useState(series ? fmtTime(series.start_time) : "16:00");
+  const [duration, setDuration] = useState(series?.duration_min || 60);
+  const [price, setPrice] = useState(series?.price ?? (students[0]?.default_price || 0));
+  const [startDate, setStartDate] = useState(toISODate(new Date()));
+  const [endDate, setEndDate] = useState(series?.end_date || "");
+  const [subjectId, setSubjectId] = useState(series?.subject_id || "");
+  const [level, setLevel] = useState(series?.level || "");
+  const [tutorId, setTutorId] = useState(series?.assigned_tutor_id || "");
+  const subjects = useSubjects();
+  const tutors = useTutors();
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const timeChanged = editing && (
+    time !== fmtTime(series.start_time) || Number(weekday) !== series.weekday
+    || Number(duration) !== (series.duration_min || 60)
+  );
 
   async function save() {
-    if (!name.trim()) return;
     setBusy(true);
-    await api.updateStudent(student.id, {
-      name: name.trim(), contact, default_price: Number(price),
-    });
-    onSaved();
+    setErr("");
+    const data = {
+      weekday: Number(weekday),
+      start_time: time.length === 5 ? `${time}:00` : time,
+      duration_min: Number(duration),
+      price: Number(price),
+      end_date: endDate || null,
+      subject_id: subjectId === "" ? null : Number(subjectId),
+      level: level === "" ? null : level,
+      assigned_tutor_id: tutorId === "" ? null : Number(tutorId),
+    };
+    try {
+      if (editing) await api.updateSeries(series.id, data);
+      else await api.createSeries({ ...data, student_id: Number(studentId), start_date: startDate });
+      onSaved();
+    } catch (e) {
+      setErr(e.message);
+      setBusy(false);
+    }
   }
 
-  return (
-    <Modal
-      title="Edycja ucznia"
-      onClose={onClose}
-      footer={<>
-        <button onClick={onClose}>Anuluj</button>
-        <button className="primary" onClick={save} disabled={busy || !name.trim()}>Zapisz</button>
-      </>}
-    >
-      <div>
-        <label htmlFor={`${uid}-imie-i-nazwisko-edit`}>Imię i nazwisko</label>
-        <input id={`${uid}-imie-i-nazwisko-edit`} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-      </div>
-      <div>
-        <label htmlFor={`${uid}-kontakt-edit`}>Kontakt (opcjonalnie)</label>
-        <input id={`${uid}-kontakt-edit`} value={contact} onChange={(e) => setContact(e.target.value)} placeholder="telefon, e-mail, rodzic..." />
-      </div>
-      <div>
-        <label htmlFor={`${uid}-domyslna-cena-edit`}>Domyślna cena za zajęcia (PLN)</label>
-        <input id={`${uid}-domyslna-cena-edit`} type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
-      </div>
-    </Modal>
-  );
-}
-
-function SeriesForm({ students, onClose, onSaved }) {
-  const uid = useId();
-  const [studentId, setStudentId] = useState(students[0]?.id || "");
-  const [weekday, setWeekday] = useState(0);
-  const [time, setTime] = useState("16:00");
-  const [duration, setDuration] = useState(60);
-  const [price, setPrice] = useState(students[0]?.default_price || 0);
-  const today = new Date().toISOString().slice(0, 10);
-  const [startDate, setStartDate] = useState(today);
-  const [endDate, setEndDate] = useState("");
-  const [subjectId, setSubjectId] = useState("");
-  const [level, setLevel] = useState("");
-  const [tutorId, setTutorId] = useState("");
-  const [subjects, setSubjects] = useState([]);
-  const [tutors, setTutors] = useState([]);
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    api.listSubjects().then(setSubjects).catch(() => {});
-    api.listTutors().then(setTutors).catch(() => {});
-  }, []);
-
-  if (!students.length) {
+  if (!editing && !students.length) {
     return (
       <Modal title="Brak uczniów" onClose={onClose}>
         <p>Najpierw dodaj ucznia.</p>
@@ -509,42 +474,29 @@ function SeriesForm({ students, onClose, onSaved }) {
     );
   }
 
-  async function save() {
-    setBusy(true);
-    await api.createSeries({
-      student_id: Number(studentId),
-      weekday: Number(weekday),
-      start_time: time + ":00",
-      duration_min: Number(duration),
-      price: Number(price),
-      start_date: startDate,
-      end_date: endDate || null,
-      subject_id: subjectId === "" ? null : Number(subjectId),
-      level: level === "" ? null : level,
-      assigned_tutor_id: tutorId === "" ? null : Number(tutorId),
-    });
-    onSaved();
-  }
-
   return (
     <Modal
-      title="Zajęcia cykliczne (co tydzień)"
+      title={editing ? "Edycja serii" : "Zajęcia cykliczne (co tydzień)"}
       onClose={onClose}
       footer={<>
         <button onClick={onClose}>Anuluj</button>
-        <button className="primary" onClick={save} disabled={busy}>Utwórz</button>
+        <button className="primary" onClick={save} disabled={busy}>{editing ? "Zapisz" : "Utwórz"}</button>
       </>}
     >
-      <div>
-        <label htmlFor={`${uid}-uczen-6`}>Uczeń</label>
-        <select id={`${uid}-uczen-6`} value={studentId} onChange={(e) => {
-          setStudentId(e.target.value);
-          const s = students.find((x) => x.id === Number(e.target.value));
-          if (s) setPrice(s.default_price);
-        }}>
-          {students.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-      </div>
+      {err && <div className="err">{err}</div>}
+
+      {!editing && (
+        <div>
+          <label htmlFor={`${uid}-uczen-6`}>Uczeń</label>
+          <select id={`${uid}-uczen-6`} value={studentId} onChange={(e) => {
+            setStudentId(e.target.value);
+            const s = students.find((x) => x.id === Number(e.target.value));
+            if (s) setPrice(s.default_price);
+          }}>
+            {students.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+      )}
       <div className="field-row">
         <div>
           <label htmlFor={`${uid}-przedmiot-7`}>Przedmiot</label>
@@ -589,148 +541,39 @@ function SeriesForm({ students, onClose, onSaved }) {
           </select>
         </div>
         <div>
-          <label htmlFor={`${uid}-cena-za-zajecia-pln-12`}>Cena za zajęcia (PLN)</label>
-          <input id={`${uid}-cena-za-zajecia-pln-12`} type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
+          <label htmlFor={`${uid}-cena-za-zajecia-pln-12`}>Cena (PLN)</label>
+          <input id={`${uid}-cena-za-zajecia-pln-12`} type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} />
         </div>
       </div>
       <div className="field-row">
-        <div>
-          <label htmlFor={`${uid}-data-rozpoczecia-13`}>Data rozpoczęcia</label>
-          <input id={`${uid}-data-rozpoczecia-13`} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-        </div>
+        {!editing && (
+          <div>
+            <label htmlFor={`${uid}-data-rozpoczecia-13`}>Data rozpoczęcia</label>
+            <input id={`${uid}-data-rozpoczecia-13`} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          </div>
+        )}
         <div>
           <label htmlFor={`${uid}-data-zakonczenia-opcj-14`}>Data zakończenia (opcj.)</label>
           <input id={`${uid}-data-zakonczenia-opcj-14`} type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         </div>
       </div>
-      <p className="muted" style={{ fontSize: 12, margin: 0 }}>
-        Zajęcia wygenerują się automatycznie w kalendarzu. Każde z nich możesz potem indywidualnie przesunąć lub odwołać.
-      </p>
-    </Modal>
-  );
-}
-
-function SeriesEditForm({ series, onClose, onSaved }) {
-  const uid = useId();
-  const [weekday, setWeekday] = useState(series.weekday);
-  const [time, setTime] = useState(fmtTime(series.start_time));
-  const [duration, setDuration] = useState(series.duration_min || 60);
-  const [price, setPrice] = useState(series.price);
-  const [endDate, setEndDate] = useState(series.end_date || "");
-  const [subjectId, setSubjectId] = useState(series.subject_id || "");
-  const [level, setLevel] = useState(series.level || "");
-  const [tutorId, setTutorId] = useState(series.assigned_tutor_id || "");
-  const [subjects, setSubjects] = useState([]);
-  const [tutors, setTutors] = useState([]);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-
-  useEffect(() => {
-    api.listSubjects().then(setSubjects).catch(() => {});
-    api.listTutors().then(setTutors).catch(() => {});
-  }, []);
-
-  const timeChanged = time !== fmtTime(series.start_time) || weekday !== series.weekday
-    || Number(duration) !== (series.duration_min || 60);
-
-  async function save() {
-    setBusy(true);
-    try {
-      await api.updateSeries(series.id, {
-        weekday: Number(weekday),
-        start_time: time.length === 5 ? `${time}:00` : time,
-        duration_min: Number(duration),
-        price: Number(price),
-        end_date: endDate || null,
-        subject_id: subjectId ? Number(subjectId) : null,
-        level: level || null,
-        assigned_tutor_id: tutorId ? Number(tutorId) : null,
-      });
-      onSaved();
-    } catch (e) {
-      setErr(e.message);
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Modal
-      title="Edycja serii"
-      onClose={onClose}
-      footer={<>
-        <button onClick={onClose}>Anuluj</button>
-        <button className="primary" onClick={save} disabled={busy}>Zapisz</button>
-      </>}
-    >
-      {err && <div className="err">{err}</div>}
-
-      <div className="field-row">
-        <div>
-          <label htmlFor={`${uid}-weekday`}>Dzień tygodnia</label>
-          <select id={`${uid}-weekday`} value={weekday} onChange={(e) => setWeekday(e.target.value)}>
-            {DAYS_PL.map((d, i) => <option key={i} value={i}>{d}</option>)}
-          </select>
-        </div>
-        <div>
-          <label htmlFor={`${uid}-time`}>Godzina</label>
-          <input id={`${uid}-time`} type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-        </div>
-      </div>
-
-      <div className="field-row">
-        <div>
-          <label htmlFor={`${uid}-subject`}>Przedmiot</label>
-          <select id={`${uid}-subject`} value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
-            <option value="">-</option>
-            {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        </div>
-        <div>
-          <label htmlFor={`${uid}-level`}>Poziom</label>
-          <select id={`${uid}-level`} value={level} onChange={(e) => setLevel(e.target.value)}>
-            <option value="">-</option>
-            <option value="podstawa">Podstawa</option>
-            <option value="rozszerzenie">Rozszerzenie</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="field-row">
-        <div>
-          <label htmlFor={`${uid}-duration`}>Czas trwania</label>
-          <select id={`${uid}-duration`} value={duration} onChange={(e) => setDuration(e.target.value)}>
-            {DURATION_OPTIONS.map((m) => <option key={m} value={m}>{m} min</option>)}
-          </select>
-        </div>
-        <div>
-          <label htmlFor={`${uid}-price`}>Cena (PLN)</label>
-          <input id={`${uid}-price`} type="number" step="0.01" value={price}
-                 onChange={(e) => setPrice(e.target.value)} />
-        </div>
-      </div>
-      <div>
-        <label htmlFor={`${uid}-end`}>Koniec serii (opcjonalnie)</label>
-        <input id={`${uid}-end`} type="date" value={endDate}
-               onChange={(e) => setEndDate(e.target.value)} />
-      </div>
-
-      <div>
-        <label htmlFor={`${uid}-tutor`}>Prowadzący</label>
-        <select id={`${uid}-tutor`} value={tutorId} onChange={(e) => setTutorId(e.target.value)}>
-          <option value="">- nieprzypisany -</option>
-          {tutors.map((t) => <option key={t.id} value={t.id}>{t.display_name || t.username}</option>)}
-        </select>
-      </div>
-
-      <p className="muted" style={{ marginTop: 14, fontSize: 12 }}>
-        Przedmiot, poziom, prowadzący i cena trafią na wszystkie przyszłe zajęcia
-        z tej serii. Zajęcia już odbyte zostają bez zmian - zachowują cenę
-        z momentu, w którym się odbyły.
-      </p>
-      {timeChanged && (
-        <p className="muted" style={{ fontSize: 12 }}>
-          Zmiana terminu pominie zajęcia, którym wcześniej ręcznie zmieniono datę
-          lub godzinę - te zostaną tam, gdzie je przesunięto.
+      {editing ? (
+        <>
+          <p className="muted" style={{ marginTop: 14, fontSize: 12 }}>
+            Przedmiot, poziom, prowadzący i cena trafią na wszystkie przyszłe zajęcia
+            z tej serii. Zajęcia już odbyte zostają bez zmian - zachowują cenę
+            z momentu, w którym się odbyły.
+          </p>
+          {timeChanged && (
+            <p className="muted" style={{ fontSize: 12 }}>
+              Zmiana terminu pominie zajęcia, którym wcześniej ręcznie zmieniono datę
+              lub godzinę - te zostaną tam, gdzie je przesunięto.
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="muted" style={{ fontSize: 12, margin: 0 }}>
+          Zajęcia wygenerują się automatycznie w kalendarzu. Każde z nich możesz potem indywidualnie przesunąć lub odwołać.
         </p>
       )}
     </Modal>
