@@ -19,8 +19,9 @@ setup("login and forced password change", async ({ page }) => {
   await page.getByRole("button", { name: "Zaloguj się" }).click();
 
   // The backend rejects everything but the password change, so the UI shows
-  // only this form: no tabs, no panels.
-  await page.getByLabel("Dotychczasowe hasło").fill("admin");
+  // only this form: no tabs, no panels. The starting password was just typed
+  // at login, so the form does not ask for it again.
+  await expect(page.getByLabel("Dotychczasowe hasło")).toHaveCount(0);
   await page.getByLabel("Nowe hasło", { exact: true }).fill(PASSWORD);
   await page.getByLabel("Powtórz nowe hasło").fill(PASSWORD);
   // First login also collects consent to the Regulamin and Polityka
