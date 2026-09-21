@@ -99,7 +99,7 @@ export default function StudentFiles({ student }) {
 /** Okno z materiałami jednego ucznia - dla listy uczniów u staff. */
 export function StudentFilesModal({ student, onClose }) {
   return (
-    <Modal title={`Materiały: ${student.name}`} onClose={onClose}
+    <Modal title={`Materiały: ${student.name}`} onClose={onClose} className="overlay-wide"
            footer={<button className="primary" onClick={onClose}>Zamknij</button>}>
       <StudentFiles student={student} />
     </Modal>
