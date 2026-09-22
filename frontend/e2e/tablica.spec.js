@@ -209,6 +209,31 @@ test.describe("tablica", () => {
     expect(info.size).toBeLessThan(2_000_000);
   });
 
+  test("po wklejeniu obrazka aktywny jest wskaźnik, nie pisak", async ({ page }) => {
+    const { path } = await createBoard(page, "Wklejanie E2E");
+    await page.goto(path);
+    await waitForBoard(page);
+    const canvas = page.locator(".excalidraw__canvas.interactive");
+    const box = await canvas.boundingBox();
+    // Klik (jeszcze wskaźnikiem, więc nic nie rysuje) ustawia fokus w edytorze
+    // i pozycję kursora - Excalidraw wkleja tylko wtedy.
+    await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
+    await page.evaluate(() => window.__tablicaAPI.setActiveTool({ type: "freedraw" }));
+
+    await page.evaluate(async (b64) => {
+      const blob = await (await fetch("data:image/png;base64," + b64)).blob();
+      const dt = new DataTransfer();
+      dt.items.add(new File([blob], "obrazek.png", { type: "image/png" }));
+      document.activeElement.dispatchEvent(
+        new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: dt }));
+    }, "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==");
+
+    await expect.poll(() => page.evaluate(
+      () => window.__tablicaAPI.getSceneElements().filter((e) => e.type === "image").length,
+    )).toBe(1);
+    expect(await page.evaluate(() => window.__tablicaAPI.getAppState().activeTool.type)).toBe("selection");
+  });
+
   test("kółko myszy nad płótnem przybliża, z Shift/Alt przesuwa", async ({ page }) => {
     const { path } = await createBoard(page, "Zoom E2E");
     await page.goto(path);
