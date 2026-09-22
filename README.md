@@ -106,6 +106,10 @@ Moduł tablicy interaktywnej (Excalidraw) do prowadzenia korepetycji online.
   pod Ctrl). Przesuwanie: Alt+kółko w pionie, Shift+kółko w poziomie,
   spacja+przeciąganie, środkowy przycisk albo narzędzie „rączka". Gest
   pinch na touchpadzie i Ctrl+kółko dalej przybliżają.
+- **Po wklejeniu obrazka** (albo upuszczeniu pliku na płótno) narzędzie wraca
+  na wskaźnik, żeby dało się go od razu przesunąć - Excalidraw robi to sam
+  tylko dla wklejonych elementów i tekstu, przy pliku graficznym zostawia
+  aktywny pisak.
 - **Pobierz** - bieżąca strona jako PNG/SVG (okno eksportu Excalidrawa);
   **PDF** - cała tablica, jedna strona tablicy na stronę PDF, z tytułem,
   zawsze na białym tle niezależnie od motywu. Składany w przeglądarce

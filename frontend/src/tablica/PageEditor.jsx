@@ -246,6 +246,31 @@ const PageEditor = forwardRef(function PageEditor(
     return () => root.removeEventListener("wheel", onWheel, { capture: true });
   }, [initialData]);
 
+  // Po wklejeniu (albo upuszczeniu) obrazka wracamy na wskaźnik, żeby dało się
+  // go od razu przesunąć. Excalidraw robi to sam dla wklejonych elementów
+  // i tekstu (pasteFromClipboard kończy się setActiveTool "selection"), ale
+  // gałąź z plikiem obrazka wychodzi wcześniej - obrazek jest zaznaczony,
+  // a aktywny zostaje pisak. Dlatego reagujemy tylko na zdarzenia z plikiem
+  // graficznym. Paste łapiemy na dokumencie, bo trafia do elementu z fokusem;
+  // warunek „fokus wewnątrz edytora" jest ten sam, którego używa Excalidraw.
+  useEffect(() => {
+    const isImage = (files) => Array.from(files || []).some((f) => f.type.startsWith("image/"));
+    const editable = (node) =>
+      node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement || node?.isContentEditable;
+    const toSelection = (files, node) => {
+      if (!wrapRef.current?.contains(node) || editable(node) || !isImage(files)) return;
+      apiRef.current?.setActiveTool({ type: "selection" });
+    };
+    const onPaste = (e) => toSelection(e.clipboardData?.files, document.activeElement);
+    const onDrop = (e) => toSelection(e.dataTransfer?.files, e.target);
+    document.addEventListener("paste", onPaste, true);
+    document.addEventListener("drop", onDrop, true);
+    return () => {
+      document.removeEventListener("paste", onPaste, true);
+      document.removeEventListener("drop", onDrop, true);
+    };
+  }, [initialData]);
+
   if (loadError) {
     return <div className="tablica-error">Nie udało się wczytać strony: {loadError}</div>;
   }
