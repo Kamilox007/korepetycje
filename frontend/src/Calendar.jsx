@@ -482,7 +482,17 @@ function AddLesson({ date, time: initialTime, students, onClose, onSaved }) {
   const [time, setTime] = useState(initialTime || "16:00");
   const [duration, setDuration] = useState(60);
   const [price, setPrice] = useState(students[0]?.default_price || 0);
+  const [subjectId, setSubjectId] = useState("");
+  const [level, setLevel] = useState("");
+  const [tutorId, setTutorId] = useState("");
+  const [subjects, setSubjects] = useState([]);
+  const [tutors, setTutors] = useState([]);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.listSubjects().then(setSubjects).catch(() => {});
+    api.listTutors().then(setTutors).catch(() => {});
+  }, []);
 
   if (!students.length) {
     return <Modal title="Brak uczniów" onClose={onClose}><p>Najpierw dodaj ucznia w zakładce „Uczniowie".</p></Modal>;
@@ -493,6 +503,9 @@ function AddLesson({ date, time: initialTime, students, onClose, onSaved }) {
     await api.createLesson({
       student_id: Number(studentId), date: d, start_time: time + ":00",
       duration_min: Number(duration), price: Number(price),
+      subject_id: subjectId === "" ? null : Number(subjectId),
+      level: level === "" ? null : level,
+      assigned_tutor_id: tutorId === "" ? null : Number(tutorId),
     });
     onSaved();
   }
@@ -517,8 +530,32 @@ function AddLesson({ date, time: initialTime, students, onClose, onSaved }) {
         </select>
       </div>
       <div className="field-row">
+        <div>
+          <label htmlFor={`${uid}-przedmiot`}>Przedmiot</label>
+          <select id={`${uid}-przedmiot`} value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
+            <option value="">- brak -</option>
+            {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor={`${uid}-poziom`}>Poziom</label>
+          <select id={`${uid}-poziom`} value={level} onChange={(e) => setLevel(e.target.value)}>
+            <option value="">-</option>
+            <option value="podstawa">podstawa</option>
+            <option value="rozszerzenie">rozszerzenie</option>
+          </select>
+        </div>
+      </div>
+      <div className="field-row">
         <div><label htmlFor={`${uid}-data-9`}>Data</label><input id={`${uid}-data-9`} type="date" value={d} onChange={(e) => setD(e.target.value)} /></div>
         <div><label htmlFor={`${uid}-godzina-10`}>Godzina</label><input id={`${uid}-godzina-10`} type="time" value={time} onChange={(e) => setTime(e.target.value)} /></div>
+      </div>
+      <div>
+        <label htmlFor={`${uid}-prowadzacy-korepetytor`}>Prowadzący korepetytor</label>
+        <select id={`${uid}-prowadzacy-korepetytor`} value={tutorId} onChange={(e) => setTutorId(e.target.value)}>
+          <option value="">- nieprzypisany -</option>
+          {tutors.map((t) => <option key={t.id} value={t.id}>{t.display_name}</option>)}
+        </select>
       </div>
       <div className="field-row">
         <div>
