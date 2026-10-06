@@ -299,18 +299,21 @@ export default function Summary({ refreshKey, tutorView = false, myRole }) {
 
 const ROMAN = ["I", "II", "III", "IV"];
 
-// The current quarter and the 12 before it - the practice has only been using
-// the panel for a short while, so this reaches well past any real data.
+// The picker starts at III kwartał 2026, when the panel began tracking the
+// limit - nothing earlier is worth offering. Newest first; the current quarter
+// is always present.
+const FIRST_QUARTER = { year: 2026, quarter: 3 };
+
 function quarterOptions() {
   const now = new Date();
   let year = now.getFullYear();
   let quarter = Math.floor(now.getMonth() / 3) + 1;
   const out = [];
-  for (let i = 0; i < 13; i++) {
+  do {
     out.push({ year, quarter, key: `${year}-${quarter}`, label: `${ROMAN[quarter - 1]} kwartał ${year}` });
     quarter -= 1;
     if (quarter === 0) { quarter = 4; year -= 1; }
-  }
+  } while (year > FIRST_QUARTER.year || (year === FIRST_QUARTER.year && quarter >= FIRST_QUARTER.quarter));
   return out;
 }
 
