@@ -23,6 +23,7 @@ def generate_lessons_for_series(
     db: Session,
     series: models.LessonSeries,
     until: date,
+    since: date | None = None,
 ) -> int:
     """Create individual occurrences (Lesson) for a series up to `until`.
 
@@ -31,6 +32,11 @@ def generate_lessons_for_series(
     skip slots it already created, even if their date was later moved or the
     lesson deleted. Slots recorded in SeriesSkip (removed by the user) are not
     recreated. Returns the number of lessons created.
+
+    `since` skips slots before that date. Everything except creating a series
+    passes today: after a weekday change the past lessons keep their old weekday
+    (only future ones are shifted), so rebuilding slots from start_date would
+    invent a second set of past lessons on the new weekday.
     """
     end = series.end_date or until
     horizon = min(end, until)
@@ -62,7 +68,7 @@ def generate_lessons_for_series(
     created = 0
     pending: list[models.Lesson] = []
     while current <= horizon:
-        if current not in existing_origins and current not in skipped:
+        if (since is None or current >= since) and current not in existing_origins and current not in skipped:
             lesson = models.Lesson(
                 tutor_id=series.tutor_id,
                 assigned_tutor_id=series.assigned_tutor_id,
@@ -108,8 +114,9 @@ def regenerate_all(db: Session, until: date | None = None, tutor_id: int | None 
     )
     if tutor_id is not None:
         q = q.filter(models.LessonSeries.tutor_id == tutor_id)
+    today = date.today()
     for series in q.all():
-        total += generate_lessons_for_series(db, series, until)
+        total += generate_lessons_for_series(db, series, until, since=today)
     return total
 
 

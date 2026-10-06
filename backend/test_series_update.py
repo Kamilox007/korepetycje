@@ -104,8 +104,26 @@ with TestClient(app) as c:
     db.close()
 
     # --- weekday: shifts the schedule, still skipping the moved one ---
+    db = SessionLocal()
+    past_before = sorted(l.id for l in db.query(models.Lesson).filter_by(series_id=series_id).all()
+                         if l.date < date.today())
+    db.close()
+
     new_weekday = (start.weekday() + 2) % 7
     c.patch(f"/api/series/{series_id}", json={"weekday": new_weekday})
+    db = SessionLocal()
+    past_after = sorted(l.id for l in db.query(models.Lesson).filter_by(series_id=series_id).all()
+                        if l.date < date.today())
+    check("changing the weekday did not invent lessons in the past", past_after == past_before)
+
+    # The daily top-up / startup run must not bring them back either.
+    from app import services
+    services.regenerate_all(db)
+    past_regen = sorted(l.id for l in db.query(models.Lesson).filter_by(series_id=series_id).all()
+                        if l.date < date.today())
+    check("the periodic regeneration does not either", past_regen == past_before)
+    db.close()
+
     db = SessionLocal()
     shifted = [l for l in db.query(models.Lesson).filter_by(series_id=series_id).all()
                if l.date >= date.today() and not l.completed and not l.rescheduled]

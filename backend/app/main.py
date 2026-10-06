@@ -813,7 +813,8 @@ def update_series(
 
     # Top up any slots the change opened up (a moved weekday, a later end date).
     if series.active:
-        services.generate_lessons_for_series(db, series, services.clamp_horizon(None))
+        services.generate_lessons_for_series(
+            db, series, services.clamp_horizon(None), since=today)
 
     db.refresh(series)
     return series
