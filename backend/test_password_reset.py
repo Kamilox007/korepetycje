@@ -6,7 +6,7 @@ database over SSH.
 import sys, pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from testing_utils import bootstrap
+from testing_utils import bootstrap, login_admin, first_login
 bootstrap()
 
 from fastapi.testclient import TestClient
@@ -27,9 +27,7 @@ ADMIN_PW = "AdminPassword1!"
 TUTOR_PW = "TutorPassword1!"
 
 with TestClient(app) as admin:
-    admin.post("/api/auth/login", data={"username": "admin", "password": "admin"})
-    admin.post("/api/auth/change-password",
-               json={"old_password": "admin", "new_password": ADMIN_PW, "accept_privacy": True})
+    login_admin(admin, ADMIN_PW)
 
     r = admin.post("/api/users", json={
         "username": "tutor1", "password": TUTOR_PW, "role": "tutor",
@@ -40,9 +38,7 @@ with TestClient(app) as admin:
 
     # the tutor sets their own password and signs in on two devices
     with TestClient(app) as t1, TestClient(app) as t2:
-        t1.post("/api/auth/login", data={"username": "tutor1", "password": TUTOR_PW})
-        t1.post("/api/auth/change-password",
-                json={"old_password": TUTOR_PW, "new_password": "OwnPassword123!", "accept_privacy": True})
+        first_login(t1, "tutor1", TUTOR_PW, "OwnPassword123!")
         t2.post("/api/auth/login", data={"username": "tutor1", "password": "OwnPassword123!"})
         check("tutor works on a second device", t2.get("/api/auth/me").status_code == 200)
 
@@ -87,9 +83,7 @@ with TestClient(app) as admin, TestClient(app) as sec:
         "username": "sec1", "password": "SecPassword1!", "role": "secretary",
         "display_name": "Secretary",
     })
-    sec.post("/api/auth/login", data={"username": "sec1", "password": "SecPassword1!"})
-    sec.post("/api/auth/change-password",
-             json={"old_password": "SecPassword1!", "new_password": "SecOwn12345!", "accept_privacy": True})
+    first_login(sec, "sec1", "SecPassword1!", "SecOwn12345!")
 
     check("secretary may reset a tutor",
           sec.post(f"/api/users/{tutor_id}/reset-password").status_code == 200)

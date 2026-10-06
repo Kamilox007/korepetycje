@@ -3,9 +3,13 @@ import Modal from "./Modal";
 import { api } from "./api";
 import { PASSWORD_HINT, passwordError } from "./password";
 
-export default function ChangePassword({ forced, onDone, onClose, onLogout }) {
+export default function ChangePassword({ forced, knownOldPassword = null, onDone, onClose, onLogout }) {
   const uid = useId();
-  const [oldP, setOldP] = useState("");
+  // On the forced first-time change the user has just logged in with the
+  // starting password; App passes it in, so there is nothing to retype. The
+  // backend still verifies it - only the typing is skipped.
+  const [oldP, setOldP] = useState(knownOldPassword || "");
+  const askOld = !knownOldPassword;
   const [newP, setNewP] = useState("");
   const [newP2, setNewP2] = useState("");
   const [acceptPrivacy, setAcceptPrivacy] = useState(false);
@@ -45,8 +49,10 @@ export default function ChangePassword({ forced, onDone, onClose, onLogout }) {
         </p>
       )}
       {err && <div className="err">{err}</div>}
-      <div><label htmlFor={`${uid}-dotychczasowe-haso-1`}>Dotychczasowe hasło</label>
-        <input id={`${uid}-dotychczasowe-haso-1`} type="password" value={oldP} onChange={(e) => setOldP(e.target.value)} /></div>
+      {askOld && (
+        <div><label htmlFor={`${uid}-dotychczasowe-haso-1`}>Dotychczasowe hasło</label>
+          <input id={`${uid}-dotychczasowe-haso-1`} type="password" value={oldP} onChange={(e) => setOldP(e.target.value)} /></div>
+      )}
       <div>
         <label htmlFor={`${uid}-nowe-haso-2`}>Nowe hasło</label>
         <input id={`${uid}-nowe-haso-2`} type="password" value={newP} onChange={(e) => setNewP(e.target.value)} />

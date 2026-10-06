@@ -3,6 +3,12 @@ import { api } from "./api";
 import Modal from "./Modal";
 import { fmtTime } from "./dates";
 
+// The staff and tutor panels show the same two tables and the same decision
+// dialog; only the endpoints differ (a tutor sees and decides on the requests
+// for their own lessons only, the backend filters). `tutorView` picks the pair.
+const STAFF_API = { approve: api.approveReschedule, reject: api.rejectReschedule };
+const TUTOR_API = { approve: api.tutorApproveReschedule, reject: api.tutorRejectReschedule };
+
 export default function Requests({ reload }) {
   const [requests, setRequests] = useState([]);
   const [decision, setDecision] = useState(null); // { req, action }
@@ -12,13 +18,27 @@ export default function Requests({ reload }) {
   }
   useEffect(() => { load(); }, []);
 
-  const pending = requests.filter((r) => r.status === "pending");
-  const handled = requests.filter((r) => r.status !== "pending");
-
   return (
     <div>
       <div className="page-head"><h1>Prośby o przesunięcie</h1></div>
+      <RequestTables requests={requests} onDecide={setDecision} />
+      {decision && (
+        <DecisionModal
+          decision={decision}
+          onClose={() => setDecision(null)}
+          onDone={async () => { setDecision(null); await load(); reload?.(); }}
+        />
+      )}
+    </div>
+  );
+}
 
+/** Pending requests with Akceptuj/Odrzuć, then the ones already decided. */
+export function RequestTables({ requests, onDecide }) {
+  const pending = requests.filter((r) => r.status === "pending");
+  const handled = requests.filter((r) => r.status !== "pending");
+  return (
+    <div>
       <h2 style={{ fontSize: 16, marginBottom: 12 }}>Oczekujące</h2>
       <div className="card" style={{ marginBottom: 24 }}>
         {pending.length === 0 ? (
@@ -34,8 +54,8 @@ export default function Requests({ reload }) {
                   <td>{r.proposed_date || "-"} {fmtTime(r.proposed_time)}</td>
                   <td className="muted">{r.message || ""}</td>
                   <td className="num row" style={{ justifyContent: "flex-end" }}>
-                    <button className="primary" onClick={() => setDecision({ req: r, action: "approve" })}>Akceptuj</button>
-                    <button className="danger" onClick={() => setDecision({ req: r, action: "reject" })}>Odrzuć</button>
+                    <button className="primary" onClick={() => onDecide({ req: r, action: "approve" })}>Akceptuj</button>
+                    <button className="danger" onClick={() => onDecide({ req: r, action: "reject" })}>Odrzuć</button>
                   </td>
                 </tr>
               ))}
@@ -68,30 +88,29 @@ export default function Requests({ reload }) {
           </div>
         </>
       )}
-
-      {decision && (
-        <DecisionModal
-          decision={decision}
-          onClose={() => setDecision(null)}
-          onDone={async () => { setDecision(null); await load(); reload?.(); }}
-        />
-      )}
     </div>
   );
 }
 
-function DecisionModal({ decision, onClose, onDone }) {
+export function DecisionModal({ decision, onClose, onDone, tutorView = false }) {
   const uid = useId();
   const { req, action } = decision;
   const approve = action === "approve";
   const [response, setResponse] = useState("");
+  const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const calls = tutorView ? TUTOR_API : STAFF_API;
 
   async function submit() {
     setBusy(true);
-    if (approve) await api.approveReschedule(req.id, response);
-    else await api.rejectReschedule(req.id, response);
-    onDone();
+    setErr("");
+    try {
+      await (approve ? calls.approve : calls.reject)(req.id, response);
+      onDone();
+    } catch (e) {
+      setErr(e.message);
+      setBusy(false);
+    }
   }
 
   return (
@@ -105,6 +124,7 @@ function DecisionModal({ decision, onClose, onDone }) {
         </button>
       </>}
     >
+      {err && <div className="err">{err}</div>}
       <p style={{ margin: 0 }}>
         {req.student_name} - {approve ? "termin zostanie zmieniony na " : "prośba o "}
         <strong>{req.proposed_date} {fmtTime(req.proposed_time)}</strong>

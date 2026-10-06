@@ -124,6 +124,9 @@ test.describe("deletion confirmations", () => {
     // The header button is always there; "Dodaj pierwszą wpłatę" only when empty.
     await page.getByRole("button", { name: "+ Dodaj wpłatę" }).click();
     await page.getByLabel("Za którego ucznia").selectOption({ label: name });
+    // A payment has to be credited to somebody; a fresh student has no lessons
+    // to suggest a tutor from, so pick the first one (the admin teaches too).
+    await page.getByLabel("Dla którego korepetytora").selectOption({ index: 1 });
     await page.getByLabel("Kwota (PLN)").fill("123.45");
     await page.getByRole("button", { name: "Zapisz" }).click();
 

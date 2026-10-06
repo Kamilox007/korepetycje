@@ -2,13 +2,15 @@ import { useState, useEffect, useCallback, useId } from "react";
 import { api } from "./api";
 import Modal from "./Modal";
 import ColorPicker from "./ColorPicker";
+import DayGrid from "./DayGrid";
 import { usePersistentState } from "./usePersistentState";
-import { TUTOR_COLORS, UNASSIGNED_COLOR, tint } from "./colors";
+import { UNASSIGNED_COLOR, tint } from "./colors";
 import {
   DAYS_SHORT, DAYS_PL, MONTHS_PL, DURATION_OPTIONS, startOfWeek, addDays, toISODate, parseISO,
-  sameDay, fmtMoney, fmtTime, monthGrid, pyWeekday,
+  sameDay, fmtTime, monthGrid, pyWeekday,
 } from "./dates";
 import { useConfirm } from "./Confirm";
+import { useTutors, useSubjects } from "./useLists";
 
 const VIEWS = [
   { id: "day", label: "Dzień" },
@@ -58,18 +60,13 @@ export default function Calendar({ students, onChanged }) {
   const [lessons, setLessons] = useState([]);
   const [editing, setEditing] = useState(null);
   const [adding, setAdding] = useState(null);
-  const [tutors, setTutors] = useState([]);
-  const [subjects, setSubjects] = useState([]);
+  const tutors = useTutors();
+  const subjects = useSubjects();
   // Session-only, not persisted: an empty calendar after reload because a
   // filter was silently still on would be more confusing than useful.
   const [subjectFilter, setSubjectFilter] = useState("");
   const [tutorFilter, setTutorFilter] = useState("");
   const [err, setErr] = useState("");
-
-  useEffect(() => {
-    api.listTutors().then(setTutors).catch(() => {});
-    api.listSubjects().then(setSubjects).catch(() => {});
-  }, []);
 
   let rangeStart, rangeEnd;
   if (view === "day") {
@@ -187,15 +184,18 @@ export default function Calendar({ students, onChanged }) {
       )}
 
       {view === "day" && (
-        <DayView
-          day={anchor}
+        <DayGrid
           lessons={lessonsFor(anchor)}
           onPick={setEditing}
           onAdd={(time) => setAdding({ date: toISODate(anchor), time })}
-          onDropTime={async (lesson, newTime) => {
+          onMoveTime={async (lesson, newTime) => {
             await api.updateLesson(lesson.id, { start_time: newTime + ":00" });
             await afterChange();
           }}
+          label={(l) => l.student_name}
+          extra={(l) => l.assigned_tutor_name && <span className="subj">{l.assigned_tutor_name}</span>}
+          tileStyle={lessonStyle}
+          columns
         />
       )}
       {view === "week" && (
@@ -242,171 +242,6 @@ export default function Calendar({ students, onChanged }) {
           onSaved={async () => { setAdding(null); await afterChange(); }}
         />
       )}
-    </div>
-  );
-}
-
-const DAY_START_HOUR = 7;
-const DAY_END_HOUR = 22;
-const HOUR_PX = 56;
-
-// Lays lessons that overlap in time out into side-by-side columns.
-// Returns a map of id -> { col, cols }: column index and columns in the group.
-function computeColumns(lessons) {
-  const toMin = (t) => {
-    const [h, m] = (t || "0:0").slice(0, 5).split(":").map(Number);
-    return h * 60 + m;
-  };
-  const items = lessons
-    .map((l) => ({
-      id: l.id,
-      start: toMin(l.start_time),
-      end: toMin(l.start_time) + (l.duration_min || 60),
-    }))
-    .sort((a, b) => a.start - b.start || b.end - a.end);
-
-  const result = {};
-  let group = [];
-  let groupEnd = -1;
-
-  const flush = () => {
-    if (!group.length) return;
-    const colEnds = [];
-    for (const it of group) {
-      let placed = false;
-      for (let c = 0; c < colEnds.length; c++) {
-        if (it.start >= colEnds[c]) { it.col = c; colEnds[c] = it.end; placed = true; break; }
-      }
-      if (!placed) { it.col = colEnds.length; colEnds.push(it.end); }
-    }
-    const cols = colEnds.length;
-    for (const it of group) result[it.id] = { col: it.col, cols };
-    group = [];
-    groupEnd = -1;
-  };
-
-  for (const it of items) {
-    if (group.length && it.start >= groupEnd) flush();
-    group.push(it);
-    groupEnd = Math.max(groupEnd, it.end);
-  }
-  flush();
-  return result;
-}
-
-function DayView({ day, lessons, onPick, onAdd, onDropTime }) {
-  const hours = [];
-  for (let h = DAY_START_HOUR; h <= DAY_END_HOUR; h++) hours.push(h);
-
-  const [drag, setDrag] = useState(null); // { lesson, previewTop, previewTime }
-
-  function topFor(timeStr) {
-    const [h, m] = timeStr.split(":").map(Number);
-    return (h - DAY_START_HOUR) * HOUR_PX + (m / 60) * HOUR_PX;
-  }
-  // Shaved a few px off the bottom so back-to-back lessons (one ending right
-  // where the next starts) show a sliver of the column background between
-  // them, instead of two tiles flush against each other reading as one.
-  function heightFor(min) {
-    return Math.max(22, (min / 60) * HOUR_PX) - 4;
-  }
-  // Y position -> time rounded to 15 minutes, clamped to the day
-  function timeFromY(y, durationMin) {
-    let totalMin = (y / HOUR_PX) * 60 + DAY_START_HOUR * 60;
-    totalMin = Math.round(totalMin / 15) * 15;
-    const dayStart = DAY_START_HOUR * 60;
-    const dayEnd = (DAY_END_HOUR + 1) * 60;
-    totalMin = Math.max(dayStart, Math.min(totalMin, dayEnd - (durationMin || 60)));
-    const h = Math.floor(totalMin / 60), m = totalMin % 60;
-    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-  }
-
-  function onColDragOver(e) {
-    if (!drag) return;
-    e.preventDefault();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    const t = timeFromY(y, drag.lesson.duration_min);
-    setDrag((d) => d ? { ...d, previewTime: t, previewTop: topFor(t) } : d);
-  }
-  async function onColDrop(e) {
-    if (!drag) return;
-    e.preventDefault();
-    const t = drag.previewTime;
-    const lesson = drag.lesson;
-    setDrag(null);
-    if (t && t !== fmtTime(lesson.start_time)) {
-      await onDropTime(lesson, t);
-    }
-  }
-
-  return (
-    <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-      <div className="day-grid">
-        <div className="hours-col">
-          {hours.map((h) => (
-            <div key={h} className="hour-row" style={{ height: HOUR_PX }}>
-              <span className="hour-label">{String(h).padStart(2, "0")}:00</span>
-            </div>
-          ))}
-        </div>
-        <div
-          className="events-col"
-          style={{ height: (DAY_END_HOUR - DAY_START_HOUR + 1) * HOUR_PX }}
-          onClick={(e) => {
-            if (e.target !== e.currentTarget) return;
-            const rel = e.nativeEvent.offsetY;
-            const h = DAY_START_HOUR + Math.floor(rel / HOUR_PX);
-            onAdd(`${String(Math.min(h, DAY_END_HOUR)).padStart(2, "0")}:00`);
-          }}
-          onDragOver={onColDragOver}
-          onDrop={onColDrop}
-          onDragLeave={(e) => { if (e.target === e.currentTarget) setDrag((d) => d ? { ...d, previewTime: null } : d); }}
-        >
-          {hours.map((h) => (
-            <div key={h} className="hour-line" style={{ top: (h - DAY_START_HOUR) * HOUR_PX }} />
-          ))}
-          {/* cień-podgląd miejsca upuszczenia */}
-          {drag && drag.previewTime && (
-            <div
-              className="drop-shadow"
-              style={{ top: drag.previewTop, height: heightFor(drag.lesson.duration_min) }}
-            >
-              {drag.previewTime}
-            </div>
-          )}
-          {(() => {
-            const layout = computeColumns(lessons);
-            const GAP = 3; // px between columns
-            return lessons.map((l) => {
-              const top = topFor(fmtTime(l.start_time));
-              const dragging = drag && drag.lesson.id === l.id;
-              const lay = layout[l.id] || { col: 0, cols: 1 };
-              // width and left offset in percent, accounting for column gaps
-              const widthPct = 100 / lay.cols;
-              const leftStyle = `calc(${lay.col * widthPct}% + 8px)`;
-              const widthStyle = `calc(${widthPct}% - ${8 + GAP}px)`;
-              return (
-                <div
-                  key={l.id}
-                  className={`event${l.completed ? " done" : ""}${l.cancelled ? " cancelled" : ""}${dragging ? " dragging" : ""}`}
-                  style={{ top, height: heightFor(l.duration_min), left: leftStyle, width: widthStyle, ...(lessonStyle(l) || {}) }}
-                  draggable={!l.completed && !l.cancelled}
-                  onDragStart={() => setDrag({ lesson: l, previewTime: fmtTime(l.start_time), previewTop: top })}
-                  onDragEnd={() => setDrag(null)}
-                  onClick={(e) => { e.stopPropagation(); onPick(l); }}
-                >
-                  <span className="t">{fmtTime(l.start_time)} {l.rescheduled ? "↻" : ""}</span>
-                  <span className="n">{l.student_name}</span>
-                  {l.assigned_tutor_name && <span className="subj">{l.assigned_tutor_name}</span>}
-                  {l.subject_name && <span className="subj">{l.subject_name}{l.level ? ` · ${l.level === "rozszerzenie" ? "R" : "P"}` : ""}</span>}
-                  {!l.cancelled && <span className="p">{fmtMoney(l.price)}</span>}
-                </div>
-              );
-            });
-          })()}
-        </div>
-      </div>
     </div>
   );
 }
@@ -526,17 +361,12 @@ function EditLesson({ lesson, onClose, onSaved }) {
   const [cancelled, setCancelled] = useState(lesson.cancelled);
   const [note, setNote] = useState(lesson.note || "");
   const [tutorId, setTutorId] = useState(lesson.assigned_tutor_id || "");
-  const [tutors, setTutors] = useState([]);
   const [subjectId, setSubjectId] = useState(lesson.subject_id || "");
   const [level, setLevel] = useState(lesson.level || "");
-  const [subjects, setSubjects] = useState([]);
+  const tutors = useTutors();
+  const subjects = useSubjects();
   const [color, setColor] = useState(lesson.color || null);
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    api.listTutors().then(setTutors).catch(() => {});
-    api.listSubjects().then(setSubjects).catch(() => {});
-  }, []);
 
   async function save() {
     setBusy(true);

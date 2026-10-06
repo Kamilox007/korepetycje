@@ -9,7 +9,16 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:8000",
         changeOrigin: true,
+        // Tablica synchronizuje się przez WebSocket pod /api/t/{token}/ws;
+        // bez tej flagi proxy dev servera przepuszcza tylko HTTP.
+        ws: true,
       },
     },
+  },
+  test: {
+    // Only unit tests under src/. Without this vitest would also pick up
+    // e2e/*.spec.js, which are Playwright tests and use a different runner.
+    include: ["src/**/*.test.js"],
+    environment: "node",
   },
 });

@@ -1,8 +1,12 @@
 # --- etap 1: build Reacta ---
 FROM node:22-alpine AS build
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+# Lockfile + `npm ci`: identyczne drzewo zależności jak lokalnie. Rozwiązywanie
+# od zera z samego package.json wywalało się w npm 10 z obrazu
+# ("Cannot read properties of null (reading 'edgesOut')") po dojściu
+# Excalidrawa z jego drzewem peer dependencies.
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY . .
 RUN npm run build
 

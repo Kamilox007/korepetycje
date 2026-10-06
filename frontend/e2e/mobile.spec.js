@@ -68,3 +68,21 @@ test("tables scroll horizontally instead of stretching the page", async ({ page 
   const viewportWidth = await page.evaluate(() => window.innerWidth);
   expect(pageWidth).toBeLessThanOrEqual(viewportWidth + 1);
 });
+
+test("tablica: ekran nie przewija się w poziomie, pasek stron przewija się sam", async ({ page }) => {
+  const res = await page.request.post("/api/boards", { data: { title: "Mobile E2E" } });
+  const { path } = await res.json();
+  await page.goto(path);
+  await page.waitForFunction(() => Boolean(window.__tablicaAPI));
+
+  const scrollsHorizontally = await page.evaluate(
+    () => document.documentElement.scrollWidth > window.innerWidth + 1
+  );
+  expect(scrollsHorizontally).toBeFalsy();
+
+  // Pasek stron ma własne przewijanie; reszta paska mieści się na ekranie.
+  const bar = page.locator(".tablica-bar");
+  const barFits = await bar.evaluate((e) => e.getBoundingClientRect().right <= window.innerWidth + 1);
+  expect(barFits).toBeTruthy();
+  await expect(page.getByRole("link", { name: "Panel" })).toBeVisible();
+});

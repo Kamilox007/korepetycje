@@ -8,13 +8,14 @@ from fastapi import FastAPI, Depends, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from icalendar import Calendar, Event
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
-from . import models, schemas, services, auth, money, transfer_code
+from . import models, schemas, services, auth, money, transfer_code, boards_rooms, boards_snapshots, boards_files
 from .database import get_db, SessionLocal
+from .ratelimit import limiter
+from .routers import boards as boards_router, boards_public as boards_public_router, student_files as student_files_router
 
 
 def seed_admin():
@@ -84,7 +85,10 @@ def _generate_upcoming() -> int:
     """Materialise series occurrences for the coming months."""
     db = SessionLocal()
     try:
-        return services.regenerate_all(db)
+        created = services.regenerate_all(db)
+        # Same daily impulse, second chore: board snapshots past retention.
+        boards_snapshots.purge_old(db)
+        return created
     finally:
         db.close()
 
@@ -94,12 +98,18 @@ async def lifespan(app: FastAPI):
     _require_migrated_db()
     seed_admin()
     _generate_upcoming()
+    boards_rooms.start()
     yield
+    # Flush live board rooms before the process goes away.
+    await boards_rooms.stop()
 
 
 app = FastAPI(title="Korepetycje API", version="3.0", lifespan=lifespan)
+app.include_router(boards_router.router)
+app.include_router(boards_router.library_router)
+app.include_router(student_files_router.router)
+app.include_router(boards_public_router.router)
 
-limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -116,7 +126,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
@@ -209,6 +219,27 @@ def logout(
     return {"ok": True}
 
 
+def _teaching_accounts(db: Session):
+    """Accounts that run lessons: tutors and admins. In a one- or two-person
+    practice the owner teaches, and leaving them off makes their own lessons
+    unassignable. Secretaries are not - they administer, they do not teach."""
+    return (
+        db.query(models.User)
+        .filter(models.User.role.in_(("tutor", "admin")))
+        .order_by(models.User.display_name)
+        .all()
+    )
+
+
+def _between(q, start: date | None, end: date | None):
+    """Lessons in an inclusive date range; either bound may be missing."""
+    if start:
+        q = q.filter(models.Lesson.date >= start)
+    if end:
+        q = q.filter(models.Lesson.date <= end)
+    return q
+
+
 # ===================== USER MANAGEMENT =====================
 # A secretary may create tutors. An admin may create tutors and secretaries.
 # Nobody but an admin creates or edits admin/secretary accounts.
@@ -223,16 +254,8 @@ def list_users(user: models.User = Depends(auth.require_staff), db: Session = De
 
 @app.get("/api/tutors", response_model=list[schemas.TutorOption])
 def list_tutors(user: models.User = Depends(auth.require_staff), db: Session = Depends(get_db)):
-    # Admins are included: in a one- or two-person practice the owner teaches,
-    # and leaving them off this list makes their own lessons unassignable.
-    # Secretaries are not - they administer, they do not run lessons.
-    rows = (
-        db.query(models.User)
-        .filter(models.User.role.in_(("tutor", "admin")))
-        .order_by(models.User.display_name)
-        .all()
-    )
-    return [schemas.TutorOption(id=t.id, display_name=t.display_name or t.username, color=t.color) for t in rows]
+    return [schemas.TutorOption(id=t.id, display_name=t.label, color=t.color)
+            for t in _teaching_accounts(db)]
 
 
 @app.post("/api/users", response_model=schemas.UserCreatedOut)
@@ -284,25 +307,22 @@ def update_user(
         raise HTTPException(403, "Brak uprawnień do edycji tego konta")
     data = payload.model_dump(exclude_unset=True)
 
-    if "bank_account" in data:
-        # Restricted to admins. The risk with an account number is not that it
-        # is seen - it goes on every invoice - but that it is swapped, which
-        # silently redirects every payment until somebody notices.
+    # Where the money goes - restricted to admins. The risk with an account
+    # number (or a BLIK phone) is not that it is seen, it goes on every
+    # invoice, but that it is swapped, which silently redirects every payment
+    # until somebody notices.
+    for field, normalize, valid, what in (
+        ("bank_account", transfer_code.normalize_account, transfer_code.valid_account, "numer rachunku"),
+        ("blik_phone", transfer_code.normalize_phone, transfer_code.valid_phone, "numer telefonu do BLIK"),
+    ):
+        if field not in data:
+            continue
         if user.role != "admin":
-            raise HTTPException(403, "Tylko administrator zmienia numer rachunku")
-        acc = transfer_code.normalize_account(data["bank_account"] or "")
-        if acc and not transfer_code.valid_account(acc):
-            raise HTTPException(400, "Numer rachunku jest nieprawidłowy")
-        data["bank_account"] = acc or None
-
-    if "blik_phone" in data:
-        # Same restriction and reasoning as bank_account, above.
-        if user.role != "admin":
-            raise HTTPException(403, "Tylko administrator zmienia numer telefonu do BLIK")
-        phone = transfer_code.normalize_phone(data["blik_phone"] or "")
-        if phone and not transfer_code.valid_phone(phone):
-            raise HTTPException(400, "Numer telefonu jest nieprawidłowy")
-        data["blik_phone"] = phone or None
+            raise HTTPException(403, f"Tylko administrator zmienia {what}")
+        value = normalize(data[field] or "")
+        if value and not valid(value):
+            raise HTTPException(400, f"Nieprawidłowy {what}")
+        data[field] = value or None
 
     for k, v in data.items():
         setattr(target, k, v)
@@ -449,7 +469,7 @@ def _tutors_by_student(db: Session, student_ids: list[int]) -> dict[int, list[sc
         if not u:
             continue
         by_student.setdefault(sid, []).append(
-            schemas.TutorOption(id=u.id, display_name=u.display_name or u.username, color=u.color)
+            schemas.TutorOption(id=u.id, display_name=u.label, color=u.color)
         )
     for opts in by_student.values():
         opts.sort(key=lambda t: t.display_name)
@@ -600,6 +620,20 @@ def purge_student(
     db.query(models.RescheduleRequest).filter(
         models.RescheduleRequest.student_id == student.id
     ).delete(synchronize_session=False)
+    # Boards are the tutor's notes, not the student's record: detach, keep.
+    db.query(models.Board).filter(models.Board.student_id == student.id).update(
+        {models.Board.student_id: None}, synchronize_session=False
+    )
+    # Materials handed to the student are the student's data: gone with them,
+    # and the disk file too unless another record still shares it.
+    hashes = {row[0] for row in db.query(models.StudentFile.sha256)
+              .filter(models.StudentFile.student_id == student.id)}
+    db.query(models.StudentFile).filter(models.StudentFile.student_id == student.id).delete(
+        synchronize_session=False
+    )
+    db.flush()
+    for sha in hashes:
+        boards_files.remove_if_orphaned(db, sha)
     if series_ids:
         db.query(models.SeriesSkip).filter(
             models.SeriesSkip.series_id.in_(series_ids)
@@ -671,7 +705,7 @@ def list_series(user: models.User = Depends(auth.require_staff), db: Session = D
         if s.assigned_tutor_id:
             t = db.get(models.User, s.assigned_tutor_id)
             if t:
-                item.assigned_tutor_name = t.display_name or t.username
+                item.assigned_tutor_name = t.label
                 item.assigned_tutor_color = t.color
         out.append(item)
     return out
@@ -815,7 +849,7 @@ def _lesson_out(l: models.Lesson, db: Session) -> schemas.LessonOut:
     if l.assigned_tutor_id:
         t = db.get(models.User, l.assigned_tutor_id)
         if t:
-            item.assigned_tutor_name = t.display_name or t.username
+            item.assigned_tutor_name = t.label
             item.assigned_tutor_color = t.color
     if l.subject_id:
         subj = db.get(models.Subject, l.subject_id)
@@ -841,10 +875,12 @@ def generate_lessons(
     """
     created = services.regenerate_all(db)
     purged = auth.purge_expired_sessions(db)
+    snapshots_purged = boards_snapshots.purge_old(db)
     return {
         "created": created,
         "horizon": services.clamp_horizon(None),
         "sessions_purged": purged,
+        "board_snapshots_purged": snapshots_purged,
     }
 
 
@@ -856,11 +892,7 @@ def list_lessons(
     user: models.User = Depends(auth.require_staff),
     db: Session = Depends(get_db),
 ):
-    q = db.query(models.Lesson)
-    if start:
-        q = q.filter(models.Lesson.date >= start)
-    if end:
-        q = q.filter(models.Lesson.date <= end)
+    q = _between(db.query(models.Lesson), start, end)
     if student_id:
         q = q.filter(models.Lesson.student_id == student_id)
     lessons = q.order_by(models.Lesson.date, models.Lesson.start_time).all()
@@ -885,17 +917,10 @@ def create_lesson(
     return _lesson_out(lesson, db)
 
 
-@app.patch("/api/lessons/{lesson_id}", response_model=schemas.LessonOut)
-def update_lesson(
-    lesson_id: int,
-    payload: schemas.LessonUpdate,
-    user: models.User = Depends(auth.require_staff),
-    db: Session = Depends(get_db),
-):
-    lesson = db.get(models.Lesson, lesson_id)
-    if not lesson:
-        raise HTTPException(404, "Zajęcia nie znalezione")
-    data = payload.model_dump(exclude_unset=True)
+def _apply_lesson_update(db: Session, lesson: models.Lesson, data: dict, user: models.User) -> schemas.LessonOut:
+    """Write a partial update onto a lesson. Shared by the staff and the tutor
+    endpoint, which differ only in who may touch which lesson and which fields
+    the schema lets through."""
     if "date" in data or "start_time" in data:
         lesson.rescheduled = True
     for k, v in data.items():
@@ -920,6 +945,19 @@ def update_lesson(
     db.commit()
     db.refresh(lesson)
     return _lesson_out(lesson, db)
+
+
+@app.patch("/api/lessons/{lesson_id}", response_model=schemas.LessonOut)
+def update_lesson(
+    lesson_id: int,
+    payload: schemas.LessonUpdate,
+    user: models.User = Depends(auth.require_staff),
+    db: Session = Depends(get_db),
+):
+    lesson = db.get(models.Lesson, lesson_id)
+    if not lesson:
+        raise HTTPException(404, "Zajęcia nie znalezione")
+    return _apply_lesson_update(db, lesson, payload.model_dump(exclude_unset=True), user)
 
 
 @app.delete("/api/lessons/{lesson_id}")
@@ -975,7 +1013,7 @@ def assign_tutor_to_lesson(
 def _payments_out(payments: list["models.Payment"], db: Session) -> list[schemas.PaymentOut]:
     tutor_ids = {p.assigned_tutor_id for p in payments if p.assigned_tutor_id}
     names = {
-        u.id: u.display_name or u.username
+        u.id: u.label
         for u in db.query(models.User).filter(models.User.id.in_(tutor_ids)).all()
     } if tutor_ids else {}
     out = []
@@ -1117,7 +1155,7 @@ def _summary_for_students(students, db=None, only_tutor_id: int | None = None):
                     continue
                 u = db.get(models.User, tid)
                 if u:
-                    names[tid] = u.display_name or u.username
+                    names[tid] = u.label
 
         by_tutor = [
             schemas.TutorBalance(
@@ -1212,7 +1250,7 @@ def _quarterly_progress(db: Session, tutor: models.User, on: date | None = None)
     roman = ["I", "II", "III", "IV"][(start.month - 1) // 3]
     return schemas.QuarterlyLimitOut(
         tutor_id=tutor.id,
-        tutor_name=tutor.display_name or tutor.username,
+        tutor_name=tutor.label,
         quarter_label=f"{roman} kwartał {start.year}",
         quarter_start=start,
         quarter_end=end,
@@ -1240,13 +1278,7 @@ def quarterly_limits(
     db: Session = Depends(get_db),
 ):
     on = _quarter_on(year, quarter)
-    tutors = (
-        db.query(models.User)
-        .filter(models.User.role.in_(("tutor", "admin")))
-        .order_by(models.User.display_name)
-        .all()
-    )
-    return [_quarterly_progress(db, t, on) for t in tutors]
+    return [_quarterly_progress(db, t, on) for t in _teaching_accounts(db)]
 
 
 @app.get("/api/income-limits", response_model=list[schemas.IncomeLimitOut])
@@ -1326,6 +1358,22 @@ def _apply_reject(r: models.RescheduleRequest, response: str | None, db: Session
     db.commit()
 
 
+def _pending_request(db: Session, req_id: int, tutor: models.User | None = None) -> models.RescheduleRequest:
+    """A request that can still be decided. With `tutor`, only one about a
+    lesson assigned to them - and a 404 rather than 403 for anyone else's, so
+    the id alone does not reveal that a request exists."""
+    r = db.get(models.RescheduleRequest, req_id)
+    if tutor is not None and r is not None:
+        lesson = db.get(models.Lesson, r.lesson_id)
+        if not (lesson and lesson.assigned_tutor_id == tutor.id):
+            r = None
+    if not r:
+        raise HTTPException(404, "Prośba nie znaleziona")
+    if r.status != "pending":
+        raise HTTPException(400, "Prośba została już rozpatrzona")
+    return r
+
+
 @app.get("/api/reschedule-requests", response_model=list[schemas.RescheduleOut])
 def list_reschedule_requests(
     user: models.User = Depends(auth.require_staff), db: Session = Depends(get_db)
@@ -1345,11 +1393,7 @@ def approve_reschedule(
     user: models.User = Depends(auth.require_staff),
     db: Session = Depends(get_db),
 ):
-    r = db.get(models.RescheduleRequest, req_id)
-    if not r:
-        raise HTTPException(404, "Prośba nie znaleziona")
-    if r.status != "pending":
-        raise HTTPException(400, "Prośba została już rozpatrzona")
+    r = _pending_request(db, req_id)
     lesson = _apply_approve(r, payload.response if payload else None, db)
     return _lesson_out(lesson, db)
 
@@ -1361,22 +1405,12 @@ def reject_reschedule(
     user: models.User = Depends(auth.require_staff),
     db: Session = Depends(get_db),
 ):
-    r = db.get(models.RescheduleRequest, req_id)
-    if not r:
-        raise HTTPException(404, "Prośba nie znaleziona")
-    if r.status != "pending":
-        raise HTTPException(400, "Prośba została już rozpatrzona")
+    r = _pending_request(db, req_id)
     _apply_reject(r, payload.response if payload else None, db)
     return {"ok": True}
 
 
 # ===================== TUTOR (restricted view) =====================
-def _tutor_owns_request(r: models.RescheduleRequest, user, db) -> bool:
-    """Whether the request concerns a lesson assigned to this tutor."""
-    lesson = db.get(models.Lesson, r.lesson_id)
-    return bool(lesson and lesson.assigned_tutor_id == user.id)
-
-
 @app.get("/api/tutor/reschedule-requests", response_model=list[schemas.RescheduleOut])
 def tutor_reschedule_requests(
     user: models.User = Depends(auth.require_tutor), db: Session = Depends(get_db)
@@ -1399,11 +1433,7 @@ def tutor_approve_reschedule(
     user: models.User = Depends(auth.require_tutor),
     db: Session = Depends(get_db),
 ):
-    r = db.get(models.RescheduleRequest, req_id)
-    if not r or not _tutor_owns_request(r, user, db):
-        raise HTTPException(404, "Prośba nie znaleziona")
-    if r.status != "pending":
-        raise HTTPException(400, "Prośba została już rozpatrzona")
+    r = _pending_request(db, req_id, tutor=user)
     lesson = _apply_approve(r, payload.response if payload else None, db)
     return _lesson_out(lesson, db)
 
@@ -1415,14 +1445,9 @@ def tutor_reject_reschedule(
     user: models.User = Depends(auth.require_tutor),
     db: Session = Depends(get_db),
 ):
-    r = db.get(models.RescheduleRequest, req_id)
-    if not r or not _tutor_owns_request(r, user, db):
-        raise HTTPException(404, "Prośba nie znaleziona")
-    if r.status != "pending":
-        raise HTTPException(400, "Prośba została już rozpatrzona")
+    r = _pending_request(db, req_id, tutor=user)
     _apply_reject(r, payload.response if payload else None, db)
     return {"ok": True}
-
 
 
 @app.get("/api/tutor/summary", response_model=schemas.SummaryOut)
@@ -1471,11 +1496,7 @@ def tutor_lessons(
     user: models.User = Depends(auth.require_tutor),
     db: Session = Depends(get_db),
 ):
-    q = db.query(models.Lesson).filter(models.Lesson.assigned_tutor_id == user.id)
-    if start:
-        q = q.filter(models.Lesson.date >= start)
-    if end:
-        q = q.filter(models.Lesson.date <= end)
+    q = _between(db.query(models.Lesson).filter(models.Lesson.assigned_tutor_id == user.id), start, end)
     lessons = q.order_by(models.Lesson.date, models.Lesson.start_time).all()
     return [_lesson_out(l, db) for l in lessons]
 
@@ -1490,31 +1511,7 @@ def tutor_update_lesson(
     lesson = db.get(models.Lesson, lesson_id)
     if not lesson or lesson.assigned_tutor_id != user.id:
         raise HTTPException(404, "Zajęcia nie znalezione")
-    data = payload.model_dump(exclude_unset=True)
-    if "date" in data or "start_time" in data:
-        lesson.rescheduled = True
-    for k, v in data.items():
-        setattr(lesson, k, v)
-
-    # A completed lesson has to say who taught it: it is what the charge is
-    # credited against, and without it the amount lands on nobody's account.
-    # Rather than refuse outright, fill in the obvious answer first - the series
-    # it came from, or the person marking it done if they teach.
-    if lesson.completed and not lesson.assigned_tutor_id:
-        if lesson.series_id:
-            series = db.get(models.LessonSeries, lesson.series_id)
-            if series and series.assigned_tutor_id:
-                lesson.assigned_tutor_id = series.assigned_tutor_id
-        if not lesson.assigned_tutor_id and user.role in ("tutor", "admin"):
-            lesson.assigned_tutor_id = user.id
-        if not lesson.assigned_tutor_id:
-            raise HTTPException(
-                400, "Przypisz korepetytora, zanim oznaczysz zajęcia jako odbyte"
-            )
-
-    db.commit()
-    db.refresh(lesson)
-    return _lesson_out(lesson, db)
+    return _apply_lesson_update(db, lesson, payload.model_dump(exclude_unset=True), user)
 
 
 # tutor availability: skeleton, to be extended later
@@ -1606,7 +1603,7 @@ def calendar_feed(token: str, db: Session = Depends(get_db)):
     cal = Calendar()
     cal.add("prodid", "-//Korepetycje//panel.kamilkrzywon.pl//PL")
     cal.add("version", "2.0")
-    cal.add("x-wr-calname", f"Korepetycje - {user.display_name or user.username}")
+    cal.add("x-wr-calname", f"Korepetycje - {user.label}")
     for l in lessons:
         start = datetime.combine(l.date, l.start_time, tzinfo=tz)
         event = Event()
@@ -1627,11 +1624,7 @@ def calendar_feed(token: str, db: Session = Depends(get_db)):
 
 
 # ===================== STUDENT PANEL =====================
-def _student_for_user(db, user) -> models.Student:
-    s = db.query(models.Student).filter(models.Student.user_id == user.id).first()
-    if not s:
-        raise HTTPException(404, "Brak powiązanego profilu ucznia")
-    return s
+_student_for_user = boards_router.student_for_user
 
 
 @app.get("/api/me/lessons", response_model=list[schemas.LessonOut])
@@ -1642,11 +1635,7 @@ def my_lessons(
     db: Session = Depends(get_db),
 ):
     student = _student_for_user(db, user)
-    q = db.query(models.Lesson).filter(models.Lesson.student_id == student.id)
-    if start:
-        q = q.filter(models.Lesson.date >= start)
-    if end:
-        q = q.filter(models.Lesson.date <= end)
+    q = _between(db.query(models.Lesson).filter(models.Lesson.student_id == student.id), start, end)
     lessons = q.order_by(models.Lesson.date, models.Lesson.start_time).all()
     return [_lesson_out(l, db) for l in lessons]
 
@@ -1682,7 +1671,7 @@ def my_transfer_info(
         if row.tutor_id:
             tutor = db.get(models.User, row.tutor_id)
             if tutor:
-                recipient = tutor.display_name or tutor.username
+                recipient = tutor.label
                 account = tutor.bank_account
                 phone = tutor.blik_phone
         if not account and fallback:
@@ -1733,12 +1722,7 @@ def my_payments(
         .order_by(models.Payment.date.desc())
         .all()
     )
-    out = []
-    for p in payments:
-        item = schemas.PaymentOut.model_validate(p)
-        item.student_name = student.name
-        out.append(item)
-    return out
+    return _payments_out(payments, db)
 
 
 @app.get("/api/me/reschedule-requests", response_model=list[schemas.RescheduleOut])
@@ -1802,10 +1786,10 @@ def my_lesson_available_slots(
         # a tutor is assigned but has no availability configured
         return schemas.AvailableSlotsOut(
             has_tutor=False,
-            tutor_name=(tutor.display_name or tutor.username) if tutor else None,
+            tutor_name=tutor.label if tutor else None,
         )
     return schemas.AvailableSlotsOut(
         has_tutor=True,
-        tutor_name=(tutor.display_name or tutor.username) if tutor else None,
+        tutor_name=tutor.label if tutor else None,
         days=days,
     )

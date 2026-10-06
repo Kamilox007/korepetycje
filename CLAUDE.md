@@ -35,7 +35,9 @@ alembic check                               # do models match the current DB?
 ```
 
 Regression tests (plain scripts, not pytest — each bootstraps its own temp SQLite DB via
-`testing_utils.bootstrap()`, migrated to head, isolated from the dev DB):
+`testing_utils.bootstrap()`, migrated to head, isolated from the dev DB; the same module has
+`login_admin` / `make_user` / `client_for` / `first_login` for the account setup every script
+starts with — don't re-inline the login + forced-password-change dance):
 
 ```bash
 pip install -r requirements-dev.txt
@@ -49,6 +51,9 @@ for t in test_*.py; do echo "== $t"; python "$t" || exit 1; done   # everything,
 npm install
 npm run dev          # http://localhost:5173, Vite proxies /api to :8000
 npm run build
+npm test             # Vitest unit tests (src/**/*.test.js) - pure modules only,
+                     # no DOM; the e2e/*.spec.js files belong to Playwright and
+                     # are excluded in vite.config.js
 ```
 
 End-to-end (Playwright — spins up its own backend+frontend against a throwaway `e2e.db`,
@@ -61,8 +66,9 @@ npm run e2e:ui          # interactive, step-through
 npm run e2e:report      # report from the last run (video/screenshots/trace on failure)
 ```
 
-CI (`.github/workflows/`) runs the backend test scripts in a loop and does `npm run build` for
-the frontend — no separate lint step exists.
+CI (`.github/workflows/`) runs the backend test scripts in a loop, then `npm test` and
+`npm run build` for the frontend — no separate lint step exists. Playwright is not run in CI
+(it needs a browser download); run it locally before touching UI flows.
 
 ## Architecture
 
@@ -146,6 +152,36 @@ history) requires retyping their name.
 Custom `Modal.jsx` closes only on a genuine background click (mousedown+mouseup both landing on
 the backdrop) — a plain `click` listener would fire when a user selects text inside the modal and
 releases the mouse outside it, silently discarding the form.
+
+### Whiteboard ("Tablica")
+
+Excalidraw embedded at `/t/:token`; the token in `boards.token` is the whole credential (no
+student accounts, no share table — same pattern as the `.ics` calendar feed). Two physically
+separate routers: `backend/app/routers/boards.py` (`/api/boards`, behind the role gate; tutor
+visibility is `assigned_tutor_id` / `created_by_user_id` — the same author-vs-owner split
+as lessons — never derived from `student_id`) and
+`backend/app/routers/boards_public.py` (`/api/t/{token}`, no user dependency — the owner is
+detected softly via `auth.optional_active_user`). Pages are identified by `board_pages.id`;
+`idx` is sort order only and may have gaps. `boards_reconcile.py` is the pure merge rule
+(higher `version` wins, ties to the lower `versionNonce`, `isDeleted` elements kept, output
+sorted by fractional `index`) and `frontend/src/tablica/reconcile.js` is its deliberate twin —
+change both or neither. Live sync lives in `boards_rooms.py`: one in-process room per open page,
+periodic save every 15 s, so uvicorn must stay at **one worker**. `PUT` on a page merges (never
+overwrites) and goes through the room when one is open. Image bytes never enter the database
+(`boards_files.py`, sha256-addressed files under `BOARD_FILES_PATH`); SQLite here does not
+enforce foreign keys, so every purge deletes children explicitly. Student materials (PDF,
+`routers/student_files.py`, table `student_files`) share that file store; a tutor reaches a
+student's files under the same rule as attaching a board to them (`resolve_student_for`), a
+student reads only their own under `/api/me/files` and lists their boards under `/api/me/boards`.
+The board route is mounted in
+`App.jsx` **before** the `api.me()` login gate. Playwright reads the canvas through
+`window.__tablicaAPI`, exposed only on the dev server. Built-in library shapes live in
+`tablica/library.js` and must keep fixed `id`/`versionNonce`/`index` (Excalidraw dedupes on
+them; without that they multiply on every open). The stroke-width slider is injected into
+Excalidraw's properties panel by a `MutationObserver` + portal (`PageEditor.jsx`) — it depends
+on Excalidraw's `data-testid="strokeWidth-*"`; if an upgrade renames them the slider silently
+disappears and the stock buttons return. PDF export (`tablica/pdf.js`) renders pages via
+`exportToBlob` and lazy-loads jsPDF; pass `"FAST"` compression to `addImage` or PDFs balloon.
 
 ### Data model
 

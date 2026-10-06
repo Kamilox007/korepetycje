@@ -11,3 +11,9 @@ id_*
 *.pem
 *-ssh
 *.patch
+# lokalna konfiguracja Claude Code (launch.json, worktrees)
+.claude/
+# katalog na pliki tablic przy lokalnym uruchomieniu
+backend/dev-board-files/
+# fonty Excalidrawa kopiowane z node_modules (frontend/scripts/copy-excalidraw-assets.mjs)
+frontend/public/excalidraw/

@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { usePersistentState } from "./usePersistentState";
 import { useTheme } from "./useTheme";
 import { api, setUnauthorizedHandler } from "./api";
 import Login from "./Login";
@@ -13,6 +12,14 @@ import Summary from "./Summary";
 import Requests from "./Requests";
 import Users from "./Users";
 import Subjects from "./Subjects";
+import Boards from "./Boards";
+import StudentMaterials from "./StudentMaterials";
+import { TutorMaterials } from "./StudentFiles";
+
+// Excalidraw waży ok. 1 MB po gzipie. Kalendarz otwierany codziennie nie ma
+// płacić za tablicę otwieraną raz w tygodniu, więc ekran tablicy ładuje się
+// dopiero pod /t/{token}.
+const BoardScreen = lazy(() => import("./tablica/BoardScreen"));
 import TutorPanel from "./TutorPanel";
 import StudentPanel from "./StudentPanel";
 import CalendarExportModal from "./CalendarExportModal";
@@ -28,6 +35,7 @@ const STAFF_TABS = [
   { path: "/platnosci", label: "Płatności" },
   { path: "/podsumowanie", label: "Podsumowanie" },
   { path: "/prosby", label: "Prośby" },
+  { path: "/tablice", label: "Tablice" },
   { path: "/przedmioty", label: "Przedmioty" },
   { path: "/uzytkownicy", label: "Użytkownicy" },
 ];
@@ -36,6 +44,8 @@ const TUTOR_TABS = [
   { path: "/zajecia", label: "Zajęcia" },
   { path: "/rozliczenia", label: "Rozliczenia" },
   { path: "/prosby", label: "Prośby" },
+  { path: "/tablice", label: "Tablice" },
+  { path: "/materialy", label: "Materiały" },
   { path: "/dyspozycyjnosc", label: "Dyspozycyjność" },
 ];
 
@@ -43,17 +53,31 @@ const STUDENT_TABS = [
   { path: "/zajecia", label: "Zajęcia" },
   { path: "/platnosci", label: "Płatności" },
   { path: "/prosby", label: "Prośby" },
+  { path: "/materialy", label: "Tablice i materiały" },
 ];
 
 export default function App() {
+  const location = useLocation();
+  // Tablica pod /t/{token} jest dla gościa bez konta: żadnej sesji, żadnego
+  // ekranu logowania. Ten komponent normalnie pyta api.me() i bez sesji
+  // pokazuje Login, dlatego trasa tablicy wychodzi PRZED tą bramką. Ekran
+  // tablicy sam pyta GET /api/t/{token} i z is_owner wie, kim jesteśmy.
+  const isBoardRoute = location.pathname.startsWith("/t/");
+
   const [auth, setAuth] = useState(null);
   const [loading, setLoading] = useState(true);
   const [forcePw, setForcePw] = useState(false);
+  // The starting password the user has just typed at login, kept only in
+  // memory and only until the forced change is done - so the forced-change
+  // screen does not ask for it a second time. Gone after a page refresh; the
+  // screen then shows the field again.
+  const [startPassword, setStartPassword] = useState(null);
   const [showPw, setShowPw] = useState(false);
   // Pending reschedule requests, shown as a badge next to the tutor's Prośby tab.
   const [pending, setPending] = useState(0);
 
   useEffect(() => {
+    if (isBoardRoute) { setLoading(false); return; }
     setUnauthorizedHandler(() => setAuth(null));
     (async () => {
       // An httponly cookie cannot be inspected from JS, so we ask the backend
@@ -65,7 +89,7 @@ export default function App() {
       } catch { /* brak sesji */ }
       setLoading(false);
     })();
-  }, []);
+  }, [isBoardRoute]);
 
   async function handleLogin(username, password) {
     const res = await api.login(username, password);
@@ -75,6 +99,7 @@ export default function App() {
       display_name: res.display_name, must_change_password: res.must_change_password,
     });
     setForcePw(res.must_change_password);
+    setStartPassword(res.must_change_password ? password : null);
   }
 
   async function logout() {
@@ -91,6 +116,17 @@ export default function App() {
       .catch(() => {});
   }, [auth]);
 
+  if (isBoardRoute) {
+    return (
+      <Suspense fallback={<div className="empty" style={{ marginTop: 80 }}>Ładowanie tablicy…</div>}>
+        <Routes>
+          <Route path="/t/:token" element={<BoardScreen />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+
   if (loading) return <div className="empty" style={{ marginTop: 80 }}>Ładowanie…</div>;
   if (!auth) return <><Login onLogin={handleLogin} /><CookieNotice /></>;
 
@@ -99,7 +135,14 @@ export default function App() {
   // While the account sits on its starting password the backend rejects everything
   // but the password change, so do not mount the panels: their requests return 403.
   if (forcePw) {
-    return <><ChangePassword forced onDone={() => setForcePw(false)} onLogout={logout} /><CookieNotice /></>;
+    return (
+      <>
+        <ChangePassword forced knownOldPassword={startPassword}
+                        onDone={() => { setForcePw(false); setStartPassword(null); }}
+                        onLogout={() => { setStartPassword(null); logout(); }} />
+        <CookieNotice />
+      </>
+    );
   }
 
   return (
@@ -112,6 +155,8 @@ export default function App() {
             <Route path="/zajecia" element={<TutorPanel section="lessons" />} />
             <Route path="/rozliczenia" element={<Summary tutorView />} />
             <Route path="/prosby" element={<TutorPanel section="requests" />} />
+            <Route path="/tablice" element={<Boards myRole="tutor" />} />
+            <Route path="/materialy" element={<TutorMaterials />} />
             <Route path="/dyspozycyjnosc" element={<TutorPanel section="availability" />} />
             <Route path="*" element={<Navigate to="/zajecia" replace />} />
           </Routes>
@@ -124,6 +169,7 @@ export default function App() {
             <Route path="/zajecia" element={<StudentPanel section="lessons" />} />
             <Route path="/platnosci" element={<StudentPanel section="payments" />} />
             <Route path="/prosby" element={<StudentPanel section="requests" />} />
+            <Route path="/materialy" element={<StudentMaterials />} />
             <Route path="*" element={<Navigate to="/zajecia" replace />} />
           </Routes>
         </RoleShell>
@@ -174,7 +220,7 @@ function Sidebar({ auth, subtitle, onLogout, onChangePassword, tabs, badge }) {
   );
 }
 
-// Simple shell for roles without tabs (tutor, student)
+// Shell for the single-role panels (tutor, student): sidebar plus routes.
 function RoleShell({ auth, subtitle, onLogout, onChangePassword, tabs = [], badge = 0, children }) {
   return (
     <div className="app">
@@ -214,6 +260,7 @@ function StaffShell({ auth, onLogout, onChangePassword }) {
           <Route path="/platnosci" element={<Payments students={students} reload={refresh} />} />
           <Route path="/podsumowanie" element={<Summary refreshKey={refreshKey} myRole={auth.role} />} />
           <Route path="/prosby" element={<Requests reload={refresh} />} />
+          <Route path="/tablice" element={<Boards myRole={auth.role} />} />
           <Route path="/przedmioty" element={<Subjects />} />
           <Route path="/uzytkownicy" element={<Users myRole={auth.role} />} />
           {/* Anything else, including "/", lands on the calendar. */}

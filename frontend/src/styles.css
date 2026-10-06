@@ -192,6 +192,11 @@ td { padding: 11px 14px; border-bottom: 1px solid var(--border); }
 tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: var(--surface-2); }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
+/* A table row that unfolds detail rows beneath it (payments per student). */
+.row-toggle { cursor: pointer; user-select: none; }
+.row-toggle:hover td { background: var(--surface-2); }
+.row-toggle-chevron { display: inline-block; width: 16px; color: var(--ink-faint); font-size: 11px; }
+.row-detail td { background: var(--surface-2); font-size: 13px; }
 
 /* badges */
 .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 9px; border-radius: 20px; font-weight: 500; }
@@ -242,6 +247,11 @@ tbody tr:hover { background: var(--surface-2); }
 .section-title { font-size: 13px; font-weight: 600; color: var(--ink-soft); margin: 4px 0 0; text-transform: uppercase; letter-spacing: 0.3px; }
 .muted { color: var(--ink-faint); }
 .err { background: var(--due-soft); color: var(--due); padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: 13px; }
+.notice { background: var(--done-soft); color: var(--done); padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: 13px; }
+/* An <a> that sits among ghost buttons in a table row and should look like one. */
+.btn-link { display: inline-block; text-decoration: none; font-size: 13px; padding: 7px 13px; border-radius: var(--radius-sm); color: var(--ink); border: 1px solid transparent; }
+.btn-link:hover { background: var(--surface-2); }
+.board-actions { white-space: nowrap; }
 
 /* ----- przełącznik widoku ----- */
 .view-switch { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); overflow: hidden; }
@@ -408,6 +418,13 @@ tbody tr:hover { background: var(--surface-2); }
 /* Okno potwierdzenia otwarte na tle innego modala (np. edycji zajęć)
    musi leżeć wyżej, inaczej zniknie pod spodem. */
 .overlay.overlay-confirm { z-index: 100; }
+/* Wider dialog for tables (student materials): file names are long, and the
+   default 440 px pushed the delete button out of the card. */
+.overlay.overlay-wide .modal { max-width: 760px; }
+/* Long file names wrap inside their cell instead of stretching the row;
+   the action column stays on one line. */
+.student-files td:first-child { word-break: break-word; overflow-wrap: anywhere; }
+.student-files td:last-child { white-space: nowrap; }
 
 /* ----- informacja o plikach cookies ----- */
 .cookie-notice {

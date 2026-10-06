@@ -11,7 +11,7 @@ This test turns SQLite's FK enforcement on to reproduce that.
 import sys, pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from testing_utils import bootstrap
+from testing_utils import bootstrap, login_admin
 bootstrap()
 
 from datetime import date, timedelta
@@ -49,9 +49,7 @@ def add_reschedule_request(student_id, lesson_id, tutor_id):
 
 
 with TestClient(app) as c:
-    c.post("/api/auth/login", data={"username": "admin", "password": "admin"})
-    c.post("/api/auth/change-password",
-           json={"old_password": "admin", "new_password": PASSWORD, "accept_privacy": True})
+    login_admin(c, PASSWORD)
     admin_id = c.get("/api/auth/me").json()["id"]
 
     today = date.today()

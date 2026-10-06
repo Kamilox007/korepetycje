@@ -18,7 +18,7 @@ Wersja produkcyjna: <https://panel.kamilkrzywon.pl>
 | Uwierzytelnianie | JWT (HS256) w ciasteczku httpOnly, hasła haszowane bcryptem |
 | Ochrona logowania | slowapi (limit per IP) + blokada konta w bazie |
 | Frontend | React 18, React Router 7, Vite 6, CSS bez frameworka |
-| Testy | skrypty regresji (backend) + Playwright (end-to-end) |
+| Testy | skrypty regresji (backend) + Vitest (jednostkowe) + Playwright (end-to-end) |
 | Wdrożenie | Docker Compose: `api` + `web` (Caddy) + `litestream` |
 | TLS | Let's Encrypt przez Caddy, odnawiany automatycznie |
 | Backup | Litestream → Backblaze B2, replikacja ciągła |
@@ -30,7 +30,7 @@ Wersja produkcyjna: <https://panel.kamilkrzywon.pl>
 | `admin` | pełne zarządzanie, w tym konta użytkowników |
 | `secretary` | wszystko poza zarządzaniem kontami administracyjnymi |
 | `tutor` | własny terminarz i zajęcia przypisane do siebie |
-| `student` | własne zajęcia, saldo, historia wpłat, prośby o przesunięcie |
+| `student` | własne zajęcia, saldo, historia wpłat, prośby o przesunięcie, swoje tablice i materiały |
 
 ### Korepetytor i sekretariat
 - Kalendarz: widok dzienny, tygodniowy i miesięczny, z przenoszeniem zajęć
@@ -42,16 +42,103 @@ Wersja produkcyjna: <https://panel.kamilkrzywon.pl>
 - Zakładanie kont uczniom i reset hasła kont personelu
 - Archiwizacja uczniów z zachowaniem historii rozliczeń
 - Akceptacja próśb o przesunięcie zajęć
+- Tablica do zajęć online, współdzielona z uczniem przez link (niżej)
+- Materiały dla ucznia: pliki PDF (zadania, rozwiązania) widoczne w jego panelu
 
 Korepetytor widzi wyłącznie zajęcia przypisane do siebie: własny kalendarz
 z tymi samymi trzema widokami, przenoszenie zajęć na inny dzień i godzinę oraz
-rozpatrywanie próśb swoich uczniów.
+rozpatrywanie próśb swoich uczniów. W Rozliczeniach wpłaty są zgrupowane
+per uczeń (liczba, ostatnia, suma), lista pojedynczych wpłat rozwija się po
+kliknięciu.
 
 ### Uczeń
 - Kalendarz własnych zajęć (dzień, tydzień, miesiąc) i saldo - tylko do odczytu
 - Kod QR przelewu z kwotą do zapłaty i tytułem (standard 2D ZBP)
 - Prośby o przesunięcie - termin zmienia się dopiero po akceptacji
 - Podpowiadane wolne terminy na podstawie dostępności korepetytora
+- Zakładka **Tablice i materiały**: linki do tablic przypisanych do ucznia
+  i pliki PDF od korepetytora - tylko do odczytu
+
+### Tablica
+
+Moduł tablicy interaktywnej (Excalidraw) do prowadzenia korepetycji online.
+
+- Korepetytor lub sekretariat zakłada tablicę w zakładce **Tablice**
+  (np. „Kasia - matura rozszerzona"), opcjonalnie przypisując ją do ucznia -
+  wtedy widać ją z poziomu listy uczniów. Sekretariat wybiera też, którego
+  korepetytora to tablica; korepetytor zakładający ją sam jest przypisany
+  automatycznie.
+- Tablica dostaje **stały link** `https://<domena>/t/<token>`. Link wysyła się
+  uczniowi raz; uczeń **nie loguje się i nie potrzebuje konta** - kto ma
+  link, ten rysuje. Przy pierwszym wejściu podaje imię do etykiety przy
+  kursorze (trzymane tylko w jego przeglądarce).
+- Tablica ma **strony**: nowa lekcja to zwykle nowa strona. Uczeń może wrócić
+  do notatek sprzed tygodni. Strony dodaje, nazywa i kasuje tylko właściciel.
+- Rysowanie jest **na żywo**: obie osoby widzą kursory i kreski drugiej
+  strony od razu. Przy braku łącza tablica zapisuje zmiany co 15 s przez
+  HTTP i scala je po powrocie połączenia; wskaźnik na pasku mówi, w jakim
+  jest stanie. Ctrl+Z cofa tylko własne zmiany.
+- Wklejone obrazki (zdjęcie zadania) lądują na dysku serwera, nie w bazie.
+  Limity: 10 MB na plik, 200 MB na tablicę.
+- **Biblioteka** (przycisk po prawej): wbudowane kształty, te same dla
+  każdego - bryły w rzucie ukośnym z przerywanymi krawędziami niewidocznymi
+  (prostopadłościan, sześcian, graniastosłup, ostrosłupy, walec, stożek,
+  kula), matematyka (układ współrzędnych, oś liczbowa, okrąg
+  trygonometryczny, trójkąty, kąt, parabola, sinusoida) i chemia (pierścień
+  benzenowy, cykloheksan, łańcuch, wiązania, strzałki reakcji i równowagi,
+  cząsteczka wody, klatki orbitalne, probówka, zlewka, kolba).
+  Własne rysunki dodane przez „dodaj do biblioteki" zapisują się **na
+  koncie** (ta sama biblioteka na każdym urządzeniu), u gościa - w jego
+  przeglądarce.
+- **Kratka** na pasku - ustawienie widoku tylko dla tego, kto ją włączył,
+  pamiętane per tablica w przeglądarce.
+- **Motyw tablicy** (Ciemny / Jasny na pasku) - niezależny od motywu panelu,
+  pamiętany w przeglądarce; dopóki nic nie wybierzesz, tablica dziedziczy
+  motyw panelu. Wymuszanie ciemnego trybu przez przeglądarkę jest zbędne
+  i szkodliwe: nakłada własne odwrócenie na nasze, przez co kolory wychodzą
+  dopełniające (czerwony jako turkusowy), a zdjęcia jako negatyw. Dark Reader
+  omijają `<meta name="darkreader-lock">` w `index.html`, a wymuszony ciemny
+  tryb Chrome - `color-scheme` w `styles.css`. Przed inwersją kolorów
+  włączoną w systemie (Android, Windows) strona nie obroni się niczym.
+- **Grubość obramowania** - w panelu właściwości Excalidrawa zamiast trzech
+  fabrycznych przycisków jest suwak 0,1-4 (co 0,1) z polem do wpisania
+  liczby; działa na zaznaczone elementy i na kolejne kreski, wybór pamiętany
+  per tablica. Poniżej ~0,5 kreska jest jaśniejsza, nie cieńsza - granica
+  ekranu. Suwak jest wstrzykiwany do panelu Excalidrawa (nie ma tam slotu);
+  gdyby po aktualizacji Excalidrawa się nie pojawił, wracają fabryczne
+  przyciski.
+- **Kółko myszy przybliża** (w Excalidrawie fabrycznie przesuwa, zoom jest
+  pod Ctrl). Przesuwanie: Alt+kółko w pionie, Shift+kółko w poziomie,
+  spacja+przeciąganie, środkowy przycisk albo narzędzie „rączka". Gest
+  pinch na touchpadzie i Ctrl+kółko dalej przybliżają.
+- **Po wklejeniu obrazka** (albo upuszczeniu pliku na płótno) narzędzie wraca
+  na wskaźnik, żeby dało się go od razu przesunąć - Excalidraw robi to sam
+  tylko dla wklejonych elementów i tekstu, przy pliku graficznym zostawia
+  aktywny pisak.
+- **Pobierz** - bieżąca strona jako PNG/SVG (okno eksportu Excalidrawa);
+  **PDF** - cała tablica, jedna strona tablicy na stronę PDF, z tytułem,
+  zawsze na białym tle niezależnie od motywu. Składany w przeglądarce
+  (jsPDF ładowany dopiero przy kliknięciu), nic nie idzie przez serwer.
+- **Nowy link** w panelu unieważnia stary natychmiast (gdy wyciekł albo
+  kurs się skończył); treść zostaje, połączone osoby są rozłączane.
+- **Archiwizacja** wyłącza link i chowa tablicę z listy; przywrócenie włącza
+  go z powrotem. Trwałe usunięcie - tylko admin, tylko z archiwum, z
+  przepisaniem tytułu - kasuje strony, obrazki i snapshoty.
+- **Historia**: przed pierwszym zapisem każdego dnia stan strony odkładany
+  jest jako snapshot (30 dni). Po przypadkowym „zaznacz wszystko + Delete"
+  właściciel przywraca stronę z panelu; przywrócenie widać od razu także
+  u połączonych osób i samo jest odwracalne.
+
+### Materiały ucznia
+
+Staff (z listy uczniów, przycisk **Materiały**) i korepetytor (zakładka
+**Materiały**, dla uczniów, z którymi ma zajęcia) dodają uczniowi pliki PDF -
+zadania, rozwiązania, notatki. Uczeń z kontem widzi je w zakładce **Tablice
+i materiały**, obok linków do swoich tablic, i otwiera w przeglądarce.
+Tylko PDF, rozpoznawany po zawartości; limity 20 MB na plik i 300 MB na
+ucznia. Bajty leżą w tym samym katalogu co obrazki tablic
+(`BOARD_FILES_PATH`), więc obowiązuje ten sam TODO o backupie. Trwałe
+usunięcie ucznia kasuje jego materiały.
 
 ## Uruchomienie lokalne
 
@@ -89,6 +176,12 @@ i `/api/auth/change-password` zwraca 403, a wydany token żyje 30 minut zamiast
 7 dni. Pominięcie interfejsu nic nie daje. Nowe hasło musi mieć co najmniej
 10 znaków i różnić się od dotychczasowego.
 
+Ekran wymuszonej zmiany nie pyta ponownie o hasło startowe - użytkownik
+wpisał je sekundę wcześniej przy logowaniu, więc frontend trzyma je w pamięci
+(tylko do zakończenia zmiany, nic w `localStorage`) i przekazuje w żądaniu.
+Backend weryfikuje stare hasło tak jak zawsze; po odświeżeniu strony pole
+wraca. To samo dotyczy kont uczniów i personelu zakładanych z panelu.
+
 ## Migracje
 
 Schemat bazy jest wersjonowany Alembikiem. Aplikacja **nie wystartuje**, jeśli
@@ -114,6 +207,16 @@ gorliwy przy typach.
 | `0004` | kwoty jako liczby całkowite w groszach |
 | `0005` | rejestr sesji (unieważnianie tokenów) |
 | `0006` | miękkie usuwanie uczniów (`archived_at`) |
+| `0007` | podział rozliczeń między korepetytorów (`tutor_id`, `assigned_tutor_id`) |
+| `0008` | znacznik akceptacji polityki prywatności |
+| `0009` | numer BLIK korepetytora |
+| `0010` | ustawienia limitu przychodu (działalność nierejestrowana) |
+| `0011` | kolor pojedynczych zajęć w kalendarzu |
+| `0012` | token publicznego kanału kalendarza (.ics) |
+| `0013` | tablica: `boards`, `board_pages`, `board_files`, `board_snapshots` |
+| `0014` | tablica: `assigned_tutor_id` - czyja jest tablica, niezależnie od tego, kto ją założył |
+| `0015` | tablica: biblioteka kształtów na koncie (`users.board_library`) |
+| `0016` | materiały ucznia (`student_files`, PDF) |
 
 ## Konfiguracja
 
@@ -128,6 +231,11 @@ Zmienne środowiskowe (`.env`, wzór w `.env.example`):
 | `DATABASE_URL` | domyślnie SQLite; Postgres przez `postgresql+psycopg://…` |
 | `B2_KEY_ID`, `B2_APP_KEY` | poświadczenia Backblaze B2 dla Litestream |
 | `BANK_ACCOUNT`, `BANK_RECIPIENT` | opcjonalne: włączają kod QR przelewu w panelu ucznia |
+| `BOARD_FILES_PATH` | katalog na obrazki wklejone do tablic; domyślnie `/data/board_files` (ten sam wolumen co baza) |
+| `BOARD_MAX_FILE_MB` | limit rozmiaru jednego obrazka na tablicy; domyślnie `10` |
+| `BOARD_MAX_TOTAL_MB` | limit łączny obrazków jednej tablicy; domyślnie `200` |
+| `STUDENT_FILE_MAX_MB` | limit rozmiaru jednego pliku PDF w materiałach ucznia; domyślnie `20` |
+| `STUDENT_FILES_MAX_TOTAL_MB` | limit łączny materiałów jednego ucznia; domyślnie `300` |
 
 `APP_ENV` steruje też flagą `Secure` na ciasteczku sesyjnym - w `dev` jest
 wyłączona, bo po HTTP przeglądarka odrzuciłaby takie ciasteczko.
@@ -168,6 +276,11 @@ miał dokąd kierować ruch.
 | `deploy/Caddyfile` | `docker compose restart web` (montowany, bez builda) |
 | `.env` | `docker compose up -d` |
 
+**Backend musi chodzić na jednym workerze uvicorna** (tak jest w `Dockerfile`;
+nie dokładaj `--workers`). Pokoje tablicy żyją w pamięci procesu - przy dwóch
+workerach dwie osoby na tej samej stronie tablicy trafiłyby do dwóch pokoi,
+które nigdy się nie spotkają. Patrz „Decyzje projektowe".
+
 Rekord A domeny musi wskazywać na serwer **przed** pierwszym uruchomieniem -
 Caddy od razu występuje o certyfikat, a Let's Encrypt limituje nieudane
 walidacje.
@@ -187,6 +300,9 @@ Przy długo działającym procesie potrzebny jest impuls dobowy:
 ```
 
 Alternatywnie `POST /api/maintenance/generate-lessons` (rola staff, idempotentne).
+
+To samo zadanie - w obu wariantach - sprząta snapshoty tablic starsze niż
+30 dni.
 
 ## Testy
 
@@ -212,11 +328,37 @@ python test_password_reset.py     # reset hasła konta personelu
 python test_series_update.py      # edycja serii i reguły propagacji na zajęcia
 python test_payment_edit.py       # korekta wpłaty
 python test_transfer_code.py      # kod QR przelewu (standard 2D ZBP)
+python test_role_isolation.py     # rozdział danych między korepetytorami, bramki ról
+python test_reschedule_flow.py    # prośby o przełożenie: uczeń -> korepetytor/staff
+python test_availability_slots.py # dostępność korepetytora i wolne terminy
+python test_board_token.py        # tablica: token, rotacja, archiwum, purge, przypisanie ucznia
+python test_board_pages.py        # tablica: router publiczny, strony po id, PUT scalający
+python test_board_reconcile.py    # tablica: reguła scalania (determinizm, przemienność, isDeleted)
+python test_board_ws.py           # tablica: pokoje, WebSocket, zapis okresowy, PUT przez pokój
+python test_board_snapshots.py    # tablica: reguła 24 h, przywracanie, retencja
+python test_board_files.py        # tablica: obrazki po sygnaturze, dedup, quota, ścieżki
+python test_board_library.py      # tablica: biblioteka kształtów na koncie, izolacja, limit
+python test_student_files.py      # materiały ucznia: zakres korepetytora, PDF po sygnaturze, widok ucznia, purge
 ```
 
 Każdy zestaw pracuje na własnej bazie w katalogu tymczasowym i nie dotyka bazy
 deweloperskiej. Wszystkie to regresje konkretnych błędów - jeśli któryś zacznie
 padać po zmianie, prawdopodobnie ta zmiana cofnęła poprawkę.
+
+### Frontend - testy jednostkowe (Vitest)
+
+```bash
+cd frontend
+npm install
+npm test              # jednorazowy przebieg
+npm run test:watch    # w tle, przy pracy nad kodem
+```
+
+Obejmują moduły bez UI, w których błąd jest cichy: `dates.js` (siatka miesiąca,
+data lokalna zamiast UTC), `password.js` (polityka haseł, ta sama co w
+`backend/app/auth.py`), `colors.js` i `tablica/reconcile.js` (reguła scalania
+elementów tablicy, ta sama co w `backend/app/boards_reconcile.py`). Biegną w kilkaset milisekund, więc nadają
+się do pętli edycja-zapis; scenariusze przez interfejs są w Playwrighcie niżej.
 
 ### Frontend - end-to-end (Playwright)
 
@@ -236,8 +378,12 @@ plus wymuszona zmiana hasła) przygotowywana jest raz w `e2e/auth.setup.js`
 i zapisywana do `e2e/.auth/`.
 
 Zakres: potwierdzenia usuwania, wylogowanie przeżywające odświeżenie strony,
-warstwowanie okien modalnych oraz układ mobilny (brak poziomego przewijania
-strony, przewijalny pasek nawigacji).
+warstwowanie okien modalnych, układ mobilny (brak poziomego przewijania
+strony, przewijalny pasek nawigacji) oraz tablica: wejście gościa bez konta,
+dwie przeglądarki naraz na jednej stronie, Ctrl+Z nie cofający cudzej pracy,
+rotacja linku. Testy tablicy czytają scenę przez `window.__tablicaAPI`,
+wystawiane tylko na dev serverze - płótno to `<canvas>`, którego nie da się
+odpytać z DOM.
 
 Po nieudanym przebiegu `npm run e2e:report` pokazuje wideo, zrzuty i ślad,
 po którym da się przewijać stan DOM krok po kroku.
@@ -321,6 +467,73 @@ minimalna prowizja umowna przewyższyłaby wartość usługi. Kod QR daje więks
 tej wygody za zero kosztów - kosztem ręcznego oznaczenia wpłaty, co i tak
 trzeba robić.
 
+**Tablica: link jest uprawnieniem, nie ma kont uczniów.** Token siedzi
+w kolumnie `boards.token` i sam w sobie daje dostęp - bez tabeli udostępnień,
+bez zapraszania, bez sprawdzania „czy ten uczeń ma dostęp". Uczeń często nie
+ma konta w panelu i nie powinien go potrzebować, żeby porysować. Świadomy
+zakład: kto ma link, ten pisze. Link nie wygasa, bo cały pomysł polega na
+wielokrotnym użyciu przez cały kurs; mitygacje to rotacja tokenu i snapshoty.
+Ten sam wzorzec, co publiczny kanał `.ics` kalendarza.
+
+**Tablica: widoczność po przypisaniu, nie po uczniu.** Ten sam podział, co na
+zajęciach i wpłatach: `created_by_user_id` mówi, kto tablicę założył,
+`assigned_tutor_id` - czyja jest. Korepetytor widzi w panelu tablice
+przypisane do siebie (i te, które sam założył); staff wszystkie. Sekretariat
+może założyć tablicę korepetytorowi albo zostawić ją „tylko administracja".
+Repozytorium ma dwie definicje „ucznia korepetytora" (`Student.tutor_id`
+i `Lesson.assigned_tutor_id`), a wybór złej to wyciek notatek między
+korepetytorami - dlatego `student_id` na tablicy nie daje nikomu dostępu
+i służy tylko do pokazania jej przy uczniu.
+
+**Tablica: pliki binarne poza bazą.** Zdjęcie zadania z telefonu ma 3 MB;
+zapisane w SQLite trafiłoby do każdego snapshotu bazy i do strumienia WAL
+Litestreama. Obrazki leżą na dysku pod ścieżką z `sha256` (dedup, nic od
+klienta nie trafia do ścieżki), w bazie są tylko metadane. Typ rozpoznawany
+po sygnaturze bajtowej, nie po nagłówku z żądania. **TODO:** katalog
+`BOARD_FILES_PATH` nie jest objęty replikacją Litestream - wymaga osobnego
+backupu (np. `rclone sync` do B2 w cronie).
+
+**Tablica: snapshoty jako jedyna obrona przed przypadkowym skasowaniem.**
+Kto ma link, może zaznaczyć wszystko i wcisnąć Delete, a zapis na żywo
+nadpisuje stan. Przed pierwszym zapisem strony w ciągu 24 h stan sprzed zapisu
+idzie do `board_snapshots` (30 dni, jak replika Litestreama). Reguła jest
+samowyzwalająca - bez crona łapie stan sprzed dzisiejszej lekcji. Przywrócenie
+nie nadpisuje: snapshot zamienia się w aktualizację, która wygrywa scalanie
+(wyższy `version`), więc dociera też do połączonych osób, a stan sprzed
+przywrócenia jest odkładany wymuszonym snapshotem.
+
+**Tablica: scalanie po `version`/`versionNonce`, bez CRDT.** Przy dwóch-trzech
+osobach Yjs to armata na muchę. Excalidraw i tak trzyma w każdym elemencie
+licznik wersji: wygrywa wyższy `version`, remis rozstrzyga niższy
+`versionNonce` - deterministycznie i niezależnie od kolejności pakietów.
+Reguła jest zaimplementowana dwa razy celowo: na serwerze
+(`boards_reconcile.py`, czysta funkcja, testowana w Pythonie) i u klienta
+(`tablica/reconcile.js`), bo klient scala przychodzące zmiany ze stanem, który
+zawiera edycje jeszcze niewysłane. Elementy `isDeleted` zostają w stanie -
+usunięcie w Excalidrawie to flaga z podbitą wersją, a wyrzucenie ich
+sprawiłoby, że skasowane rzeczy zmartwychwstają. `PUT` też scala, nigdy nie
+nadpisuje, więc drugi mechanizm (kontrola `rev` z 409) był zbędny.
+
+**Tablica: `app_state` po stronie klienta.** Scroll, zoom i wybrane narzędzie
+to stan konkretnej przeglądarki - w `localStorage`, per link i per strona.
+Zapisanie ich na serwerze sprawiałoby, że zoom jednej osoby skacze drugiej po
+ekranie.
+
+**Tablica: pokoje w pamięci jednego procesu.** Otwarta strona ma pokój
+w słowniku procesu `api`; serwer jest autorytatywny, baza to siatka
+bezpieczeństwa na restart (zapis co 15 s i przy wyjściu ostatniej osoby),
+nie kanał synchronizacji. Stąd **wymóg jednego workera uvicorna** - patrz
+„Wdrożenie". Skalowanie poziome wymagałoby Redis pub/sub; przy tej skali
+celowo go nie ma i nie ma pod niego abstrakcji.
+
+**Tablica: rate limit jest za Caddy de facto globalny.** Uvicorn honoruje
+`X-Forwarded-For` tylko od `forwarded_allow_ips` (domyślnie `127.0.0.1`),
+a Caddy łączy się z adresu sieci dockera, więc każdy klient ma to samo IP.
+Dotyczy też limitu logowania. Limity na routerze publicznym są przez to luźne
+(300/min, uploady 30/min), a przed zapełnieniem dysku broni quota per tablica,
+nie limit żądań. **TODO:** `FORWARDED_ALLOW_IPS=*` w `docker-compose.yml`
+(jedyną drogą do `api` jest Caddy) - osobna zmiana z własnym testem.
+
 ## Model danych
 
 | Tabela | Zawartość |
@@ -335,11 +548,19 @@ trzeba robić.
 | `reschedule_requests` | prośby o przesunięcie |
 | `availability` | dostępność korepetytora |
 | `sessions` | wydane tokeny, do unieważniania sesji |
+| `boards` | tablice: token (uprawnienie), tytuł, opcjonalny uczeń, twórca, przypisany korepetytor, `archived_at` |
+| `board_pages` | strony tablicy: elementy Excalidrawa (JSON), `idx` do sortowania, licznik zapisów |
+| `board_files` | metadane obrazków (sha256, typ, rozmiar); bajty na dysku w `BOARD_FILES_PATH` |
+| `board_snapshots` | dobowe kopie stron do odzysku, retencja 30 dni |
+| `users.board_library` | własne pozycje biblioteki tablicy (JSON), wbudowane bryły nie są tu zapisywane |
+| `student_files` | materiały ucznia (PDF): metadane, bajty na dysku w `BOARD_FILES_PATH` |
 
 ## Backup
 
-Litestream replikuje bazę do Backblaze B2 na bieżąco (interwał 1 s), ze
-snapshotem dobowym i retencją 30 dni.
+Litestream replikuje bazę do Backblaze B2 **co godzinę** (tylko gdy coś się
+zmieniło), ze snapshotem dobowym i retencją 30 dni. Świadomy wybór: przy
+awarii serwera przepada co najwyżej ostatnia godzina wpisów, za to bucket nie
+zapełnia się tysiącami małych segmentów, jak przy domyślnej 1 s.
 
 Odtworzenie - **przetestuj, zanim będzie potrzebne**:
 
@@ -352,3 +573,9 @@ docker run --rm -v ./restore:/out \
 
 Ostatni argument to ścieżka bazy, po której Litestream odnajduje wpis
 w konfiguracji - nie adres repliki. Podanie obu naraz kończy się błędem.
+
+**TODO: obrazki tablic nie są backupowane.** Litestream replikuje wyłącznie
+plik bazy. Katalog `BOARD_FILES_PATH` (domyślnie `/data/board_files`, na tym
+samym wolumenie `db-data`) trzeba objąć osobnym mechanizmem, np. `rclone sync`
+do tego samego bucketa B2 w cronie. Do tego czasu odtworzenie bazy przywróci
+tablice z metadanymi obrazków, ale bez samych obrazków.

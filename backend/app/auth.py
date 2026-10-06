@@ -214,6 +214,66 @@ def purge_expired_sessions(db: Session) -> int:
     return n
 
 
+def resolve_session_token(token: str | None, db: Session) -> tuple[models.User, str] | None:
+    """The user behind a session token, or None if it does not hold up.
+
+    The one place that decides whether a token is good: signature, claims,
+    an open (non-revoked) session row, an existing user. Shared by the HTTP
+    dependency below and by the board WebSocket, which cannot take a
+    `Request` dependency at all - two copies of this logic would drift apart
+    at the first change to auth.
+
+    Returns (user, jti) so the caller can record which session it was.
+    """
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+        jti = payload.get("jti")
+        if user_id is None or jti is None:
+            return None
+    except JWTError:
+        return None
+
+    # A valid signature is no longer enough: the session must still be open.
+    # This is what makes a password change end sessions on other devices.
+    sess = db.get(models.Session, jti)
+    if sess is None or sess.revoked_at is not None:
+        return None
+
+    user = db.get(models.User, int(user_id))
+    if user is None:
+        return None
+
+    # Throttled write: precision to the minute is enough and SQLite locks the
+    # file on every write.
+    now = utcnow()
+    if (now - sess.last_seen_at).total_seconds() > LAST_SEEN_THROTTLE_SECONDS:
+        sess.last_seen_at = now
+        db.commit()
+
+    return user, jti
+
+
+def optional_active_user(cookies: dict, db: Session) -> models.User | None:
+    """For endpoints a bare link reaches: the logged-in owner if the browser
+    sent a good session cookie, otherwise a guest (None) - never an error.
+
+    Only the cookie is considered, not the Authorization header: a guest link
+    is opened in a browser, and the cookie is what a browser sends on its
+    own. An account still on its starting password is a guest here too,
+    consistent with require_active_user.
+    """
+    found = resolve_session_token(cookies.get(COOKIE_NAME), db)
+    if found is None:
+        return None
+    user, _ = found
+    if user.must_change_password:
+        return None
+    return user
+
+
 def get_current_user(
     request: Request,
     header_token: str | None = Depends(oauth2_scheme),
@@ -224,40 +284,15 @@ def get_current_user(
     The order matters: browsers use the cookie, while /docs, curl and cron jobs
     use the header. One function covers both cases.
     """
-    cred_exc = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Nieprawidłowy lub wygasły token",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
     token = request.cookies.get(COOKIE_NAME) or header_token
-    if not token:
-        raise cred_exc
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
-        jti = payload.get("jti")
-        if user_id is None or jti is None:
-            raise cred_exc
-    except JWTError:
-        raise cred_exc
-
-    # A valid signature is no longer enough: the session must still be open.
-    # This is what makes a password change end sessions on other devices.
-    sess = db.get(models.Session, jti)
-    if sess is None or sess.revoked_at is not None:
-        raise cred_exc
-
-    user = db.get(models.User, int(user_id))
-    if user is None:
-        raise cred_exc
-
-    # Throttled write: precision to the minute is enough and SQLite locks the
-    # file on every write.
-    now = utcnow()
-    if (now - sess.last_seen_at).total_seconds() > LAST_SEEN_THROTTLE_SECONDS:
-        sess.last_seen_at = now
-        db.commit()
-
+    found = resolve_session_token(token, db)
+    if found is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Nieprawidłowy lub wygasły token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    user, jti = found
     request.state.jti = jti
     return user
 

@@ -7,7 +7,7 @@ reaches completed lessons.
 import sys, pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from testing_utils import bootstrap
+from testing_utils import bootstrap, login_admin
 bootstrap()
 
 from datetime import date, timedelta
@@ -28,9 +28,7 @@ def check(label, cond):
 PASSWORD = "SeriesTest123!"
 
 with TestClient(app) as c:
-    c.post("/api/auth/login", data={"username": "admin", "password": "admin"})
-    c.post("/api/auth/change-password",
-           json={"old_password": "admin", "new_password": PASSWORD, "accept_privacy": True})
+    login_admin(c, PASSWORD)
 
     sid = c.post("/api/students", json={"name": "Series Student", "default_price": 80}).json()["id"]
     subj = c.post("/api/subjects", json={"name": "Matematyka"}).json()["id"]

@@ -3,7 +3,8 @@ import { api } from "./api";
 import Modal from "./Modal";
 import { TUTOR_COLORS } from "./colors";
 import ColorPicker from "./ColorPicker";
-import { PASSWORD_HINT, passwordError, genStartPassword } from "./password";
+import { passwordError, genStartPassword } from "./password";
+import { StartPasswordField, CredentialsModal } from "./Credentials";
 import { useConfirm } from "./Confirm";
 
 const ROLE_LABEL = { admin: "Administrator", secretary: "Sekretariat", tutor: "Korepetytor", student: "Uczeń" };
@@ -70,22 +71,14 @@ export default function Users({ myRole }) {
       <Section title="Uczniowie (konta)" users={students} onRemove={remove} onReset={resetPassword} />
 
       {resetResult && (
-        <Modal
+        <CredentialsModal
           title="Nowe hasło startowe"
-          onClose={() => setResetResult(null)}
-          footer={<button className="primary" onClick={() => setResetResult(null)}>Gotowe</button>}
-        >
-          <p>
-            Przekaż je użytkownikowi <strong>{resetResult.display_name || resetResult.username}</strong>.
-            Hasło pokazujemy tylko teraz - nigdzie nie jest przechowywane w czytelnej postaci.
-          </p>
-          <div className="card" style={{ padding: 12, marginTop: 10 }}>
-            <div className="muted" style={{ fontSize: 12 }}>Login</div>
-            <div style={{ fontWeight: 600, marginBottom: 8 }}>{resetResult.username}</div>
-            <div className="muted" style={{ fontSize: 12 }}>Hasło startowe</div>
-            <code style={{ fontSize: 16 }}>{resetResult.password}</code>
-          </div>
-        </Modal>
+          intro={<>Przekaż je użytkownikowi <strong>{resetResult.display_name || resetResult.username}</strong>. Hasło widać tylko teraz:</>}
+          username={resetResult.username}
+          password={resetResult.password}
+          note="Użytkownik zmieni hasło przy pierwszym logowaniu."
+          onDone={() => setResetResult(null)}
+        />
       )}
 
       {showForm && (
@@ -233,7 +226,6 @@ function UserForm({ myRole, onClose, onSaved }) {
   const [color, setColor] = useState(TUTOR_COLORS[0]);
   const [created, setCreated] = useState(null);
   const [err, setErr] = useState("");
-  const [resetResult, setResetResult] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const roleOptions = myRole === "admin"
@@ -259,15 +251,14 @@ function UserForm({ myRole, onClose, onSaved }) {
 
   if (created) {
     return (
-      <Modal title="Konto utworzone" onClose={onSaved}
-        footer={<button className="primary" onClick={onSaved}>Gotowe</button>}>
-        <p style={{ margin: 0 }}>Przekaż dane logowania. Hasło widać tylko teraz:</p>
-        <div className="cred-box">
-          <div><span className="muted">Login:</span> <strong>{created.username}</strong></div>
-          <div><span className="muted">Hasło:</span> <strong>{created.password}</strong></div>
-        </div>
-        <p className="muted" style={{ fontSize: 12, margin: 0 }}>Użytkownik zmieni hasło przy pierwszym logowaniu.</p>
-      </Modal>
+      <CredentialsModal
+        title="Konto utworzone"
+        intro="Przekaż dane logowania. Hasło widać tylko teraz:"
+        username={created.username}
+        password={created.password}
+        note="Użytkownik zmieni hasło przy pierwszym logowaniu."
+        onDone={onSaved}
+      />
     );
   }
 
@@ -288,13 +279,7 @@ function UserForm({ myRole, onClose, onSaved }) {
         <input id={`${uid}-imie-i-nazwisko-2`} value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="np. Jan Kowalski" /></div>
       <div><label htmlFor={`${uid}-login-3`}>Login</label>
         <input id={`${uid}-login-3`} value={username} onChange={(e) => setUsername(e.target.value)} /></div>
-      <div><label htmlFor={`${uid}-haso-startowe-4`}>Hasło startowe</label>
-        <div className="row">
-          <input id={`${uid}-haso-startowe-4`} value={password} onChange={(e) => setPassword(e.target.value)} />
-          <button onClick={() => setPassword(genStartPassword())} title="Wygeneruj">↻</button>
-        </div>
-        <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>{PASSWORD_HINT}</p>
-      </div>
+      <StartPasswordField id={`${uid}-haso-startowe-4`} value={password} onChange={setPassword} />
       {role === "tutor" && (
         <div>
           <label>Kolor w kalendarzu</label>

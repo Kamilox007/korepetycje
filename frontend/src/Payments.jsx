@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useId } from "react";
 import { api } from "./api";
 import Modal from "./Modal";
-import { fmtMoney } from "./dates";
+import { fmtMoney, toISODate } from "./dates";
 import { useConfirm } from "./Confirm";
+import { useTutors } from "./useLists";
 
 export default function Payments({ students, reload }) {
   const confirm = useConfirm();
@@ -121,27 +122,16 @@ export default function Payments({ students, reload }) {
   );
 }
 
-/** Every tutor in the practice — always offered, so staff can credit a
- *  payment to anyone, not just someone this student happens to have a
- *  correctly-tagged lesson record with. Narrower, lesson-derived lists kept
- *  producing gaps: no completed lesson yet, no lesson at all yet, or a
- *  lesson that was simply never assigned a tutor — every one of them made
- *  the picker unusable right when it was needed. */
-function useAllTutors() {
-  const [tutors, setTutors] = useState([]);
-  useEffect(() => {
-    api.listTutors().then(setTutors).catch(() => setTutors([]));
-  }, []);
-  return tutors;
-}
-
 /** This student's lesson history — used only to suggest a default and to
  *  show a "zalega" balance hint next to each option, never to restrict which
  *  tutor can be picked. */
 function useSuggestedTutors(studentId) {
   const [suggested, setSuggested] = useState([]);
   useEffect(() => {
-    if (!studentId) { setSuggested([]); return; }
+    // Empty right away, so a previous student's suggestion never applies to
+    // the next one while the fetch is in flight.
+    setSuggested([]);
+    if (!studentId) return;
     Promise.all([
       api.listLessons({ studentId }),
       api.summary().catch(() => null),
@@ -168,28 +158,29 @@ function PaymentForm({ students, onClose, onSaved }) {
   const uid = useId();
   const [studentId, setStudentId] = useState(students[0]?.id || "");
   const [amount, setAmount] = useState("");
-  const today = new Date().toISOString().slice(0, 10);
-  const [date, setDate] = useState(today);
+  const [date, setDate] = useState(toISODate(new Date()));
   const [payer, setPayer] = useState("");
   const [note, setNote] = useState("");
   const [tutorId, setTutorId] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const allTutors = useAllTutors();
+  const allTutors = useTutors();
   const suggested = useSuggestedTutors(studentId);
   const suggestedBalance = new Map(suggested.map((t) => [t.tutor_id, t.balance]));
 
+  // Default to the one tutor this student's lessons point to, when there is
+  // exactly one — otherwise leave it for staff to pick. Keyed on the tutor id
+  // rather than the `suggested` array: a fresh array arrives with every fetch,
+  // and re-running on that wiped a tutor staff had just picked by hand.
+  const onlyTutor = suggested.length === 1 ? suggested[0].tutor_id : null;
+  useEffect(() => {
+    setTutorId(onlyTutor ? String(onlyTutor) : "");
+  }, [studentId, onlyTutor]);
+
+  // After every hook: an early return above them would break the hook order.
   if (!students.length) {
     return <Modal title="Brak uczniów" onClose={onClose}><p>Najpierw dodaj ucznia.</p></Modal>;
   }
-
-  // Default to the one tutor this student's lessons point to, when there is
-  // exactly one — otherwise leave it for staff to pick. Also covers a
-  // student change: suggested briefly empties and repopulates for the new
-  // student, re-running this.
-  useEffect(() => {
-    setTutorId(suggested.length === 1 ? String(suggested[0].tutor_id) : "");
-  }, [studentId, suggested]);
 
   async function save() {
     if (!amount) return;
@@ -286,7 +277,7 @@ function PaymentEditForm({ payment, studentName, onClose, onSaved }) {
   const [tutorId, setTutorId] = useState(payment.assigned_tutor_id ? String(payment.assigned_tutor_id) : "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const allTutors = useAllTutors();
+  const allTutors = useTutors();
 
   async function save() {
     if (!amount) return;

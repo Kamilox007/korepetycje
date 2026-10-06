@@ -9,8 +9,6 @@ import {
 } from "./dates";
 
 export default function StudentPanel({ section = "lessons" }) {
-  // Which section is shown comes from the URL now; the sidebar links switch it.
-  const tab = section;
   const [lessons, setLessons] = useState([]);
   const [summary, setSummary] = useState(null);
   const [payments, setPayments] = useState([]);
@@ -72,7 +70,7 @@ export default function StudentPanel({ section = "lessons" }) {
         </div>
       )}
 
-      {tab === "lessons" && (
+      {section === "lessons" && (
         <div className="view-switch" style={{ marginBottom: 12 }}>
           <button className={`seg${mode === "calendar" ? " active" : ""}`} onClick={() => setMode("calendar")}>
             Kalendarz
@@ -83,7 +81,7 @@ export default function StudentPanel({ section = "lessons" }) {
         </div>
       )}
 
-      {tab === "lessons" && mode === "calendar" && (
+      {section === "lessons" && mode === "calendar" && (
         <LessonCalendar
           lessons={lessons}
           anchor={anchor}
@@ -95,7 +93,7 @@ export default function StudentPanel({ section = "lessons" }) {
         />
       )}
 
-      {tab === "lessons" && mode === "list" && (
+      {section === "lessons" && mode === "list" && (
         <div className="card">
           {upcoming.length === 0 ? (
             <div className="empty"><p>Brak nadchodzących zajęć.</p></div>
@@ -131,9 +129,9 @@ export default function StudentPanel({ section = "lessons" }) {
         </div>
       )}
 
-      {tab === "payments" && <TransferQR />}
+      {section === "payments" && <TransferQR />}
 
-      {tab === "payments" && (
+      {section === "payments" && (
         <div className="card">
           {payments.length === 0 ? (
             <div className="empty"><p>Brak zarejestrowanych wpłat.</p></div>
@@ -155,7 +153,7 @@ export default function StudentPanel({ section = "lessons" }) {
         </div>
       )}
 
-      {tab === "requests" && (
+      {section === "requests" && (
         <div className="card">
           {requests.length === 0 ? (
             <div className="empty"><p>Nie złożyłeś jeszcze żadnej prośby o przesunięcie.</p></div>

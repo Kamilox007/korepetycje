@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, Fragment, useId } from "react";
 import { api } from "./api";
 import Modal from "./Modal";
 import { fmtMoney } from "./dates";
+import { useConfirm } from "./Confirm";
 
 export default function Summary({ refreshKey, tutorView = false, myRole }) {
   const [data, setData] = useState(null);
@@ -12,6 +13,8 @@ export default function Summary({ refreshKey, tutorView = false, myRole }) {
   const [limitsKey, setLimitsKey] = useState(0);
   // null = the current quarter; otherwise { year, quarter } picked from the list
   const [quarter, setQuarter] = useState(null);
+  // Students whose payment list is unfolded in "Wpłaty wg ucznia".
+  const [openStudents, setOpenStudents] = useState(() => new Set());
 
   useEffect(() => {
     // A tutor gets their own students and their own figures only; the endpoint
@@ -36,11 +39,23 @@ export default function Summary({ refreshKey, tutorView = false, myRole }) {
 
   if (!data) return <div className="empty">Ładowanie…</div>;
 
+  // One line per student with the total; the individual payments unfold on
+  // click. Summing in grosze, not zloty floats - the same reason the backend
+  // stores amounts as integers.
   const byStudent = new Map();
   for (const p of payments || []) {
-    if (!byStudent.has(p.student_id)) byStudent.set(p.student_id, []);
-    byStudent.get(p.student_id).push(p);
+    if (!byStudent.has(p.student_id)) {
+      byStudent.set(p.student_id, { name: p.student_name || "—", rows: [], totalGrosze: 0 });
+    }
+    const g = byStudent.get(p.student_id);
+    g.rows.push(p);
+    g.totalGrosze += Math.round(p.amount * 100);
   }
+  const toggleStudent = (id) => setOpenStudents((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
 
   // Every tutor with their own students and each one's saldo, across the
   // whole practice rather than just the per-student split — a tutor's own
@@ -101,9 +116,7 @@ export default function Summary({ refreshKey, tutorView = false, myRole }) {
                       <td className="num">{s.lessons_total}</td>
                       <td className="num">{s.lessons_completed}</td>
                       <td className="num">
-                        <span className={`badge ${s.balance >= 0 ? "done" : "due"}`}>
-                          {fmtMoney(s.balance)}
-                        </span>
+                        <BalanceBadge value={s.balance} />
                       </td>
                     </tr>
                     {split.map((t) => (
@@ -114,9 +127,7 @@ export default function Summary({ refreshKey, tutorView = false, myRole }) {
                         <td className="num" />
                         <td className="num" />
                         <td className="num">
-                          <span className={`badge ${t.balance >= 0 ? "done" : "due"}`}>
-                            {fmtMoney(t.balance)}
-                          </span>
+                          <BalanceBadge value={t.balance} />
                         </td>
                       </tr>
                     ))}
@@ -145,18 +156,14 @@ export default function Summary({ refreshKey, tutorView = false, myRole }) {
                     <tr>
                       <td style={{ fontWeight: 500 }}>{t.name}</td>
                       <td className="num">
-                        <span className={`badge ${t.balance >= 0 ? "done" : "due"}`}>
-                          {fmtMoney(t.balance)}
-                        </span>
+                        <BalanceBadge value={t.balance} />
                       </td>
                     </tr>
                     {t.students.map((st) => (
                       <tr key={`${key}-${st.id}`} className="sub-row">
                         <td className="muted" style={{ paddingLeft: 24 }}>{st.name}</td>
                         <td className="num">
-                          <span className={`badge ${st.balance >= 0 ? "done" : "due"}`}>
-                            {fmtMoney(st.balance)}
-                          </span>
+                          <BalanceBadge value={st.balance} />
                         </td>
                       </tr>
                     ))}
@@ -192,7 +199,7 @@ export default function Summary({ refreshKey, tutorView = false, myRole }) {
                     <td className="num">{l.limit != null ? fmtMoney(l.limit) : <span className="muted">brak</span>}</td>
                     <td className="num">
                       {l.remaining != null ? (
-                        <span className={`badge ${l.remaining >= 0 ? "done" : "due"}`}>{fmtMoney(l.remaining)}</span>
+                        <BalanceBadge value={l.remaining} />
                       ) : "—"}
                     </td>
                   </tr>
@@ -252,23 +259,35 @@ export default function Summary({ refreshKey, tutorView = false, myRole }) {
           <div className="card">
             <table>
               <thead>
-                <tr><th>Uczeń</th><th>Data</th><th>Od kogo</th><th className="num">Kwota</th></tr>
+                <tr><th>Uczeń</th><th>Wpłat</th><th>Ostatnia</th><th className="num">Razem</th></tr>
               </thead>
               <tbody>
-                {[...byStudent.entries()].map(([studentId, rows]) => (
-                  <Fragment key={studentId}>
-                    {rows.map((p, i) => (
-                      <tr key={p.id}>
-                        <td style={{ fontWeight: i === 0 ? 500 : 400 }}>
-                          {i === 0 ? (rows[0].student_name || "—") : ""}
+                {[...byStudent.entries()].map(([studentId, g]) => {
+                  const open = openStudents.has(studentId);
+                  return (
+                    <Fragment key={studentId}>
+                      <tr className="row-toggle" onClick={() => toggleStudent(studentId)}
+                          aria-expanded={open}>
+                        <td style={{ fontWeight: 500 }}>
+                          <span className="row-toggle-chevron" aria-hidden="true">{open ? "▾" : "▸"}</span>
+                          {g.name}
                         </td>
-                        <td className="muted">{p.date}</td>
-                        <td>{p.payer || "—"}</td>
-                        <td className="num" style={{ fontWeight: 600, color: "var(--done)" }}>{fmtMoney(p.amount)}</td>
+                        <td className="muted">{g.rows.length}</td>
+                        <td className="muted">{g.rows[0].date}</td>
+                        <td className="num" style={{ fontWeight: 600, color: "var(--done)" }}>{fmtMoney(g.totalGrosze / 100)}</td>
                       </tr>
-                    ))}
-                  </Fragment>
-                ))}
+                      {open && g.rows.map((p) => (
+                        <tr key={p.id} className="row-detail">
+                          <td></td>
+                          <td className="muted" colSpan={2}>
+                            {p.date}{p.payer ? ` · ${p.payer}` : ""}{p.note ? ` · ${p.note}` : ""}
+                          </td>
+                          <td className="num">{fmtMoney(p.amount)}</td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -315,6 +334,11 @@ function QuarterSelect({ value, onChange }) {
   );
 }
 
+// Green for a credit (or zero), red for money owed - the same reading everywhere.
+function BalanceBadge({ value }) {
+  return <span className={`badge ${value >= 0 ? "done" : "due"}`}>{fmtMoney(value)}</span>;
+}
+
 function LimitProgressBar({ earned, limit }) {
   const pct = limit > 0 ? Math.min(100, (earned / limit) * 100) : 0;
   const over = earned > limit;
@@ -327,6 +351,7 @@ function LimitProgressBar({ earned, limit }) {
 
 function IncomeLimitManager({ onClose, onChanged }) {
   const uid = useId();
+  const confirm = useConfirm();
   const [settings, setSettings] = useState(null);
   const [effectiveFrom, setEffectiveFrom] = useState("");
   const [amount, setAmount] = useState("");
@@ -356,10 +381,21 @@ function IncomeLimitManager({ onClose, onChanged }) {
     }
   }
 
-  async function remove(id) {
-    await api.deleteIncomeLimit(id);
-    load();
-    onChanged();
+  async function remove(s) {
+    const ok = await confirm({
+      title: "Usunąć limit?",
+      message: `Limit ${fmtMoney(s.limit)} obowiązujący od ${s.effective_from} zostanie usunięty.`,
+      consequence: "Od tej daty będzie obowiązywał poprzedni wpis, a jeśli go nie ma - brak limitu.",
+      confirmLabel: "Usuń limit",
+    });
+    if (!ok) return;
+    try {
+      await api.deleteIncomeLimit(s.id);
+      load();
+      onChanged();
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   return (
@@ -386,7 +422,7 @@ function IncomeLimitManager({ onClose, onChanged }) {
               <tr key={s.id}>
                 <td>{s.effective_from}</td>
                 <td className="num">{fmtMoney(s.limit)}</td>
-                <td className="num"><button className="ghost danger" onClick={() => remove(s.id)}>Usuń</button></td>
+                <td className="num"><button className="ghost danger" onClick={() => remove(s)}>Usuń</button></td>
               </tr>
             ))}
           </tbody>

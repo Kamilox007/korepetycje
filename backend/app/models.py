@@ -1,8 +1,8 @@
 from datetime import datetime, date, time
 from sqlalchemy import (
     MetaData,
-    Integer, String, Float, Boolean, Date, Time, DateTime, ForeignKey, Text,
-    UniqueConstraint,
+    Integer, String, Boolean, Date, Time, DateTime, ForeignKey, Text,
+    UniqueConstraint, JSON,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -26,13 +26,13 @@ class Base(DeclarativeBase):
 
 
 class User(Base):
-    """Login account. Role: 'tutor' or 'student'."""
+    """Login account. Role: 'admin', 'secretary', 'tutor' or 'student'."""
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     username: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    role: Mapped[str] = mapped_column(String(20), nullable=False)  # tutor | student
+    role: Mapped[str] = mapped_column(String(20), nullable=False)  # admin | secretary | tutor | student
     display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     color: Mapped[str | None] = mapped_column(String(20), nullable=True)  # kolor korepetytora w kalendarzu
     # Where this tutor's students send their transfers. Admin-only to edit:
@@ -47,6 +47,9 @@ class User(Base):
     # itself is what proves it's this tutor's feed. Generated lazily, and
     # replaceable if the URL ever leaks.
     calendar_token: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True, index=True)
+    # Whiteboard library items the account added ("dodaj do biblioteki").
+    # Follows the account across devices; the built-in shapes are not stored.
+    board_library: Mapped[list | None] = mapped_column(JSON, nullable=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
     # Set once, the first time the account clears must_change_password with the
     # checkbox ticked (covers both the Regulamin and the Polityka Prywatności —
@@ -62,6 +65,12 @@ class User(Base):
     student_profile: Mapped["Student"] = relationship(
         back_populates="user", foreign_keys="Student.user_id", uselist=False
     )
+
+    @property
+    def label(self) -> str:
+        """What the UI calls this account: the display name, or the login
+        for accounts created without one."""
+        return self.display_name or self.username
 
 
 class Student(Base):
@@ -318,3 +327,147 @@ class Session(Base):
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
     # NULL means active. Set on logout and on password change.
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+# ===================== TABLICA (współdzielona tablica z uczniem) =====================
+
+class Board(Base):
+    """A shared whiteboard. The token in the URL is the whole access control:
+    whoever has the link can draw. There is no per-student permission table
+    on purpose - see README, "Decyzje projektowe".
+    """
+    __tablename__ = "boards"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # Stored in the clear (not hashed): the panel has to show the link again.
+    # Same shape as User.calendar_token, which plays the same role.
+    token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    # Optional: a trial-lesson board needs no student record. Only used to show
+    # the board on the student's card - NOT a visibility rule (that goes by
+    # created_by_user_id, so the two tutor columns on Student cannot be mixed up).
+    student_id: Mapped[int | None] = mapped_column(ForeignKey("students.id"), nullable=True, index=True)
+    # Who entered it. Same split as Lesson/Payment: the author is not
+    # necessarily the tutor it belongs to, since staff can set boards up on a
+    # tutor's behalf.
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    # Whose board it is: this tutor sees it in their panel and is its owner
+    # under the link. A tutor creating a board is assigned automatically; staff
+    # pick (or leave empty for a staff-only board).
+    assigned_tutor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    # Bumped on every page save.
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    # Set when someone connects to the board's WebSocket, not on GET - the
+    # repo avoids a write on every read (compare Session.last_seen_at).
+    last_opened_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Soft delete, same convention as Student. An archived board's link answers 404.
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+
+    student: Mapped["Student | None"] = relationship()
+    pages: Mapped[list["BoardPage"]] = relationship(
+        back_populates="board", cascade="all, delete-orphan", order_by="BoardPage.idx"
+    )
+
+
+class BoardPage(Base):
+    """One page of a board. A new lesson usually gets a new page.
+
+    Identity is `id`, never `idx`: rooms, snapshots and the WebSocket all point
+    at a page by id, so deleting a page cannot re-target anything. `idx` is
+    only the sort order and may have gaps after a delete.
+    """
+    __tablename__ = "board_pages"
+    __table_args__ = (
+        # Two clients adding a page at once is a race; the database decides,
+        # not Python - same rule as (series_id, origin_date) on lessons.
+        UniqueConstraint("board_id", "idx", name="uq_board_pages_board_idx"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # ondelete documents intent; SQLite here does not enforce FKs, so purge
+    # deletes children explicitly (see purge_board in routers/boards.py).
+    board_id: Mapped[int] = mapped_column(
+        ForeignKey("boards.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    idx: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    # Excalidraw elements, sorted by their fractional `index`. Never the
+    # `files` map (binary data lives on disk, see BoardFile) and never
+    # appState (that is per-browser view state, kept in localStorage).
+    elements: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    # Save counter. Informational (tests, diagnostics) - not an optimistic
+    # lock, since merges by version/versionNonce already resolve conflicts.
+    rev: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    board: Mapped["Board"] = relationship(back_populates="pages")
+
+
+class BoardFile(Base):
+    """An image pasted into a board. Bytes live on disk under a sha256-derived
+    path, never in the database: one photo of a homework problem would
+    otherwise land in every Litestream snapshot.
+
+    Two records may share a sha256 (global dedup); the disk file is removed
+    only when the last record pointing at it goes.
+    """
+    __tablename__ = "board_files"
+    __table_args__ = (
+        UniqueConstraint("board_id", "file_id", name="uq_board_files_board_file_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    board_id: Mapped[int] = mapped_column(
+        ForeignKey("boards.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # Identifier assigned by Excalidraw; referenced from image elements.
+    file_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    mime: Mapped[str] = mapped_column(String(60), nullable=False)
+    bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class BoardSnapshot(Base):
+    """A page's elements as they were before the first save of a day.
+
+    Whoever has the link can select-all and press Delete, usually by accident;
+    the live save would then overwrite the only copy. Retained 30 days.
+    """
+    __tablename__ = "board_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    board_id: Mapped[int] = mapped_column(
+        ForeignKey("boards.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    page_id: Mapped[int] = mapped_column(
+        ForeignKey("board_pages.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    elements: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    # Indexed for the retention sweep.
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
+class StudentFile(Base):
+    """A PDF handed to a student (worksheet, solutions, notes).
+
+    Same content-addressed disk store as BoardFile; the row is metadata only.
+    ondelete documents intent - SQLite here does not enforce it, so
+    purge_student removes these rows explicitly.
+    """
+    __tablename__ = "student_files"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    student_id: Mapped[int] = mapped_column(
+        ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    uploaded_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    # Display name; the original filename, cleaned up. Never part of a path.
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    mime: Mapped[str] = mapped_column(String(60), nullable=False)
+    bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
