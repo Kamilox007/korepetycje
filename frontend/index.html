@@ -3,6 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Aplikacja ma własny ciemny motyw (styles.css, przełącznik na pasku
+         tablicy), więc Dark Reader ma trzymać się z daleka. Bez tego nakłada
+         swoje odwrócenie na nasze: kolory wychodzą dopełniające (czerwony
+         jako turkusowy, zielony jako magenta), a zdjęcia jako negatyw -
+         zmierzone na zrzucie od ucznia. Wymuszony ciemny tryb Chrome omija
+         nas już dzięki `color-scheme` w styles.css. -->
+    <meta name="darkreader-lock" />
     <title>Korepetycje</title>
   </head>
   <body>

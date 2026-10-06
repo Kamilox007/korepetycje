@@ -94,7 +94,12 @@ Moduł tablicy interaktywnej (Excalidraw) do prowadzenia korepetycji online.
   pamiętane per tablica w przeglądarce.
 - **Motyw tablicy** (Ciemny / Jasny na pasku) - niezależny od motywu panelu,
   pamiętany w przeglądarce; dopóki nic nie wybierzesz, tablica dziedziczy
-  motyw panelu.
+  motyw panelu. Wymuszanie ciemnego trybu przez przeglądarkę jest zbędne
+  i szkodliwe: nakłada własne odwrócenie na nasze, przez co kolory wychodzą
+  dopełniające (czerwony jako turkusowy), a zdjęcia jako negatyw. Dark Reader
+  omijają `<meta name="darkreader-lock">` w `index.html`, a wymuszony ciemny
+  tryb Chrome - `color-scheme` w `styles.css`. Przed inwersją kolorów
+  włączoną w systemie (Android, Windows) strona nie obroni się niczym.
 - **Grubość obramowania** - w panelu właściwości Excalidrawa zamiast trzech
   fabrycznych przycisków jest suwak 0,1-4 (co 0,1) z polem do wpisania
   liczby; działa na zaznaczone elementy i na kolejne kreski, wybór pamiętany
