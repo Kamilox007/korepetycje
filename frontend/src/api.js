@@ -9,6 +9,11 @@ const BASE = "/api";
 let onUnauthorized = null;
 export function setUnauthorizedHandler(fn) { onUnauthorized = fn; }
 
+// q = { year, quarter } or null for the current quarter
+function quarterQuery(q) {
+  return q ? `?year=${q.year}&quarter=${q.quarter}` : "";
+}
+
 async function req(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
 
@@ -107,7 +112,7 @@ export const api = {
 
   // ----- summary -----
   summary: () => req("/summary"),
-  quarterlyLimits: () => req("/summary/quarterly-limits"),
+  quarterlyLimits: (q) => req(`/summary/quarterly-limits${quarterQuery(q)}`),
   incomeLimits: () => req("/income-limits"),
   addIncomeLimit: (data) => req("/income-limits", { method: "POST", body: JSON.stringify(data) }),
   deleteIncomeLimit: (id) => req(`/income-limits/${id}`, { method: "DELETE" }),
@@ -134,7 +139,7 @@ export const api = {
   // ----- korepetytor -----
   tutorSummary: () => req("/tutor/summary"),
   tutorPayments: () => req("/tutor/payments"),
-  myQuarterlyLimit: () => req("/me/quarterly-limit"),
+  myQuarterlyLimit: (q) => req(`/me/quarterly-limit${quarterQuery(q)}`),
   calendarFeed: () => req("/me/calendar-feed"),
   regenerateCalendarFeed: () => req("/me/calendar-feed/regenerate", { method: "POST" }),
   tutorLessons: ({ start, end } = {}) => {

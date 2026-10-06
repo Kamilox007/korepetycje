@@ -134,6 +134,30 @@ with TestClient(app) as admin:
         r = sec.get("/api/summary/quarterly-limits")
         check("secretary can see the staff-wide table too", r.status_code == 200)
 
+        # --- picking another quarter ---
+        py, pq = prev_quarter_day.year, (prev_quarter_day.month - 1) // 3 + 1
+        r = tutor.get(f"/api/me/quarterly-limit?year={py}&quarter={pq}")
+        check("an earlier quarter can be requested -> 200", r.status_code == 200)
+        prev = r.json()
+        check("it covers that quarter",
+              prev["quarter_end"] == str(prev_quarter_day) and prev["quarter_label"].endswith(str(py)))
+        check("it counts that quarter's payment, not this quarter's", prev["earned"] == 9999.0)
+        check("it is judged against the limit in effect back then", prev["limit"] == 5000.0)
+
+        cy, cq = today.year, (today.month - 1) // 3 + 1
+        check("asking for the current quarter explicitly matches the default",
+              tutor.get(f"/api/me/quarterly-limit?year={cy}&quarter={cq}").json() == body)
+
+        rows_prev = {row["tutor_id"]: row for row in
+                     admin.get(f"/api/summary/quarterly-limits?year={py}&quarter={pq}").json()}
+        check("the staff table takes the quarter too",
+              rows_prev[tutor_id]["earned"] == 9999.0 and rows_prev[admin_id]["earned"] == 0.0)
+
+        check("a quarter out of range is rejected",
+              tutor.get("/api/me/quarterly-limit?year=2026&quarter=5").status_code == 422)
+        check("a year without a quarter is rejected",
+              tutor.get("/api/me/quarterly-limit?year=2026").status_code == 400)
+
         # --- deleting a setting ---
         old_id = next(s["id"] for s in listed if s["effective_from"] == "2020-01-01")
         check("secretary cannot delete a setting",

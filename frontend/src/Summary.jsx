@@ -10,6 +10,8 @@ export default function Summary({ refreshKey, tutorView = false, myRole }) {
   const [limits, setLimits] = useState(null);
   const [showLimitManager, setShowLimitManager] = useState(false);
   const [limitsKey, setLimitsKey] = useState(0);
+  // null = the current quarter; otherwise { year, quarter } picked from the list
+  const [quarter, setQuarter] = useState(null);
 
   useEffect(() => {
     // A tutor gets their own students and their own figures only; the endpoint
@@ -24,13 +26,13 @@ export default function Summary({ refreshKey, tutorView = false, myRole }) {
 
   useEffect(() => {
     if (!tutorView) return;
-    api.myQuarterlyLimit().then(setMyLimit).catch(() => setMyLimit(null));
-  }, [refreshKey, tutorView, limitsKey]);
+    api.myQuarterlyLimit(quarter).then(setMyLimit).catch(() => setMyLimit(null));
+  }, [refreshKey, tutorView, limitsKey, quarter]);
 
   useEffect(() => {
     if (tutorView) return;
-    api.quarterlyLimits().then(setLimits).catch(() => setLimits([]));
-  }, [refreshKey, tutorView, limitsKey]);
+    api.quarterlyLimits(quarter).then(setLimits).catch(() => setLimits([]));
+  }, [refreshKey, tutorView, limitsKey, quarter]);
 
   if (!data) return <div className="empty">Ładowanie…</div>;
 
@@ -169,10 +171,13 @@ export default function Summary({ refreshKey, tutorView = false, myRole }) {
       {!tutorView && limits && limits.length > 0 && (
         <>
           <div className="page-head" style={{ marginTop: 32 }}>
-            <h2 style={{ margin: 0 }}>{limits[0].quarter_label} — limit kwartalny</h2>
-            {myRole === "admin" && (
-              <button className="ghost" onClick={() => setShowLimitManager(true)}>Zarządzaj limitem</button>
-            )}
+            <h2 style={{ margin: 0 }}>Limit kwartalny</h2>
+            <div className="row">
+              <QuarterSelect value={quarter} onChange={setQuarter} />
+              {myRole === "admin" && (
+                <button className="ghost" onClick={() => setShowLimitManager(true)}>Zarządzaj limitem</button>
+              )}
+            </div>
           </div>
           <div className="card">
             <table>
@@ -207,7 +212,10 @@ export default function Summary({ refreshKey, tutorView = false, myRole }) {
 
       {tutorView && myLimit && (
         <>
-          <div className="page-head" style={{ marginTop: 32 }}><h2 style={{ margin: 0 }}>{myLimit.quarter_label} — limit kwartalny</h2></div>
+          <div className="page-head" style={{ marginTop: 32 }}>
+            <h2 style={{ margin: 0 }}>Limit kwartalny</h2>
+            <QuarterSelect value={quarter} onChange={setQuarter} />
+          </div>
           <div className="card">
             {myLimit.limit == null ? (
               <p className="muted" style={{ margin: 0 }}>
@@ -267,6 +275,43 @@ export default function Summary({ refreshKey, tutorView = false, myRole }) {
         </>
       )}
     </div>
+  );
+}
+
+const ROMAN = ["I", "II", "III", "IV"];
+
+// The current quarter and the 12 before it - the practice has only been using
+// the panel for a short while, so this reaches well past any real data.
+function quarterOptions() {
+  const now = new Date();
+  let year = now.getFullYear();
+  let quarter = Math.floor(now.getMonth() / 3) + 1;
+  const out = [];
+  for (let i = 0; i < 13; i++) {
+    out.push({ year, quarter, key: `${year}-${quarter}`, label: `${ROMAN[quarter - 1]} kwartał ${year}` });
+    quarter -= 1;
+    if (quarter === 0) { quarter = 4; year -= 1; }
+  }
+  return out;
+}
+
+/** `value` is null for the current quarter, else { year, quarter }. */
+function QuarterSelect({ value, onChange }) {
+  const options = quarterOptions();
+  const current = options[0];
+  const selected = value ? `${value.year}-${value.quarter}` : current.key;
+  return (
+    <select
+      aria-label="Kwartał"
+      value={selected}
+      onChange={(e) => {
+        const o = options.find((x) => x.key === e.target.value);
+        onChange(o.key === current.key ? null : { year: o.year, quarter: o.quarter });
+      }}
+      style={{ width: "auto" }}
+    >
+      {options.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+    </select>
   );
 }
 
