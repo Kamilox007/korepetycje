@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
-from fastapi import FastAPI, Depends, HTTPException, Request, Response
+from fastapi import FastAPI, Depends, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from icalendar import Calendar, Event
@@ -1223,11 +1223,22 @@ def _limit_for(db: Session, on: date) -> models.IncomeLimitSetting | None:
     )
 
 
-def _quarterly_progress(db: Session, tutor: models.User) -> schemas.QuarterlyLimitOut:
+def _quarter_on(year: int | None, quarter: int | None) -> date:
+    """A date inside the requested calendar quarter; today when none is asked for."""
+    if year is None and quarter is None:
+        return date.today()
+    if year is None or quarter is None:
+        raise HTTPException(400, "Podaj jednocześnie rok i kwartał")
+    return date(year, (quarter - 1) * 3 + 1, 1)
+
+
+def _quarterly_progress(db: Session, tutor: models.User, on: date | None = None) -> schemas.QuarterlyLimitOut:
     """This tutor's income against the quarterly limit, cash basis: only
     payments credited to them (assigned_tutor_id), counted on the date paid.
+    The limit is the one in effect at the start of that quarter, so an older
+    quarter is judged against the limit that applied then.
     """
-    start, end = _quarter_bounds(date.today())
+    start, end = _quarter_bounds(on or date.today())
     payments = db.query(models.Payment).filter(
         models.Payment.assigned_tutor_id == tutor.id,
         models.Payment.date >= start,
@@ -1250,13 +1261,24 @@ def _quarterly_progress(db: Session, tutor: models.User) -> schemas.QuarterlyLim
 
 
 @app.get("/api/me/quarterly-limit", response_model=schemas.QuarterlyLimitOut)
-def my_quarterly_limit(user: models.User = Depends(auth.require_tutor), db: Session = Depends(get_db)):
-    return _quarterly_progress(db, user)
+def my_quarterly_limit(
+    year: int | None = Query(None, ge=2000, le=2100),
+    quarter: int | None = Query(None, ge=1, le=4),
+    user: models.User = Depends(auth.require_tutor),
+    db: Session = Depends(get_db),
+):
+    return _quarterly_progress(db, user, _quarter_on(year, quarter))
 
 
 @app.get("/api/summary/quarterly-limits", response_model=list[schemas.QuarterlyLimitOut])
-def quarterly_limits(user: models.User = Depends(auth.require_staff), db: Session = Depends(get_db)):
-    return [_quarterly_progress(db, t) for t in _teaching_accounts(db)]
+def quarterly_limits(
+    year: int | None = Query(None, ge=2000, le=2100),
+    quarter: int | None = Query(None, ge=1, le=4),
+    user: models.User = Depends(auth.require_staff),
+    db: Session = Depends(get_db),
+):
+    on = _quarter_on(year, quarter)
+    return [_quarterly_progress(db, t, on) for t in _teaching_accounts(db)]
 
 
 @app.get("/api/income-limits", response_model=list[schemas.IncomeLimitOut])

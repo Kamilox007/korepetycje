@@ -9,6 +9,11 @@ const BASE = "/api";
 let onUnauthorized = null;
 export function setUnauthorizedHandler(fn) { onUnauthorized = fn; }
 
+// q = { year, quarter } or null for the current quarter
+function quarterQuery(q) {
+  return q ? `?year=${q.year}&quarter=${q.quarter}` : "";
+}
+
 // The backend answers errors with {"detail": "..."} (FastAPI); anything else
 // falls back to the status code so the user still sees *something*.
 async function errorFrom(res, fallback = `${res.status}`) {
@@ -124,7 +129,7 @@ export const api = {
 
   // ----- summary -----
   summary: () => req("/summary"),
-  quarterlyLimits: () => req("/summary/quarterly-limits"),
+  quarterlyLimits: (q) => req(`/summary/quarterly-limits${quarterQuery(q)}`),
   incomeLimits: () => req("/income-limits"),
   addIncomeLimit: (data) => post("/income-limits", data),
   deleteIncomeLimit: (id) => del(`/income-limits/${id}`),
@@ -155,7 +160,7 @@ export const api = {
   tutorStudents: () =>
     req("/tutor/summary").then((s) => s.students.map((x) => ({ id: x.student_id, name: x.student_name }))),
   tutorPayments: () => req("/tutor/payments"),
-  myQuarterlyLimit: () => req("/me/quarterly-limit"),
+  myQuarterlyLimit: (q) => req(`/me/quarterly-limit${quarterQuery(q)}`),
   calendarFeed: () => req("/me/calendar-feed"),
   regenerateCalendarFeed: () => post("/me/calendar-feed/regenerate"),
   tutorLessons: (range) => req(`/tutor/lessons${query(range)}`),
