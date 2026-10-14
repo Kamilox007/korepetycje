@@ -180,7 +180,13 @@ The board route is mounted in
 them; without that they multiply on every open). The stroke-width slider is injected into
 Excalidraw's properties panel by a `MutationObserver` + portal (`PageEditor.jsx`) — it depends
 on Excalidraw's `data-testid="strokeWidth-*"`; if an upgrade renames them the slider silently
-disappears and the stock buttons return. PDF export (`tablica/pdf.js`) renders pages via
+disappears and the stock buttons return. The board's own bar (`BoardScreen.jsx`) owns
+everything else: a few recent page chips plus a `Strony (N)` dropdown, `+` kept outside the
+scrollable strip, and one `⋯` menu for the rest. Excalidraw's hamburger is hidden by CSS on
+`.main-menu-trigger` (its own class, not the toolbar's `dropdown-menu-button`), but the custom
+`<MainMenu>` stays mounted so a renamed class shows our items rather than the stock ones with
+cloud links. Cursor name labels are toggled with `I` (checked empirically: of b c g i j m n s u
+w x y Excalidraw only binds x) by blanking `username` on the collaborators map. PDF export (`tablica/pdf.js`) renders pages via
 `exportToBlob` and lazy-loads jsPDF; pass `"FAST"` compression to `addImage` or PDFs balloon.
 
 ### Data model

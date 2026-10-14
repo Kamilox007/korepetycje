@@ -23,8 +23,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 220px;
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
 }
+/* Pasek pokazuje kilka ostatnich stron; cała lista jest w menu „Strony",
+   a „+" stoi poza paskiem, więc nie da się ich wypchnąć poza ekran. */
 .tablica-pages {
   display: flex;
   gap: 4px;
@@ -46,10 +49,63 @@
 }
 .tablica-page:hover { background: var(--surface-2); }
 .tablica-page.active { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
-.tablica-add { font-weight: 600; padding: 5px 9px; }
+.tablica-add { font-weight: 600; padding: 5px 9px; flex: none; }
 .tablica-right { display: flex; align-items: center; gap: 8px; flex: none; }
 .tablica-btn { padding: 5px 10px; font-size: 13px; }
 .tablica-btn.active { background: var(--accent-soft); color: var(--accent); }
+
+/* Listy rozwijane paska: „Strony" i „⋯". */
+.tablica-menu { position: relative; flex: none; }
+.tablica-menu-lista {
+  position: absolute;
+  top: calc(100% + 6px);
+  z-index: 30;
+  min-width: 190px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+}
+.tablica-strony-menu .tablica-menu-lista { left: 0; }
+.tablica-wiecej .tablica-menu-lista { right: 0; }
+.tablica-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  text-align: left;
+  text-decoration: none;
+  white-space: nowrap;
+  border-radius: var(--radius-sm);
+}
+.tablica-menu-item:hover { background: var(--surface-2); }
+.tablica-menu-item:disabled { color: var(--ink-faint); }
+.tablica-menu-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+/* Pozycje przełączane (kratka, imiona) - ptaszek po lewej, żeby lista nie
+   skakała, gdy coś się włączy. */
+.tablica-menu-item.zaznaczony::before { content: "✓"; margin-left: -2px; }
+.tablica-menu-item.zaznaczony { font-weight: 500; }
+.tablica-menu-skrot {
+  margin-left: auto;
+  padding: 1px 5px;
+  font-size: 11px;
+  color: var(--ink-faint);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.tablica-menu-sep { height: 1px; margin: 4px 2px; background: var(--border); }
+/* Hamburger Excalidrawa: wszystko, co w nim było, jest teraz w „⋯" na pasku.
+   Sam <MainMenu> zostaje - gdyby ten selektor kiedyś przestał działać, lepiej
+   pokazać nasze pozycje niż fabryczne z linkami do chmury. */
+.tablica-editor .main-menu-trigger { display: none; }
 /* Grubość obramowania: suwak 0,1-4 wstrzyknięty do panelu właściwości
    Excalidrawa (PageEditor); fabryczne trzy przyciski schowane. */
 .tablica-editor { height: 100%; }
@@ -108,6 +164,12 @@
 .tablica-gone h1 { font-size: 20px; margin: 0 0 8px; }
 .tablica-gone p { color: var(--ink-soft); margin: 0; }
 .tablica-error { color: var(--due); }
+
+@media (max-width: 700px) {
+  /* Na telefonie zakładki stron nie mają gdzie się zmieścić - zostaje menu
+     „Strony" i „+", czyli komplet możliwości bez ściskania paska. */
+  .tablica-pages { display: none; }
+}
 
 @media (max-width: 600px) {
 
