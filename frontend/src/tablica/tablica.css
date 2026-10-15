@@ -53,6 +53,9 @@
 .tablica-right { display: flex; align-items: center; gap: 8px; flex: none; }
 .tablica-btn { padding: 5px 10px; font-size: 13px; }
 .tablica-btn.active { background: var(--accent-soft); color: var(--accent); }
+/* Kratka i pełny ekran zostają na wierzchu jako ikonki - używa się ich
+   w trakcie lekcji, a napisy zjadałyby miejsce zakładkom stron. */
+.tablica-ikona { display: inline-flex; align-items: center; padding: 5px 7px; line-height: 0; }
 
 /* Listy rozwijane paska: „Strony" i „⋯". */
 .tablica-menu { position: relative; flex: none; }

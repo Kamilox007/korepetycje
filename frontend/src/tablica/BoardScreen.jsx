@@ -146,6 +146,28 @@ export default function BoardScreen() {
     setGrid((g) => { write(`tablica:${token}:grid`, g ? "0" : "1"); return !g; });
   }
 
+  // Pełny ekran chowa pasek adresu przeglądarki - na tablecie i telefonie to
+  // kilkanaście procent wysokości. Zawsze na całym dokumencie, nie na samej
+  // tablicy: dialog potwierdzeń siedzi wyżej w drzewie Reacta i przy trybie
+  // pełnoekranowym na elemencie byłby niewidoczny.
+  const [fullscreen, setFullscreen] = useState(false);
+  useEffect(() => {
+    const sync = () => setFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", sync);
+    sync();
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch (e) {
+      setError("Nie udało się przełączyć pełnego ekranu: " + e.message);
+    }
+  }
+  // iOS Safari nie umie pełnego ekranu poza wideo - tam przycisku nie ma.
+  const fullscreenMozliwy = typeof document !== "undefined" && document.fullscreenEnabled;
+
   function selectPage(id) {
     setPageId(id);
     write(`tablica:${token}:page`, String(id));
@@ -256,6 +278,18 @@ export default function BoardScreen() {
           <span className={`tablica-status ${status}`}>
             {status === "live" ? "na żywo" : status === "connecting" ? "łączenie…" : "offline - zmiany zapisywane co 15 s"}
           </span>
+          {/* Dwie rzeczy używane w trakcie lekcji zostają na wierzchu. */}
+          <button className={`ghost tablica-btn tablica-ikona${grid ? " active" : ""}`} onClick={toggleGrid}
+                  aria-pressed={grid} aria-label="Kratka" title="Kratka (tylko na Twoim ekranie)">
+            <IkonaKratki />
+          </button>
+          {fullscreenMozliwy && (
+            <button className={`ghost tablica-btn tablica-ikona${fullscreen ? " active" : ""}`} onClick={toggleFullscreen}
+                    aria-pressed={fullscreen} aria-label={fullscreen ? "Wyjdź z pełnego ekranu" : "Pełny ekran"}
+                    title={fullscreen ? "Wyjdź z pełnego ekranu" : "Pełny ekran (chowa pasek adresu)"}>
+              <IkonaPelnegoEkranu wlaczony={fullscreen} />
+            </button>
+          )}
           <Menu className="tablica-wiecej" label={pdfBusy || "⋯"} ariaLabel="Więcej" title="Więcej">
             <button role="menuitem" className="tablica-menu-item" onClick={() => editorRef.current?.openExport()}>
               Pobierz stronę (PNG, SVG)
@@ -266,10 +300,6 @@ export default function BoardScreen() {
             <div className="tablica-menu-sep" />
             <button role="menuitem" className="tablica-menu-item" onClick={toggleTheme}>
               Motyw: {theme === "dark" ? "ciemny" : "jasny"}
-            </button>
-            <button role="menuitem" className={`tablica-menu-item${grid ? " zaznaczony" : ""}`} onClick={toggleGrid}
-                    aria-pressed={grid}>
-              Kratka
             </button>
             <button role="menuitem" className={`tablica-menu-item${showNames ? " zaznaczony" : ""}`} onClick={toggleNames}
                     aria-pressed={showNames}>
@@ -339,6 +369,29 @@ export default function BoardScreen() {
 
 function initials(n) {
   return (n || "?").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+}
+
+/* Ikonki rysowane w miejscu: dwie sztuki nie są warte zależności, a tak
+   biorą kolor z przycisku (również w stanie „włączone"). */
+function IkonaKratki() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor"
+         strokeWidth="1.3" aria-hidden="true" focusable="false">
+      <rect x="1.5" y="1.5" width="13" height="13" rx="1.5" />
+      <path d="M6 1.5v13M10.5 1.5v13M1.5 6h13M1.5 10.5h13" />
+    </svg>
+  );
+}
+
+function IkonaPelnegoEkranu({ wlaczony }) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor"
+         strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      {wlaczony
+        ? <path d="M6.5 1.5v5h-5M9.5 1.5v5h5M6.5 14.5v-5h-5M9.5 14.5v-5h5" />
+        : <path d="M1.5 5.5v-4h4M14.5 5.5v-4h-4M1.5 10.5v4h4M14.5 10.5v4h-4" />}
+    </svg>
+  );
 }
 
 /**

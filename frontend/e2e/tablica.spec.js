@@ -383,6 +383,41 @@ test.describe("tablica", () => {
     expect(await widoczny(".main-menu-trigger")).toBe(false);
   });
 
+  test("kratka i pełny ekran: ikonki na pasku, nie w menu", async ({ page }) => {
+    const { path } = await createBoard(page, "Ikonki E2E");
+    await page.goto(path);
+    await waitForBoard(page);
+
+    const kratka = page.getByRole("button", { name: "Kratka" });
+    const pelny = page.getByRole("button", { name: "Pełny ekran" });
+    await expect(kratka).toBeVisible();
+    await expect(pelny).toBeVisible();
+
+    // Kratka: stan przełącznika przeżywa odświeżenie (ustawienie tej
+    // przeglądarki) - a appState Excalidrawa jej nie raportuje, więc sprawdzamy
+    // nasz przycisk, nie jego pole.
+    await expect(kratka).toHaveAttribute("aria-pressed", "false");
+    await kratka.click();
+    await expect(kratka).toHaveAttribute("aria-pressed", "true");
+    await page.reload();
+    await waitForBoard(page);
+    await expect(page.getByRole("button", { name: "Kratka" })).toHaveAttribute("aria-pressed", "true");
+
+    // Pełny ekran obejmuje cały dokument, żeby dialogi spoza drzewa tablicy
+    // (potwierdzenia) nie zniknęły razem z nim.
+    await pelny.click();
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement?.tagName || null)).toBe("HTML");
+    const wyjscie = page.getByRole("button", { name: "Wyjdź z pełnego ekranu" });
+    await expect(wyjscie).toBeVisible();
+    await wyjscie.click();
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement?.tagName || null)).toBe(null);
+
+    // W menu „⋯" ich nie ma - są pod ręką na pasku.
+    await page.locator(".tablica-wiecej button").click();
+    const pozycje = await page.locator(".tablica-wiecej [role=menuitem]").allInnerTexts();
+    expect(pozycje.join(" ")).not.toMatch(/Kratka|ełny ekran/);
+  });
+
   test("imiona przy kursorach: przełącznik w menu i skrót I", async ({ page, browser }) => {
     const { path } = await createBoard(page, "Imiona E2E");
     const guestCtx = await guestContext(browser);
