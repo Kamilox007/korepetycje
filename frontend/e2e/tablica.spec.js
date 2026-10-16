@@ -490,6 +490,25 @@ test.describe("tablica", () => {
     await ctx.close();
   });
 
+  test("suwaki w panelu mają pełny tor, bez odziedziczonego paddingu", async ({ page }) => {
+    const { path } = await createBoard(page, "Suwaki E2E");
+    await page.goto(path);
+    await waitForBoard(page);
+
+    // Panel właściwości pokazuje się dopiero przy zaznaczonym elemencie.
+    await draw(page, rect("do-zaznaczenia"));
+    await page.evaluate(() => window.__tablicaAPI.updateScene(
+      { appState: { selectedElementIds: { "do-zaznaczenia": true } } }));
+    await expect(page.locator(".tablica-stroke input[type=range]")).toBeVisible();
+
+    // Excalidraw nadaje każdemu <input> padding 8px 10px; na suwaku zjada to
+    // po 10 px toru z każdej strony i kółko nie dochodzi do końca.
+    const paddingi = await page.evaluate(() => [...document.querySelectorAll("input[type=range]")]
+      .map((s) => getComputedStyle(s).paddingLeft));
+    expect(paddingi.length).toBeGreaterThanOrEqual(2);   // nasza grubość + przeźroczystość
+    for (const p of paddingi) expect(p).toBe("0px");
+  });
+
   test("kratka i pełny ekran: ikonki na pasku, nie w menu", async ({ page }) => {
     const { path } = await createBoard(page, "Ikonki E2E");
     await page.goto(path);
