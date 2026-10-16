@@ -105,7 +105,9 @@ Moduł tablicy interaktywnej (Excalidraw) do prowadzenia korepetycji online.
   siedzi w menu **⋯** po prawej. Hamburger Excalidrawa jest schowany, bo
   wszystko z niego jest w **⋯**.
 - **Dotyk na tablecie**: jeden palec rysuje, dwa palce przesuwają i
-  przybliżają. Drugi palec dołożony w trakcie kreski anuluje ją i przechodzi
+  przybliżają. W trybie rysika (niżej) palec nie rysuje, tylko przesuwa -
+  ale wyłącznie wtedy, gdy pióro nie dotyka ekranu, żeby dłoń sunąca
+  w trakcie pisania nie przewijała kartki. Drugi palec dołożony w trakcie kreski anuluje ją i przechodzi
   w przesuwanie, więc nie zostaje bazgroł. Jednym palcem przesuwa się też
   narzędziem **Ręka** (skrót H).
 - **Tryb rysika** (w menu ⋯) - Excalidraw włącza go sam, gdy pierwszy raz

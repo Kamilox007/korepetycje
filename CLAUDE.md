@@ -199,7 +199,11 @@ stylus touches the canvas, and `penMode` + the freedraw tool hard-codes the pinc
 toggle in `⋯`, which writes `penMode` together with `penDetected: true` so a later stylus
 touch cannot undo the choice. `PageEditor` additionally clears `penMode` for the duration of
 a two-finger gesture (`touchstart` with two touches, restored on `touchend`/`touchcancel`),
-which is what makes pinch zoom work with the pencil without giving up palm rejection. Cursor name labels are toggled with `I` (checked empirically: of b c g i j m n s u
+which is what makes pinch zoom work with the pencil without giving up palm rejection. Since
+pen mode makes Excalidraw drop touch input entirely, `PageEditor` also pans the viewport
+itself on a one-finger drag (drawing tools only, 8 px threshold), gated on no
+`pointerType: "pen"` being down — without that gate a palm sliding along the screen while
+writing would scroll the board. Cursor name labels are toggled with `I` (checked empirically: of b c g i j m n s u
 w x y Excalidraw only binds x) by blanking `username` on the collaborators map. PDF export (`tablica/pdf.js`) renders pages via
 `exportToBlob` and lazy-loads jsPDF; pass `"FAST"` compression to `addImage` or PDFs balloon.
 
