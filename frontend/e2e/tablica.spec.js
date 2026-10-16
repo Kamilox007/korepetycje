@@ -383,6 +383,84 @@ test.describe("tablica", () => {
     expect(await widoczny(".main-menu-trigger")).toBe(false);
   });
 
+  test("dotyk na tablecie: dwa palce przesuwają i przybliżają, tryb rysika blokuje pinch", async ({ page, browser }) => {
+    const { path } = await createBoard(page, "Dotyk E2E");
+    const ctx = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+      viewport: { width: 1024, height: 768 }, hasTouch: true,
+    });
+    const tablet = await ctx.newPage();
+    await tablet.goto(path);
+    await tablet.getByLabel("Imię").fill("Uczeń");
+    await tablet.getByRole("button", { name: "Gotowe" }).click();
+    await waitForBoard(tablet);
+    const cdp = await ctx.newCDPSession(tablet);
+
+    const dotyk = (type, punkty) => cdp.send("Input.dispatchTouchEvent", {
+      type, touchPoints: punkty.map(([x, y], i) => ({ x, y, id: i + 1, radiusX: 10, radiusY: 10, force: 1 })),
+    });
+    const widok = () => tablet.evaluate(() => {
+      const s = window.__tablicaAPI.getAppState();
+      return { zoom: Number(s.zoom.value.toFixed(2)), x: Math.round(s.scrollX), y: Math.round(s.scrollY),
+               el: window.__tablicaAPI.getSceneElements().filter((e) => !e.isDeleted).length };
+    });
+    const zeruj = () => tablet.evaluate(() => {
+      const a = window.__tablicaAPI;
+      a.updateScene({ elements: [], appState: { scrollX: 0, scrollY: 0, zoom: { value: 1 } }, captureUpdate: "NEVER" });
+      a.setActiveTool({ type: "freedraw" });
+    });
+    const gest = async (klatki) => {
+      await dotyk("touchStart", klatki[0]);
+      for (const k of klatki.slice(1)) { await dotyk("touchMove", k); await tablet.waitForTimeout(40); }
+      await dotyk("touchEnd", []);
+      await tablet.waitForTimeout(350);
+    };
+    const przesun = (n) => Array.from({ length: n }, (_, k) => [[400 + k * 20, 400 + k * 12], [500 + k * 20, 400 + k * 12]]);
+    const rozsun = (n) => Array.from({ length: n }, (_, k) => [[450 - k * 25, 400], [550 + k * 25, 400]]);
+
+    // Pisak w dłoni, tryb rysika wyłączony: dwa palce robią jedno i drugie.
+    await zeruj();
+    await gest(przesun(7));
+    const poPrzesunieciu = await widok();
+    expect(poPrzesunieciu).toMatchObject({ x: 120, y: 72, zoom: 1, el: 0 });
+
+    await zeruj();
+    await gest(rozsun(7));
+    expect((await widok()).zoom).toBeGreaterThan(1);
+
+    // Jeden palec przy pisaku rysuje; drugi palec dołożony w trakcie kreski
+    // anuluje ją i przechodzi w przesuwanie - bez zostawiania bazgrołu.
+    await zeruj();
+    await gest([[[300, 300]], [[330, 320]], [[360, 340]], [[390, 360]]]);
+    expect((await widok()).el).toBe(1);
+    await zeruj();
+    await dotyk("touchStart", [[300, 500]]);
+    await dotyk("touchMove", [[320, 500]]);
+    await tablet.waitForTimeout(40);
+    await gest([[[320, 500], [420, 500]], [[340, 520], [440, 520]], [[360, 540], [460, 540]]]);
+    expect((await widok()).el).toBe(0);
+
+    // Tryb rysika (menu ⋯): palec przestaje rysować, a pinch przestaje
+    // przybliżać - tak działa Excalidraw po wykryciu pióra.
+    await tablet.locator(".tablica-wiecej button").click();
+    await tablet.getByRole("menuitem", { name: "Tryb rysika" }).click();
+    await zeruj();
+    await gest(rozsun(7));
+    expect((await widok()).zoom).toBe(1);
+
+    // Palec w trybie rysika jest całkiem ignorowany: nie rysuje i nie
+    // przesuwa. Rysuje pióro, a do przesuwania są dwa palce.
+    await zeruj();
+    await gest([[[300, 300]], [[340, 330]], [[380, 360]], [[420, 390]]]);
+    expect(await widok()).toMatchObject({ el: 0, x: 0, y: 0, zoom: 1 });
+
+    // ...a dwa palce dalej przesuwają.
+    await zeruj();
+    await gest(przesun(7));
+    expect(await widok()).toMatchObject({ x: 120, y: 72, zoom: 1 });
+    await ctx.close();
+  });
+
   test("kratka i pełny ekran: ikonki na pasku, nie w menu", async ({ page }) => {
     const { path } = await createBoard(page, "Ikonki E2E");
     await page.goto(path);
