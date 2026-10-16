@@ -17,7 +17,8 @@ import { STROKE_MIN, STROKE_MAX } from "./stroke";
  * drugiej po ekranie.
  */
 const PageEditor = forwardRef(function PageEditor(
-  { token, pageId, theme, name, grid, library, strokeWidth, showNames, onStrokeWidthChange, onStatus, onPeers, onClosed, onError }, ref,
+  { token, pageId, theme, name, grid, library, strokeWidth, showNames, penMode,
+    onStrokeWidthChange, onPenMode, onStatus, onPeers, onClosed, onError }, ref,
 ) {
   const apiRef = useRef(null);
 
@@ -28,6 +29,16 @@ const PageEditor = forwardRef(function PageEditor(
     /** Okno „zapisz jako obraz" Excalidrawa: PNG/SVG, tło, motyw, schowek. */
     openExport() {
       apiRef.current?.updateScene({ appState: { openDialog: { name: "imageExport" } } });
+    },
+    /**
+     * Tryb rysika Excalidrawa. Włączony: dotyk nie rysuje (odrzucanie dłoni),
+     * ale przy aktywnym pisaku dwa palce tylko przesuwają - Excalidraw twardo
+     * ustawia tam skalę na 1, więc pinch nie przybliża. Excalidraw włącza ten
+     * tryb sam przy pierwszym dotknięciu piórem; `penDetected` ustawiamy razem
+     * z wyborem, żeby kolejne dotknięcie pióra nie cofnęło decyzji.
+     */
+    setPenMode(on) {
+      apiRef.current?.updateScene({ appState: { penMode: on, penDetected: true } });
     },
     setStrokeWidth(width) {
       const a = apiRef.current;
@@ -56,7 +67,7 @@ const PageEditor = forwardRef(function PageEditor(
   // Callbacks that may change identity (name, handlers) are read through a
   // ref, so the sync object built once below always sees the latest.
   const latest = useRef({});
-  latest.current = { name, showNames, onStatus, onPeers, onClosed, onError };
+  latest.current = { name, showNames, onPenMode, onStatus, onPeers, onClosed, onError };
   // Wbudowane bryły + dodatki użytkownika (z konta albo z przeglądarki);
   // zmiany odkładane przez store z BoardScreen, żeby nie mnożyć zapisów
   // przy przełączaniu stron.
@@ -142,6 +153,13 @@ const PageEditor = forwardRef(function PageEditor(
     apiRef.current?.updateScene({ collaborators: map });
   }
 
+  // Wybór trybu rysika z poprzedniej wizyty (null = zostawiamy automat
+  // Excalidrawa, który włącza go przy pierwszym dotknięciu piórem).
+  useEffect(() => {
+    if (penMode === null || penMode === undefined || !initialData) return;
+    apiRef.current?.updateScene({ appState: { penMode, penDetected: true } });
+  }, [penMode, initialData]);
+
   // Przełączenie imion ma zadziałać od razu, a nie dopiero przy ruchu kursora.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { pushCollaborators(); }, [showNames]);
@@ -150,6 +168,7 @@ const PageEditor = forwardRef(function PageEditor(
   // gdy już byliśmy na stronie). Nadawca wysyła element dopiero po udanym
   // uploadzie, ale między jego POST a naszym GET może być chwila - stąd
   // kilka prób z odstępem zamiast jednego strzału.
+  const penModeRef = useRef(false);
   const fetching = useRef(new Set());
   async function fetchMissingFiles(elements) {
     const a = apiRef.current;
@@ -331,6 +350,12 @@ const PageEditor = forwardRef(function PageEditor(
       onChange={(elements, appState, files) => {
         syncRef.current?.handleChange(elements, files);
         saveView(appState);
+        // Tryb rysika Excalidraw potrafi włączyć sam (pierwsze dotknięcie
+        // piórem), więc pasek czyta stan stąd, a nie tylko z własnego wyboru.
+        if (appState.penMode !== penModeRef.current) {
+          penModeRef.current = appState.penMode;
+          latest.current.onPenMode?.(appState.penMode);
+        }
       }}
       onPointerUpdate={({ pointer, button }) => {
         syncRef.current?.pointer(pointer.x, pointer.y, button);

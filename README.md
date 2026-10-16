@@ -104,6 +104,16 @@ Moduł tablicy interaktywnej (Excalidraw) do prowadzenia korepetycji online.
   pobieranie, PDF, motyw, imiona, usuwanie strony, powrót do panelu -
   siedzi w menu **⋯** po prawej. Hamburger Excalidrawa jest schowany, bo
   wszystko z niego jest w **⋯**.
+- **Dotyk na tablecie**: jeden palec rysuje, dwa palce przesuwają i
+  przybliżają. Drugi palec dołożony w trakcie kreski anuluje ją i przechodzi
+  w przesuwanie, więc nie zostaje bazgroł. Jednym palcem przesuwa się też
+  narzędziem **Ręka** (skrót H).
+- **Tryb rysika** (w menu ⋯) - Excalidraw włącza go sam, gdy pierwszy raz
+  dotkniesz ekranu piórem, i wtedy: palec jest ignorowany (dłoń nie bazgrze,
+  rysuje tylko pióro), a przy aktywnym pisaku dwa palce **tylko przesuwają** -
+  Excalidraw twardo ustawia tam skalę na 1, więc pinch nie przybliża. Wyłącz
+  go, jeśli wolisz przybliżać palcami; wybór jest pamiętany per tablica
+  w przeglądarce i pióro już go nie cofa.
 - **Imiona przy kursorach** (w menu ⋯ albo skrótem **I**) - przy jednej osobie
   etykieta tylko zasłania rysunek. Ustawienie jest tylko dla tego ekranu,
   kursory zostają widoczne.

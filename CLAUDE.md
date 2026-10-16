@@ -189,7 +189,11 @@ above `BoardScreen` in the tree and element fullscreen would hide it. Excalidraw
 does not mirror the `gridModeEnabled` prop, so assert the bar button, not the scene. Excalidraw's hamburger is hidden by CSS on
 `.main-menu-trigger` (its own class, not the toolbar's `dropdown-menu-button`), but the custom
 `<MainMenu>` stays mounted so a renamed class shows our items rather than the stock ones with
-cloud links. Cursor name labels are toggled with `I` (checked empirically: of b c g i j m n s u
+cloud links. Excalidraw turns `penMode` on by itself the first time a
+stylus touches the canvas, and `penMode` + the freedraw tool hard-codes the pinch scale to 1
+(two fingers pan, never zoom) while ignoring touch input entirely — hence the `Tryb rysika`
+toggle in `⋯`, which writes `penMode` together with `penDetected: true` so a later stylus
+touch cannot undo the choice. Cursor name labels are toggled with `I` (checked empirically: of b c g i j m n s u
 w x y Excalidraw only binds x) by blanking `username` on the collaborators map. PDF export (`tablica/pdf.js`) renders pages via
 `exportToBlob` and lazy-loads jsPDF; pass `"FAST"` compression to `addImage` or PDFs balloon.
 

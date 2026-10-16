@@ -146,6 +146,23 @@ export default function BoardScreen() {
     setGrid((g) => { write(`tablica:${token}:grid`, g ? "0" : "1"); return !g; });
   }
 
+  // Tryb rysika: Excalidraw włącza go sam, gdy pierwszy raz dotkniesz ekranu
+  // piórem. Wtedy palec przestaje rysować (dobre - dłoń nie bazgrze), ale
+  // przy aktywnym pisaku dwa palce już nie przybliżają, tylko przesuwają.
+  // `wybranyTrybRysika` to świadoma decyzja z poprzedniej wizyty (null =
+  // zostaw automat), a `penMode` to stan, który naprawdę ma teraz edytor.
+  const [wybranyTrybRysika] = useState(() => {
+    const v = read(`tablica:${token}:rysik`);
+    return v === "1" ? true : v === "0" ? false : null;
+  });
+  const [penMode, setPenMode] = useState(wybranyTrybRysika ?? false);
+  function togglePenMode() {
+    const next = !penMode;
+    setPenMode(next);
+    write(`tablica:${token}:rysik`, next ? "1" : "0");
+    editorRef.current?.setPenMode(next);
+  }
+
   // Pełny ekran chowa pasek adresu przeglądarki - na tablecie i telefonie to
   // kilkanaście procent wysokości. Zawsze na całym dokumencie, nie na samej
   // tablicy: dialog potwierdzeń siedzi wyżej w drzewie Reacta i przy trybie
@@ -305,6 +322,11 @@ export default function BoardScreen() {
                     aria-pressed={showNames}>
               Imiona przy kursorach <span className="tablica-menu-skrot">I</span>
             </button>
+            <button role="menuitem" className={`tablica-menu-item${penMode ? " zaznaczony" : ""}`} onClick={togglePenMode}
+                    aria-pressed={penMode}
+                    title="Włączony: palcem nie narysujesz (dłoń nie bazgrze), ale przy pisaku dwa palce tylko przesuwają. Wyłączony: dwa palce przybliżają.">
+              Tryb rysika
+            </button>
             <div className="tablica-menu-sep" />
             {board.is_owner ? (
               <>
@@ -340,6 +362,8 @@ export default function BoardScreen() {
             library={library}
             strokeWidth={strokeWidth}
             showNames={showNames}
+            penMode={wybranyTrybRysika}
+            onPenMode={setPenMode}
             onStrokeWidthChange={pickStrokeWidth}
             onStatus={setStatus}
             onPeers={(ps, selfId) => setPeers(ps.map((p) => ({ ...p, self: p.peer_id === selfId })))}
