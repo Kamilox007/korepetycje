@@ -273,6 +273,39 @@ const PageEditor = forwardRef(function PageEditor(
     return () => root.removeEventListener("wheel", onWheel, { capture: true });
   }, [initialData]);
 
+  // Przybliżanie dwoma palcami przy aktywnym pisaku. Excalidraw w trybie
+  // rysika ustawia tam skalę na sztywno 1 (gesty: `freedraw && penMode ? 1
+  // : dystans/dystansPoczątkowy`), więc dwa palce tylko przesuwają i trzeba
+  // przełączać narzędzie, żeby przybliżyć. Na czas samego gestu gasimy tryb
+  // rysika i zapalamy go z powrotem po oderwaniu palców: odrzucanie dłoni
+  // zostaje, a liczenie skali robi już Excalidraw swoją matematyką.
+  useEffect(() => {
+    const root = wrapRef.current;
+    if (!root) return undefined;
+    let zgaszony = false;
+    const start = (e) => {
+      const a = apiRef.current;
+      if (!a || zgaszony || e.touches.length !== 2) return;
+      const st = a.getAppState();
+      if (!st.penMode || st.activeTool.type !== "freedraw") return;
+      zgaszony = true;
+      a.updateScene({ appState: { penMode: false } });
+    };
+    const koniec = (e) => {
+      if (!zgaszony || e.touches.length > 0) return;
+      zgaszony = false;
+      apiRef.current?.updateScene({ appState: { penMode: true } });
+    };
+    root.addEventListener("touchstart", start, { capture: true, passive: true });
+    root.addEventListener("touchend", koniec, { capture: true, passive: true });
+    root.addEventListener("touchcancel", koniec, { capture: true, passive: true });
+    return () => {
+      root.removeEventListener("touchstart", start, { capture: true });
+      root.removeEventListener("touchend", koniec, { capture: true });
+      root.removeEventListener("touchcancel", koniec, { capture: true });
+    };
+  }, [initialData]);
+
   // Po wklejeniu (albo upuszczeniu) obrazka wracamy na wskaźnik, żeby dało się
   // go od razu przesunąć. Excalidraw robi to sam dla wklejonych elementów
   // i tekstu (pasteFromClipboard kończy się setActiveTool "selection"), ale

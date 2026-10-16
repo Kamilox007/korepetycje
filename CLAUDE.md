@@ -165,7 +165,11 @@ detected softly via `auth.optional_active_user`). Pages are identified by `board
 `idx` is sort order only and may have gaps. `boards_reconcile.py` is the pure merge rule
 (higher `version` wins, ties to the lower `versionNonce`, `isDeleted` elements kept, output
 sorted by fractional `index`) and `frontend/src/tablica/reconcile.js` is its deliberate twin —
-change both or neither. Live sync lives in `boards_rooms.py`: one in-process room per open page,
+change both or neither. Both drop an `index` that is not a parseable fractional index: the
+first character encodes the integer-part length, so `"b9"` or `"d1"` make Excalidraw throw
+`invalid order key` inside its pointer handler, nobody on that page can draw any more, and
+every client still holding the element re-uploads it after a reconnect — one bad element
+poisons the board until the field is stripped (Excalidraw then regenerates it). Live sync lives in `boards_rooms.py`: one in-process room per open page,
 periodic save every 15 s, so uvicorn must stay at **one worker**. `PUT` on a page merges (never
 overwrites) and goes through the room when one is open. Image bytes never enter the database
 (`boards_files.py`, sha256-addressed files under `BOARD_FILES_PATH`); SQLite here does not
@@ -193,10 +197,13 @@ cloud links. Excalidraw turns `penMode` on by itself the first time a
 stylus touches the canvas, and `penMode` + the freedraw tool hard-codes the pinch scale to 1
 (two fingers pan, never zoom) while ignoring touch input entirely — hence the `Tryb rysika`
 toggle in `⋯`, which writes `penMode` together with `penDetected: true` so a later stylus
-touch cannot undo the choice. Since pen mode makes Excalidraw drop touch input entirely,
-`PageEditor` also pans the viewport itself on a one-finger drag (drawing tools only, 8 px
-threshold), gated on no `pointerType: "pen"` being down — without that gate a palm sliding
-along the screen while writing would scroll the board. Cursor name labels are toggled with `I` (checked empirically: of b c g i j m n s u
+touch cannot undo the choice. `PageEditor` additionally clears `penMode` for the duration of
+a two-finger gesture (`touchstart` with two touches, restored on `touchend`/`touchcancel`),
+which is what makes pinch zoom work with the pencil without giving up palm rejection. Since
+pen mode makes Excalidraw drop touch input entirely, `PageEditor` also pans the viewport
+itself on a one-finger drag (drawing tools only, 8 px threshold), gated on no
+`pointerType: "pen"` being down — without that gate a palm sliding along the screen while
+writing would scroll the board. Cursor name labels are toggled with `I` (checked empirically: of b c g i j m n s u
 w x y Excalidraw only binds x) by blanking `username` on the collaborators map. PDF export (`tablica/pdf.js`) renders pages via
 `exportToBlob` and lazy-loads jsPDF; pass `"FAST"` compression to `addImage` or PDFs balloon.
 
