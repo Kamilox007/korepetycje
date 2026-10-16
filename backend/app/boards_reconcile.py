@@ -33,6 +33,43 @@ def _rank(el: Element) -> tuple[int, int]:
     return (_num(el.get("version")), -_num(el.get("versionNonce")))
 
 
+def valid_order_key(index: Any) -> bool:
+    """Is `index` a fractional index Excalidraw can parse?
+
+    The first character encodes how long the integer part is ('a' -> 1 digit
+    after it, 'b' -> 2, ... and mirrored for 'Z'..'A'), so "b9" or "d1" are
+    too short and Excalidraw's getIntegerPart raises "invalid order key" on
+    them. It raises inside the pointer handler, which kills drawing for
+    everyone holding that element - see sanitize_index below.
+    """
+    if not isinstance(index, str) or not index:
+        return False
+    head = index[0]
+    if "a" <= head <= "z":
+        needed = ord(head) - ord("a") + 2
+    elif "A" <= head <= "Z":
+        needed = ord("Z") - ord(head) + 2
+    else:
+        return False
+    if len(index) < needed:
+        return False
+    return all(c.isdigit() or "a" <= c <= "z" or "A" <= c <= "Z" for c in index)
+
+
+def sanitize_index(el: Element) -> Element:
+    """Strip an unparseable `index`, keeping the element itself.
+
+    A client that sends one poisons the page for everybody: Excalidraw throws
+    on every freedraw pointerdown, so nobody can draw, and every client that
+    still holds the element re-uploads it after the next reconnect. Without
+    `index` Excalidraw simply generates a fresh one on load, which is the
+    cheap, lossless way out.
+    """
+    if "index" in el and not valid_order_key(el.get("index")):
+        return {k: v for k, v in el.items() if k != "index"}
+    return el
+
+
 def wins(incoming: Element, current: Element | None) -> bool:
     """Should `incoming` replace `current`? True when there is nothing to replace."""
     if current is None:
@@ -52,6 +89,7 @@ def reconcile(current: dict[str, Element], incoming: list[Element]) -> list[Elem
         el_id = el.get("id")
         if not isinstance(el_id, str) or not el_id:
             continue
+        el = sanitize_index(el)
         if wins(el, current.get(el_id)):
             current[el_id] = el
             changed.append(el)

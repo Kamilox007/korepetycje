@@ -29,6 +29,32 @@ export function wins(incoming, current) {
   return (incoming.versionNonce ?? 0) < (current.versionNonce ?? 0);
 }
 
+/**
+ * Czy `index` da się sparsować jako fractional index Excalidrawa?
+ *
+ * Pierwszy znak mówi, ile cyfr ma część całkowita ("a" - jedna, "b" - dwie,
+ * i lustrzanie dla "Z".."A"), więc "b9" czy "d1" są za krótkie i Excalidraw
+ * rzuca na nich "invalid order key" - w środku obsługi wskaźnika, przez co
+ * nikt nie może rysować. Bliźniak `valid_order_key` w boards_reconcile.py.
+ */
+export function validOrderKey(index) {
+  if (typeof index !== "string" || !index) return false;
+  const g = index[0];
+  let potrzeba;
+  if (g >= "a" && g <= "z") potrzeba = g.charCodeAt(0) - 97 + 2;
+  else if (g >= "A" && g <= "Z") potrzeba = 90 - g.charCodeAt(0) + 2;
+  else return false;
+  if (index.length < potrzeba) return false;
+  return /^[0-9A-Za-z]+$/.test(index);
+}
+
+/** Usuwa niemożliwy do sparsowania `index`; Excalidraw wygeneruje nowy. */
+export function sanitizeIndex(el) {
+  if (!("index" in el) || validOrderKey(el.index)) return el;
+  const { index, ...reszta } = el;
+  return reszta;
+}
+
 /** Kolejność rysowania: po `index` (fractional indexing), remis po id. */
 export function orderByIndex(elements) {
   return [...elements].sort((a, b) => {
@@ -55,8 +81,9 @@ export function mergeElements(local, remote, { protectIds } = {}) {
   const map = new Map(local.map((el) => [el.id, el]));
   const accepted = [];
   const rejected = [];
-  for (const el of remote) {
-    if (!el || typeof el.id !== "string" || !el.id) continue;
+  for (const raw of remote) {
+    if (!raw || typeof raw.id !== "string" || !raw.id) continue;
+    const el = sanitizeIndex(raw);
     const cur = map.get(el.id);
     if (cur && protectIds && protectIds.has(el.id)) { rejected.push(el); continue; }
     if (wins(el, cur)) {

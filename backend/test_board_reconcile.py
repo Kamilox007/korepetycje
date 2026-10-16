@@ -8,7 +8,7 @@ about who won and the two screens drift apart in silence.
 import sys, pathlib, itertools, copy
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from app.boards_reconcile import reconcile, ordered, contains_data_url, wins
+from app.boards_reconcile import valid_order_key, reconcile, ordered, contains_data_url, wins
 
 FAILS = []
 
@@ -99,6 +99,26 @@ state = {"n": el("n", 2, 1)}
 changed = reconcile(state, [{"id": "n", "version": None, "versionNonce": "abc", "x": 1}])
 check("null/garbage version fields do not raise and count as 0",
       changed == [] and state["n"]["version"] == 2)
+
+# --- index guard ---
+# "b9"/"d1" to klucze za krotkie wzgledem naglowka: Excalidraw rzuca na nich
+# "invalid order key" w obsludze wskaznika i nikt nie moze rysowac.
+check("valid order keys pass", all(valid_order_key(k) for k in ("a0", "a1", "b00", "Zz", "a0V")))
+check("too short for its head is rejected", not any(valid_order_key(k) for k in ("b9", "c1", "d1")))
+check("non-key junk is rejected",
+      not any(valid_order_key(k) for k in ("", None, 5, "!!", "0a", "a!")))
+state = {}
+changed = reconcile(state, [el("x", 1, 1, index="d1")])
+check("element with a broken index is kept but loses the index",
+      changed and "index" not in state["x"] and state["x"]["id"] == "x")
+state = {}
+reconcile(state, [el("y", 1, 1, index="a0")])
+check("a valid index is left alone", state["y"]["index"] == "a0")
+state = {}
+reconcile(state, [{"id": "z", "version": 1, "versionNonce": 1}])
+check("element without an index is not invented one", "index" not in state["z"])
+check("ordered() puts an index-less element last",
+      [e["id"] for e in ordered({"a": {"id": "a", "version": 1}, "b": el("b", 1, 1, index="a0")})] == ["b", "a"])
 
 # --- data URL guard ---
 check("plain scene has no data URL", not contains_data_url([el("a", 1, 1)]))
