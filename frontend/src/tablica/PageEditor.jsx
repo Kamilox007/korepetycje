@@ -298,6 +298,65 @@ const PageEditor = forwardRef(function PageEditor(
     };
   }, [initialData]);
 
+  // Przesuwanie jednym palcem przy aktywnym pisaku. W trybie rysika Excalidraw
+  // ignoruje dotyk - i właśnie dlatego dłoń oparta o ekran nie bazgrze - więc
+  // palec nie robi nic i jedynym sposobem przesunięcia tablicy przy pisaniu
+  // zostają dwa palce. Widok przesuwamy więc sami, ale TYLKO gdy pióro nie
+  // dotyka ekranu: dłoń sunąca w trakcie pisania nie ma prawa przewinąć
+  // kartki, a to zdarza się przy każdym zdaniu.
+  useEffect(() => {
+    const root = wrapRef.current;
+    if (!root) return undefined;
+    // Narzędzia, przy których Excalidraw sam obsługuje dotyk (zaznaczanie,
+    // rączka, pisanie tekstu) - tam nie mamy czego poprawiać.
+    const WLASNA_OBSLUGA = new Set(["selection", "hand", "text", "image"]);
+    const PROG_PX = 8;              // zanim uznamy dotknięcie za przesuwanie
+    let piorNaEkranie = 0;
+    let gest = null;
+
+    const pioroDol = (e) => { if (e.pointerType === "pen") piorNaEkranie += 1; };
+    const pioroGora = (e) => { if (e.pointerType === "pen") piorNaEkranie = Math.max(0, piorNaEkranie - 1); };
+
+    const start = (e) => {
+      gest = null;
+      const a = apiRef.current;
+      if (!a || e.touches.length !== 1 || piorNaEkranie > 0) return;
+      const st = a.getAppState();
+      if (!st.penMode || WLASNA_OBSLUGA.has(st.activeTool.type)) return;
+      const t = e.touches[0];
+      gest = { x: t.clientX, y: t.clientY, scrollX: st.scrollX, scrollY: st.scrollY, jedzie: false };
+    };
+    const ruch = (e) => {
+      const a = apiRef.current;
+      // Drugi palec albo pióro w trakcie: oddajemy gest Excalidrawowi.
+      if (!gest || !a || e.touches.length !== 1 || piorNaEkranie > 0) { gest = null; return; }
+      const t = e.touches[0];
+      const dx = t.clientX - gest.x, dy = t.clientY - gest.y;
+      if (!gest.jedzie && Math.hypot(dx, dy) < PROG_PX) return;
+      gest.jedzie = true;
+      const zoom = a.getAppState().zoom.value || 1;
+      a.updateScene({ appState: { scrollX: gest.scrollX + dx / zoom, scrollY: gest.scrollY + dy / zoom } });
+    };
+    const koniec = () => { gest = null; };
+
+    root.addEventListener("pointerdown", pioroDol, { capture: true, passive: true });
+    root.addEventListener("pointerup", pioroGora, { capture: true, passive: true });
+    root.addEventListener("pointercancel", pioroGora, { capture: true, passive: true });
+    root.addEventListener("touchstart", start, { capture: true, passive: true });
+    root.addEventListener("touchmove", ruch, { capture: true, passive: true });
+    root.addEventListener("touchend", koniec, { capture: true, passive: true });
+    root.addEventListener("touchcancel", koniec, { capture: true, passive: true });
+    return () => {
+      root.removeEventListener("pointerdown", pioroDol, { capture: true });
+      root.removeEventListener("pointerup", pioroGora, { capture: true });
+      root.removeEventListener("pointercancel", pioroGora, { capture: true });
+      root.removeEventListener("touchstart", start, { capture: true });
+      root.removeEventListener("touchmove", ruch, { capture: true });
+      root.removeEventListener("touchend", koniec, { capture: true });
+      root.removeEventListener("touchcancel", koniec, { capture: true });
+    };
+  }, [initialData]);
+
   if (loadError) {
     return <div className="tablica-error">Nie udało się wczytać strony: {loadError}</div>;
   }

@@ -416,6 +416,12 @@ test.describe("tablica", () => {
       await tablet.waitForTimeout(350);
     };
     const przesun = (n) => Array.from({ length: n }, (_, k) => [[400 + k * 20, 400 + k * 12], [500 + k * 20, 400 + k * 12]]);
+    /** Pióro przyłożone do ekranu albo oderwane (osobny typ wskaźnika). */
+    const pioro = (naEkranie) => tablet.evaluate((naEkranie) => {
+      document.querySelector(".excalidraw__canvas.interactive").dispatchEvent(
+        new PointerEvent(naEkranie ? "pointerdown" : "pointerup",
+          { bubbles: true, pointerType: "pen", pointerId: 99, clientX: 500, clientY: 500 }));
+    }, naEkranie);
     const rozsun = (n) => Array.from({ length: n }, (_, k) => [[450 - k * 25, 400], [550 + k * 25, 400]]);
 
     // Pisak w dłoni, tryb rysika wyłączony: dwa palce robią jedno i drugie.
@@ -448,11 +454,19 @@ test.describe("tablica", () => {
     await gest(rozsun(7));
     expect((await widok()).zoom).toBe(1);
 
-    // Palec w trybie rysika jest całkiem ignorowany: nie rysuje i nie
-    // przesuwa. Rysuje pióro, a do przesuwania są dwa palce.
+    // Palec w trybie rysika nie rysuje - Excalidraw go ignoruje - ale widok
+    // przesuwamy sami, inaczej przy pisaniu zostają tylko dwa palce.
     await zeruj();
     await gest([[[300, 300]], [[340, 330]], [[380, 360]], [[420, 390]]]);
-    expect(await widok()).toMatchObject({ el: 0, x: 0, y: 0, zoom: 1 });
+    expect(await widok()).toMatchObject({ el: 0, x: 120, y: 90, zoom: 1 });
+
+    // Z piórem na ekranie palec już nie przesuwa: dłoń sunąca w trakcie
+    // pisania nie ma prawa przewinąć kartki.
+    await zeruj();
+    await pioro(true);
+    await gest([[[300, 300]], [[340, 330]], [[380, 360]], [[420, 390]]]);
+    expect(await widok()).toMatchObject({ el: 0, x: 0, y: 0 });
+    await pioro(false);
 
     // ...a dwa palce dalej przesuwają.
     await zeruj();
