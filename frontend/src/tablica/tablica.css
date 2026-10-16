@@ -119,6 +119,11 @@
 .tablica-editor fieldset:has(> .tablica-stroke) > .buttonList { display: none; }
 .tablica-stroke { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 2px 0 0; }
 .tablica-stroke input[type="range"] { flex: 1; min-width: 0; margin: 0; accent-color: var(--accent); }
+/* Panel Excalidrawa daje KAŻDEMU <input> padding 8px 10px i trafia tym też
+   w suwaki: tor kurczy się o 10 px z każdej strony, więc kółko przy wartości
+   skrajnej stoi widocznie przed końcem kontrolki. Dotyczy naszej grubości
+   i fabrycznej przeźroczystości - stąd reguła na cały edytor. */
+.tablica-editor input[type="range"] { padding: 0; }
 .tablica-stroke-line { display: block; width: 16px; background: var(--color-on-surface, var(--ink)); border-radius: 6px; flex: none; }
 .tablica-stroke-value {
   width: 52px; flex: none; padding: 2px 4px; font-size: 12px;

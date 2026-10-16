@@ -184,7 +184,10 @@ The board route is mounted in
 them; without that they multiply on every open). The stroke-width slider is injected into
 Excalidraw's properties panel by a `MutationObserver` + portal (`PageEditor.jsx`) — it depends
 on Excalidraw's `data-testid="strokeWidth-*"`; if an upgrade renames them the slider silently
-disappears and the stock buttons return. The board's own bar (`BoardScreen.jsx`) owns
+disappears and the stock buttons return. That panel also pads every `<input>` with
+`8px 10px`, which on a range input eats 10 px of track on each side — so `tablica.css` resets
+the padding for every range input inside the editor, ours and Excalidraw's own opacity slider
+alike. The board's own bar (`BoardScreen.jsx`) owns
 everything else: a few recent page chips plus a `Strony (N)` dropdown, `+` kept outside the
 scrollable strip, and one `⋯` menu for the rest; grid and
 fullscreen stay out of that menu as icon buttons, since both get used mid-lesson. Fullscreen
