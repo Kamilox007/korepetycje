@@ -15,7 +15,11 @@
   flex: none;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  overflow: hidden;
+  /* Bez overflow: hidden - przycinało rozwijane listy do wysokości paska.
+     Własna warstwa, bo płótno Excalidrawa ma z-index 2 i jest dalej w DOM,
+     więc inaczej zasłania listy mimo ich wyższego z-index. */
+  position: relative;
+  z-index: 10;
 }
 .tablica-title {
   font-weight: 600;
