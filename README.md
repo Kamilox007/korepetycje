@@ -112,8 +112,11 @@ Moduł tablicy interaktywnej (Excalidraw) do prowadzenia korepetycji online.
   dotkniesz ekranu piórem, i wtedy: palec jest ignorowany (dłoń nie bazgrze,
   rysuje tylko pióro), a przy aktywnym pisaku dwa palce **tylko przesuwają** -
   Excalidraw twardo ustawia tam skalę na 1, więc pinch nie przybliża. Wyłącz
-  go, jeśli wolisz przybliżać palcami; wybór jest pamiętany per tablica
-  w przeglądarce i pióro już go nie cofa.
+  go, jeśli wolisz rysować palcem; wybór jest pamiętany per tablica
+  w przeglądarce i pióro już go nie cofa. Samo **przybliżanie dwoma palcami
+  działa niezależnie od tego trybu**: na czas gestu gasimy go i zapalamy
+  z powrotem po oderwaniu palców, więc nie trzeba zmieniać narzędzia, żeby
+  powiększyć.
 - **Imiona przy kursorach** (w menu ⋯ albo skrótem **I**) - przy jednej osobie
   etykieta tylko zasłania rysunek. Ustawienie jest tylko dla tego ekranu,
   kursory zostają widoczne.
