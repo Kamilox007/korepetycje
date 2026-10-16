@@ -452,24 +452,27 @@ test.describe("tablica", () => {
     await gest([[[320, 500], [420, 500]], [[340, 520], [440, 520]], [[360, 540], [460, 540]]]);
     expect((await widok()).el).toBe(0);
 
-    // Tryb rysika (menu ⋯): palec przestaje rysować, a pinch przestaje
-    // przybliżać - tak działa Excalidraw po wykryciu pióra.
+    // Tryb rysika (menu ⋯): palec przestaje rysować.
     await tablet.locator(".tablica-wiecej button").click();
     await tablet.getByRole("menuitem", { name: "Tryb rysika" }).click();
-    await zeruj();
-    await gest(rozsun(7));
-    expect((await widok()).zoom).toBe(1);
-
-    // Palec w trybie rysika jest całkiem ignorowany: nie rysuje i nie
-    // przesuwa. Rysuje pióro, a do przesuwania są dwa palce.
     await zeruj();
     await gest([[[300, 300]], [[340, 330]], [[380, 360]], [[420, 390]]]);
     expect(await widok()).toMatchObject({ el: 0, x: 0, y: 0, zoom: 1 });
 
-    // ...a dwa palce dalej przesuwają.
+    // Dwa palce dalej przesuwają...
     await zeruj();
     await gest(przesun(7));
     expect(await widok()).toMatchObject({ x: 120, y: 72, zoom: 1 });
+
+    // ...i przybliżają, mimo że Excalidraw sam by tego zabronił (skala na
+    // sztywno 1 przy pisaku). Na czas gestu gasimy tryb rysika i zapalamy
+    // go z powrotem po oderwaniu palców, więc dłoń dalej nie bazgrze.
+    await zeruj();
+    await gest(rozsun(7));
+    expect((await widok()).zoom).toBeGreaterThan(1);
+    expect(await tablet.evaluate(() => window.__tablicaAPI.getAppState().penMode)).toBe(true);
+    await gest([[[300, 300]], [[330, 320]], [[360, 340]]]);
+    expect((await widok()).el).toBe(0);
     await ctx.close();
   });
 
