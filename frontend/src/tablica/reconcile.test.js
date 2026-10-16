@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  wins, mergeElements, orderByIndex, pendingChanges, markKnown, localWinners, versionKey,
+  wins, mergeElements, orderByIndex, pendingChanges, markKnown, localWinners, versionKey, validOrderKey,
 } from "./reconcile";
 
 // Reguła musi być identyczna z backend/app/boards_reconcile.py (i z
@@ -113,6 +113,21 @@ describe("pendingChanges / markKnown / localWinners", () => {
     expect(pending.map((e) => e.id)).toEqual(["b", "c"]);
     markKnown(known, pending);
     expect(pendingChanges([el("a", 1, 1), el("b", 2, 1), el("c", 1, 1)], known)).toEqual([]);
+  });
+
+  it("validOrderKey: klucze za krótkie względem nagłówka odpadają", () => {
+    for (const k of ["a0", "a1", "b00", "Zz", "a0V"]) expect(validOrderKey(k)).toBe(true);
+    // Tyle wystarczy, żeby Excalidraw rzucił "invalid order key" w obsłudze
+    // wskaźnika i nikt na tablicy nie mógł rysować.
+    for (const k of ["b9", "c1", "d1", "", null, 5, "!!", "0a"]) expect(validOrderKey(k)).toBe(false);
+  });
+
+  it("scalanie wyrzuca uszkodzony index, zostawiając element", () => {
+    const { elements } = mergeElements([], [el("x", 1, 1, { index: "d1" }), el("y", 1, 1, { index: "a0" })]);
+    const x = elements.find((e) => e.id === "x");
+    expect(x).toBeTruthy();
+    expect("index" in x).toBe(false);
+    expect(elements.find((e) => e.id === "y").index).toBe("a0");
   });
 
   it("versionKey traktuje brak wersji jak 0", () => {

@@ -165,7 +165,11 @@ detected softly via `auth.optional_active_user`). Pages are identified by `board
 `idx` is sort order only and may have gaps. `boards_reconcile.py` is the pure merge rule
 (higher `version` wins, ties to the lower `versionNonce`, `isDeleted` elements kept, output
 sorted by fractional `index`) and `frontend/src/tablica/reconcile.js` is its deliberate twin —
-change both or neither. Live sync lives in `boards_rooms.py`: one in-process room per open page,
+change both or neither. Both drop an `index` that is not a parseable fractional index: the
+first character encodes the integer-part length, so `"b9"` or `"d1"` make Excalidraw throw
+`invalid order key` inside its pointer handler, nobody on that page can draw any more, and
+every client still holding the element re-uploads it after a reconnect — one bad element
+poisons the board until the field is stripped (Excalidraw then regenerates it). Live sync lives in `boards_rooms.py`: one in-process room per open page,
 periodic save every 15 s, so uvicorn must stay at **one worker**. `PUT` on a page merges (never
 overwrites) and goes through the room when one is open. Image bytes never enter the database
 (`boards_files.py`, sha256-addressed files under `BOARD_FILES_PATH`); SQLite here does not
