@@ -379,6 +379,18 @@ test.describe("tablica", () => {
     // Wybrana strona dołącza do paska, nawet gdy jest daleko poza ostatnimi.
     await expect(page.locator(".tablica-pages .tablica-page.active")).toHaveText(pierwsza);
 
+    // Rozwijane listy muszą być NAD płótnem i nieprzycięte paskiem.
+    await page.locator(".tablica-wiecej button").click();
+    const naWierzchu = await page.evaluate(() => {
+      const l = document.querySelector(".tablica-menu-lista");
+      const r = l.getBoundingClientRect();
+      const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return { wysokosc: Math.round(r.height), trafiony: el?.className || "" };
+    });
+    expect(naWierzchu.wysokosc).toBeGreaterThan(60);
+    expect(naWierzchu.trafiony).toContain("tablica-menu-item");
+    await page.keyboard.press("Escape");
+
     // Hamburger Excalidrawa schowany - jego pozycje są w „⋯".
     expect(await widoczny(".main-menu-trigger")).toBe(false);
   });
