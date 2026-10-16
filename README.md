@@ -90,9 +90,24 @@ Moduł tablicy interaktywnej (Excalidraw) do prowadzenia korepetycji online.
   Własne rysunki dodane przez „dodaj do biblioteki" zapisują się **na
   koncie** (ta sama biblioteka na każdym urządzeniu), u gościa - w jego
   przeglądarce.
-- **Kratka** na pasku - ustawienie widoku tylko dla tego, kto ją włączył,
-  pamiętane per tablica w przeglądarce.
-- **Motyw tablicy** (Ciemny / Jasny na pasku) - niezależny od motywu panelu,
+- **Kratka** (ikonka na pasku) - ustawienie widoku tylko dla tego, kto ją
+  włączył, pamiętane per tablica w przeglądarce.
+- **Pełny ekran** (ikonka obok kratki) - chowa pasek adresu przeglądarki, co
+  na tablecie i telefonie daje kilkanaście procent wysokości. Obejmuje cały
+  dokument, nie samą tablicę, żeby okna potwierdzeń nie zniknęły razem z nim.
+  Na iOS Safari przycisku nie ma, bo ta przeglądarka nie umie pełnego ekranu
+  poza wideo - tam zostaje „Dodaj do ekranu głównego".
+- **Pasek stron** pokazuje kilka ostatnich stron; pełna lista jest pod
+  przyciskiem **Strony (N)**, a **+** stoi poza przewijaną częścią, więc nie
+  da się go wypchnąć poza ekran nawet przy dwudziestu stronach. Na telefonie
+  (poniżej 700 px) zakładki ustępują miejsca samej liście. Reszta akcji -
+  pobieranie, PDF, motyw, imiona, usuwanie strony, powrót do panelu -
+  siedzi w menu **⋯** po prawej. Hamburger Excalidrawa jest schowany, bo
+  wszystko z niego jest w **⋯**.
+- **Imiona przy kursorach** (w menu ⋯ albo skrótem **I**) - przy jednej osobie
+  etykieta tylko zasłania rysunek. Ustawienie jest tylko dla tego ekranu,
+  kursory zostają widoczne.
+- **Motyw tablicy** (Ciemny / Jasny w menu ⋯) - niezależny od motywu panelu,
   pamiętany w przeglądarce; dopóki nic nie wybierzesz, tablica dziedziczy
   motyw panelu. Wymuszanie ciemnego trybu przez przeglądarkę jest zbędne
   i szkodliwe: nakłada własne odwrócenie na nasze, przez co kolory wychodzą

@@ -17,7 +17,7 @@ import { STROKE_MIN, STROKE_MAX } from "./stroke";
  * drugiej po ekranie.
  */
 const PageEditor = forwardRef(function PageEditor(
-  { token, pageId, theme, name, grid, library, strokeWidth, onStrokeWidthChange, onStatus, onPeers, onClosed, onError }, ref,
+  { token, pageId, theme, name, grid, library, strokeWidth, showNames, onStrokeWidthChange, onStatus, onPeers, onClosed, onError }, ref,
 ) {
   const apiRef = useRef(null);
 
@@ -56,7 +56,7 @@ const PageEditor = forwardRef(function PageEditor(
   // Callbacks that may change identity (name, handlers) are read through a
   // ref, so the sync object built once below always sees the latest.
   const latest = useRef({});
-  latest.current = { name, onStatus, onPeers, onClosed, onError };
+  latest.current = { name, showNames, onStatus, onPeers, onClosed, onError };
   // Wbudowane bryły + dodatki użytkownika (z konta albo z przeglądarki);
   // zmiany odkładane przez store z BoardScreen, żeby nie mnożyć zapisów
   // przy przełączaniu stron.
@@ -135,8 +135,16 @@ const PageEditor = forwardRef(function PageEditor(
   }, [token, pageId]);
 
   function pushCollaborators() {
-    apiRef.current?.updateScene({ collaborators: new Map(collaborators.current) });
+    // Puste `username` = Excalidraw rysuje sam kursor, bez etykiety z imieniem.
+    const show = latest.current.showNames !== false;
+    const map = new Map();
+    for (const [id, c] of collaborators.current) map.set(id, show ? c : { ...c, username: "" });
+    apiRef.current?.updateScene({ collaborators: map });
   }
+
+  // Przełączenie imion ma zadziałać od razu, a nie dopiero przy ruchu kursora.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { pushCollaborators(); }, [showNames]);
 
   // Obrazki, których bajtów jeszcze nie mamy (wklejone przez kogoś innego,
   // gdy już byliśmy na stronie). Nadawca wysyła element dopiero po udanym

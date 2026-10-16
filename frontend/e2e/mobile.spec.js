@@ -69,7 +69,7 @@ test("tables scroll horizontally instead of stretching the page", async ({ page 
   expect(pageWidth).toBeLessThanOrEqual(viewportWidth + 1);
 });
 
-test("tablica: ekran nie przewija się w poziomie, pasek stron przewija się sam", async ({ page }) => {
+test("tablica: ekran nie przewija się w poziomie, strony dostępne z menu", async ({ page }) => {
   const res = await page.request.post("/api/boards", { data: { title: "Mobile E2E" } });
   const { path } = await res.json();
   await page.goto(path);
@@ -80,9 +80,14 @@ test("tablica: ekran nie przewija się w poziomie, pasek stron przewija się sam
   );
   expect(scrollsHorizontally).toBeFalsy();
 
-  // Pasek stron ma własne przewijanie; reszta paska mieści się na ekranie.
+  // Cały pasek mieści się na ekranie: na telefonie zakładki stron ustępują
+  // miejsca menu „Strony", a „+" i „⋯" zostają pod ręką.
   const bar = page.locator(".tablica-bar");
   const barFits = await bar.evaluate((e) => e.getBoundingClientRect().right <= window.innerWidth + 1);
   expect(barFits).toBeTruthy();
-  await expect(page.getByRole("link", { name: "Panel" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Strony \(\d+\)$/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Nowa strona" })).toBeVisible();
+
+  await page.locator(".tablica-wiecej button").click();
+  await expect(page.getByRole("menuitem", { name: "Panel" })).toBeVisible();
 });

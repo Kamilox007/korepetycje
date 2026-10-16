@@ -72,6 +72,25 @@ export default function BoardScreen() {
   });
   // Kratka to ustawienie widoku tej przeglądarki, pamiętane per tablica.
   const [grid, setGrid] = useState(() => read(`tablica:${token}:grid`) === "1");
+  // Imiona przy cudzych kursorach. Przy jednej osobie na tablicy etykieta
+  // tylko zasłania rysunek, stąd przełącznik - też tylko dla tego ekranu.
+  const [showNames, setShowNames] = useState(() => read(`tablica:${token}:imiona`) !== "0");
+  const toggleNames = useCallback(() => {
+    setShowNames((v) => { write(`tablica:${token}:imiona`, v ? "0" : "1"); return !v; });
+  }, [token]);
+  // Skrót „I" jak imiona. Excalidraw nie używa tej litery (sprawdzone
+  // empirycznie: z liter b c g i j m n s u w x y zajmuje tylko x).
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== "i" && e.key !== "I") return;
+      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      const el = document.activeElement;
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el?.isContentEditable) return;
+      toggleNames();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleNames]);
   // Biblioteka kształtów: otwierana raz na wejściu (konto albo przeglądarka),
   // wspólna dla wszystkich stron tej tablicy.
   const [library, setLibrary] = useState(null);
@@ -126,6 +145,28 @@ export default function BoardScreen() {
   function toggleGrid() {
     setGrid((g) => { write(`tablica:${token}:grid`, g ? "0" : "1"); return !g; });
   }
+
+  // Pełny ekran chowa pasek adresu przeglądarki - na tablecie i telefonie to
+  // kilkanaście procent wysokości. Zawsze na całym dokumencie, nie na samej
+  // tablicy: dialog potwierdzeń siedzi wyżej w drzewie Reacta i przy trybie
+  // pełnoekranowym na elemencie byłby niewidoczny.
+  const [fullscreen, setFullscreen] = useState(false);
+  useEffect(() => {
+    const sync = () => setFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", sync);
+    sync();
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch (e) {
+      setError("Nie udało się przełączyć pełnego ekranu: " + e.message);
+    }
+  }
+  // iOS Safari nie umie pełnego ekranu poza wideo - tam przycisku nie ma.
+  const fullscreenMozliwy = typeof document !== "undefined" && document.fullscreenEnabled;
 
   function selectPage(id) {
     setPageId(id);
@@ -187,13 +228,30 @@ export default function BoardScreen() {
 
   const current = board.pages.find((p) => p.id === pageId) || null;
   const others = peers.filter((p) => !p.self);
+  // Na pasku mieści się kilka ostatnich stron, reszta jest w menu „Strony".
+  // Bieżąca musi być widoczna zawsze, nawet gdy jest daleko w tyle.
+  const ogon = board.pages.slice(-5);
+  const ostatnieStrony = !current || ogon.some((p) => p.id === current.id)
+    ? ogon
+    : [current, ...ogon.slice(1)];
 
   return (
     <div className={`tablica ${theme === "dark" ? "tablica-dark" : ""}`}>
       <header className="tablica-bar">
         <div className="tablica-title" title={board.title}>{board.title}</div>
-        <nav className="tablica-pages" aria-label="Strony">
+        {/* Wszystkie strony zawsze pod ręką: przy dwudziestu stronach pasek
+            nie ma szans ich pomieścić, a i tak musi zostać miejsce na „+". */}
+        <Menu className="tablica-strony-menu" label={`Strony (${board.pages.length})`} title="Wszystkie strony">
           {board.pages.map((p) => (
+            <button key={p.id} role="menuitem"
+                    className={`tablica-menu-item${p.id === pageId ? " active" : ""}`}
+                    onClick={() => selectPage(p.id)}>
+              {p.title}
+            </button>
+          ))}
+        </Menu>
+        <nav className="tablica-pages" aria-label="Ostatnie strony">
+          {ostatnieStrony.map((p) => (
             <button
               key={p.id}
               className={`tablica-page${p.id === pageId ? " active" : ""}`}
@@ -204,10 +262,11 @@ export default function BoardScreen() {
               {p.title}
             </button>
           ))}
-          {board.is_owner && (
-            <button className="tablica-page tablica-add" onClick={addPage} aria-label="Nowa strona" title="Nowa strona">+</button>
-          )}
         </nav>
+        {/* „+" poza przewijanym paskiem - inaczej znika jako pierwsze. */}
+        {board.is_owner && (
+          <button className="tablica-page tablica-add" onClick={addPage} aria-label="Nowa strona" title="Nowa strona">+</button>
+        )}
         <div className="tablica-right">
           {others.length > 0 && (
             <span className="tablica-peers" title={others.map((p) => p.name).join(", ")}>
@@ -216,29 +275,52 @@ export default function BoardScreen() {
               ))}
             </span>
           )}
-          <button className="ghost tablica-btn" onClick={() => editorRef.current?.openExport()}
-                  title="Pobierz tę stronę jako PNG lub SVG">Pobierz</button>
-          <button className="ghost tablica-btn" onClick={downloadPdf} disabled={!!pdfBusy}
-                  title="Cała tablica jako PDF - jedna strona tablicy na stronę">{pdfBusy || "PDF"}</button>
-          <button className="ghost tablica-btn" onClick={toggleTheme}
-                  title="Motyw tablicy (niezależny od panelu)">{theme === "dark" ? "Jasny" : "Ciemny"}</button>
-          <button className={`ghost tablica-btn${grid ? " active" : ""}`} onClick={toggleGrid}
-                  aria-pressed={grid} title="Kratka (tylko na Twoim ekranie)">Kratka</button>
           <span className={`tablica-status ${status}`}>
             {status === "live" ? "na żywo" : status === "connecting" ? "łączenie…" : "offline - zmiany zapisywane co 15 s"}
           </span>
-          {board.is_owner ? (
-            <>
-              {current && board.pages.length > 1 && (
-                <button className="ghost tablica-btn" onClick={() => removePage(current)}>Usuń stronę</button>
-              )}
-              <Link className="tablica-btn tablica-link" to="/tablice">Panel</Link>
-            </>
-          ) : (
-            <button className="ghost tablica-btn" onClick={() => setAskName(true)} title="Imię przy kursorze">
-              {name || "Gość"}
+          {/* Dwie rzeczy używane w trakcie lekcji zostają na wierzchu. */}
+          <button className={`ghost tablica-btn tablica-ikona${grid ? " active" : ""}`} onClick={toggleGrid}
+                  aria-pressed={grid} aria-label="Kratka" title="Kratka (tylko na Twoim ekranie)">
+            <IkonaKratki />
+          </button>
+          {fullscreenMozliwy && (
+            <button className={`ghost tablica-btn tablica-ikona${fullscreen ? " active" : ""}`} onClick={toggleFullscreen}
+                    aria-pressed={fullscreen} aria-label={fullscreen ? "Wyjdź z pełnego ekranu" : "Pełny ekran"}
+                    title={fullscreen ? "Wyjdź z pełnego ekranu" : "Pełny ekran (chowa pasek adresu)"}>
+              <IkonaPelnegoEkranu wlaczony={fullscreen} />
             </button>
           )}
+          <Menu className="tablica-wiecej" label={pdfBusy || "⋯"} ariaLabel="Więcej" title="Więcej">
+            <button role="menuitem" className="tablica-menu-item" onClick={() => editorRef.current?.openExport()}>
+              Pobierz stronę (PNG, SVG)
+            </button>
+            <button role="menuitem" className="tablica-menu-item" onClick={downloadPdf} disabled={!!pdfBusy}>
+              Cała tablica do PDF
+            </button>
+            <div className="tablica-menu-sep" />
+            <button role="menuitem" className="tablica-menu-item" onClick={toggleTheme}>
+              Motyw: {theme === "dark" ? "ciemny" : "jasny"}
+            </button>
+            <button role="menuitem" className={`tablica-menu-item${showNames ? " zaznaczony" : ""}`} onClick={toggleNames}
+                    aria-pressed={showNames}>
+              Imiona przy kursorach <span className="tablica-menu-skrot">I</span>
+            </button>
+            <div className="tablica-menu-sep" />
+            {board.is_owner ? (
+              <>
+                {current && board.pages.length > 1 && (
+                  <button role="menuitem" className="tablica-menu-item" onClick={() => removePage(current)}>
+                    Usuń tę stronę
+                  </button>
+                )}
+                <Link role="menuitem" className="tablica-menu-item" to="/tablice">Panel</Link>
+              </>
+            ) : (
+              <button role="menuitem" className="tablica-menu-item" onClick={() => setAskName(true)}>
+                Zmień imię ({name || "Gość"})
+              </button>
+            )}
+          </Menu>
         </div>
       </header>
 
@@ -257,6 +339,7 @@ export default function BoardScreen() {
             grid={grid}
             library={library}
             strokeWidth={strokeWidth}
+            showNames={showNames}
             onStrokeWidthChange={pickStrokeWidth}
             onStatus={setStatus}
             onPeers={(ps, selfId) => setPeers(ps.map((p) => ({ ...p, self: p.peer_id === selfId })))}
@@ -286,6 +369,60 @@ export default function BoardScreen() {
 
 function initials(n) {
   return (n || "?").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+}
+
+/* Ikonki rysowane w miejscu: dwie sztuki nie są warte zależności, a tak
+   biorą kolor z przycisku (również w stanie „włączone"). */
+function IkonaKratki() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor"
+         strokeWidth="1.3" aria-hidden="true" focusable="false">
+      <rect x="1.5" y="1.5" width="13" height="13" rx="1.5" />
+      <path d="M6 1.5v13M10.5 1.5v13M1.5 6h13M1.5 10.5h13" />
+    </svg>
+  );
+}
+
+function IkonaPelnegoEkranu({ wlaczony }) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor"
+         strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      {wlaczony
+        ? <path d="M6.5 1.5v5h-5M9.5 1.5v5h5M6.5 14.5v-5h-5M9.5 14.5v-5h5" />
+        : <path d="M1.5 5.5v-4h4M14.5 5.5v-4h-4M1.5 10.5v4h4M14.5 10.5v4h-4" />}
+    </svg>
+  );
+}
+
+/**
+ * Przycisk z listą rozwijaną: lista stron i menu „⋯". Zamyka się kliknięciem
+ * w dowolny element listy, kliknięciem obok i Escapem.
+ */
+function Menu({ label, title, ariaLabel, className = "", children }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const obok = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    const esc = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", obok);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", obok);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  return (
+    <div className={`tablica-menu ${className}`} ref={ref}>
+      <button className="ghost tablica-btn" onClick={() => setOpen((o) => !o)}
+              aria-haspopup="menu" aria-expanded={open} aria-label={ariaLabel} title={title}>
+        {label}
+      </button>
+      {open && (
+        <div className="tablica-menu-lista" role="menu" onClick={() => setOpen(false)}>{children}</div>
+      )}
+    </div>
+  );
 }
 
 function read(key) { try { return localStorage.getItem(key); } catch { return null; } }

@@ -75,7 +75,10 @@ test.describe("tablica", () => {
     await expect(guest.getByRole("link", { name: "Kalendarz" })).toHaveCount(0);
     await expect(guest.getByRole("link", { name: "Panel" })).toHaveCount(0);
     await expect(guest.getByRole("button", { name: "Nowa strona" })).toHaveCount(0);
-    await expect(guest.getByRole("button", { name: "Kasia" })).toBeVisible();
+    // Imię gościa siedzi w menu „⋯" razem z resztą akcji paska.
+    await guest.locator(".tablica-wiecej button").click();
+    await expect(guest.getByRole("menuitem", { name: "Zmień imię (Kasia)" })).toBeVisible();
+    await guest.keyboard.press("Escape");
 
     // Odświeżenie: imię zapamiętane, bez ponownego pytania.
     await guest.reload();
@@ -85,8 +88,10 @@ test.describe("tablica", () => {
     // Właściciel z ciasteczkiem widzi swoje narzędzia.
     await page.goto(path);
     await waitForBoard(page);
-    await expect(page.getByRole("link", { name: "Panel" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Nowa strona" })).toBeVisible();
+    await page.locator(".tablica-wiecej button").click();
+    await expect(page.getByRole("menuitem", { name: "Panel" })).toBeVisible();
+    await page.keyboard.press("Escape");
     await guestCtx.close();
   });
 
@@ -334,6 +339,121 @@ test.describe("tablica", () => {
     await guest.goto(new URL(newLink).pathname);
     await guest.getByRole("button", { name: "Gotowe" }).click();
     await waitForBoard(guest);
+    await guestCtx.close();
+  });
+
+  test("przy wielu stronach pasek nie gubi plusa ani dostępu do stron", async ({ page }) => {
+    const { path, token } = await createBoard(page, "Dużo stron E2E");
+    for (let i = 0; i < 11; i++) {
+      const res = await page.request.post(`/api/t/${token}/pages`, { data: { title: `Strona ${i + 2}` } });
+      expect(res.ok()).toBeTruthy();
+    }
+    await page.goto(path);
+    await waitForBoard(page);
+
+    const widoczny = (sel) => page.evaluate((s) => {
+      const e = document.querySelector(s);
+      if (!e) return false;
+      const r = e.getBoundingClientRect();
+      return r.width > 0 && r.left >= -1 && r.right <= window.innerWidth + 1;
+    }, sel);
+
+    // Na pasku kilka ostatnich stron, cała lista w menu - a „+" i menu
+    // zostają na ekranie także wtedy, gdy okno jest wąskie jak na telefonie.
+    for (const width of [1280, 900, 700, 560]) {
+      await page.setViewportSize({ width, height: 760 });
+      await page.waitForTimeout(300);
+      expect.soft(await widoczny(".tablica-add"), `+ przy ${width}px`).toBe(true);
+      expect.soft(await widoczny(".tablica-strony-menu"), `menu stron przy ${width}px`).toBe(true);
+      expect.soft(await widoczny(".tablica-wiecej"), `menu ⋯ przy ${width}px`).toBe(true);
+    }
+    expect(await page.locator(".tablica-pages .tablica-page").count()).toBeLessThanOrEqual(5);
+
+    // Z menu da się wejść na stronę, której na pasku nie ma.
+    await page.setViewportSize({ width: 1280, height: 760 });
+    await page.getByRole("button", { name: "Strony (12)" }).click();
+    const pozycje = page.locator(".tablica-strony-menu [role=menuitem]");
+    await expect(pozycje).toHaveCount(12);
+    const pierwsza = await pozycje.first().innerText();
+    await pozycje.first().click();
+    // Wybrana strona dołącza do paska, nawet gdy jest daleko poza ostatnimi.
+    await expect(page.locator(".tablica-pages .tablica-page.active")).toHaveText(pierwsza);
+
+    // Hamburger Excalidrawa schowany - jego pozycje są w „⋯".
+    expect(await widoczny(".main-menu-trigger")).toBe(false);
+  });
+
+  test("kratka i pełny ekran: ikonki na pasku, nie w menu", async ({ page }) => {
+    const { path } = await createBoard(page, "Ikonki E2E");
+    await page.goto(path);
+    await waitForBoard(page);
+
+    const kratka = page.getByRole("button", { name: "Kratka" });
+    const pelny = page.getByRole("button", { name: "Pełny ekran" });
+    await expect(kratka).toBeVisible();
+    await expect(pelny).toBeVisible();
+
+    // Kratka: stan przełącznika przeżywa odświeżenie (ustawienie tej
+    // przeglądarki) - a appState Excalidrawa jej nie raportuje, więc sprawdzamy
+    // nasz przycisk, nie jego pole.
+    await expect(kratka).toHaveAttribute("aria-pressed", "false");
+    await kratka.click();
+    await expect(kratka).toHaveAttribute("aria-pressed", "true");
+    await page.reload();
+    await waitForBoard(page);
+    await expect(page.getByRole("button", { name: "Kratka" })).toHaveAttribute("aria-pressed", "true");
+
+    // Pełny ekran obejmuje cały dokument, żeby dialogi spoza drzewa tablicy
+    // (potwierdzenia) nie zniknęły razem z nim.
+    await pelny.click();
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement?.tagName || null)).toBe("HTML");
+    const wyjscie = page.getByRole("button", { name: "Wyjdź z pełnego ekranu" });
+    await expect(wyjscie).toBeVisible();
+    await wyjscie.click();
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement?.tagName || null)).toBe(null);
+
+    // W menu „⋯" ich nie ma - są pod ręką na pasku.
+    await page.locator(".tablica-wiecej button").click();
+    const pozycje = await page.locator(".tablica-wiecej [role=menuitem]").allInnerTexts();
+    expect(pozycje.join(" ")).not.toMatch(/Kratka|ełny ekran/);
+  });
+
+  test("imiona przy kursorach: przełącznik w menu i skrót I", async ({ page, browser }) => {
+    const { path } = await createBoard(page, "Imiona E2E");
+    const guestCtx = await guestContext(browser);
+    const guest = await guestCtx.newPage();
+    await page.goto(path);
+    await waitForBoard(page);
+    await guest.goto(path);
+    await guest.getByLabel("Imię").fill("Kasia");
+    await guest.getByRole("button", { name: "Gotowe" }).click();
+    await waitForBoard(guest);
+
+    // Gość rusza kursorem - u właściciela pojawia się kursor z imieniem.
+    const canvasGoscia = guest.locator(".excalidraw__canvas.interactive");
+    const box = await canvasGoscia.boundingBox();
+    await guest.mouse.move(box.x + 120, box.y + 120);
+    await guest.mouse.move(box.x + 160, box.y + 140);
+    const imiona = () => page.evaluate(
+      () => [...window.__tablicaAPI.getAppState().collaborators.values()].map((c) => c.username || ""));
+    await expect.poll(imiona, { timeout: 10_000 }).toEqual(["Kasia"]);
+
+    // Skrót I chowa etykiety, nie ruszając samych kursorów.
+    await page.keyboard.press("i");
+    await expect.poll(imiona, { timeout: 5_000 }).toEqual([""]);
+    await page.keyboard.press("i");
+    await expect.poll(imiona, { timeout: 5_000 }).toEqual(["Kasia"]);
+
+    // To samo z menu „⋯".
+    await page.locator(".tablica-wiecej button").click();
+    await page.getByRole("menuitem", { name: /Imiona przy kursorach/ }).click();
+    await expect.poll(imiona, { timeout: 5_000 }).toEqual([""]);
+
+    // Litera wpisywana w pole tekstowe nie jest skrótem.
+    await page.locator(".tablica-pages .tablica-page.active").dblclick();
+    await page.getByLabel("Tytuł").fill("iii");
+    await expect.poll(imiona, { timeout: 3_000 }).toEqual([""]);
+    await page.getByRole("button", { name: "Anuluj" }).click();
     await guestCtx.close();
   });
 
