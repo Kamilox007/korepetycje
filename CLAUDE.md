@@ -181,7 +181,9 @@ The board route is mounted in
 `App.jsx` **before** the `api.me()` login gate. Playwright reads the canvas through
 `window.__tablicaAPI`, exposed only on the dev server. Built-in library shapes live in
 `tablica/library.js` and must keep fixed `id`/`versionNonce`/`index` (Excalidraw dedupes on
-them; without that they multiply on every open). The stroke-width slider is injected into
+them; without that they multiply on every open); `library.test.js` checks ids, indices and the
+table/shape inventory, and multi-element shapes are wrapped in a fixed `groupIds` so an
+inserted table moves as one piece. The stroke-width slider is injected into
 Excalidraw's properties panel by a `MutationObserver` + portal (`PageEditor.jsx`) — it depends
 on Excalidraw's `data-testid="strokeWidth-*"`; if an upgrade renames them the slider silently
 disappears and the stock buttons return. That panel also pads every `<input>` with
