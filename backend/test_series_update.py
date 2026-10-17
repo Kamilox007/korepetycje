@@ -146,6 +146,31 @@ with TestClient(app) as c:
 
     check("unknown series -> 404", c.patch("/api/series/99999", json={"level": "podstawa"}).status_code == 404)
 
+    # --- every weekday change, independent of the day CI happens to run ---
+    # The check above only bites when the new weekday falls earlier in the
+    # week than the old one relative to today, so it passed on some days and
+    # failed on others. Here all six shifts run on fresh series.
+    today = date.today()
+    for shift in range(1, 7):
+        st = today - timedelta(days=7)
+        sr = c.post("/api/series", json={
+            "student_id": sid, "weekday": st.weekday(), "start_time": "10:00:00",
+            "price": 80, "start_date": str(st), "end_date": str(today + timedelta(days=30)),
+        }).json()
+        target = (st.weekday() + shift) % 7
+        c.patch(f"/api/series/{sr['id']}", json={"weekday": target})
+        db = SessionLocal()
+        rows = db.query(models.Lesson).filter_by(series_id=sr["id"]).all()
+        moved = [l for l in rows if not l.completed and l.date >= today]
+        old_past = [l for l in rows if l.date < today]
+        check(f"shift +{shift}: no lesson lands in the past",
+              all(l.date.weekday() == st.weekday() for l in old_past))
+        check(f"shift +{shift}: future lessons sit on the new weekday",
+              moved and all(l.date.weekday() == target for l in moved))
+        check(f"shift +{shift}: nothing past the series end",
+              all(l.date <= today + timedelta(days=30) for l in rows))
+        db.close()
+
 print()
 print("FAILURES:", FAILS if FAILS else "none")
 sys.exit(1 if FAILS else 0)
