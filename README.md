@@ -84,12 +84,18 @@ Moduł tablicy interaktywnej (Excalidraw) do prowadzenia korepetycji online.
   każdego - bryły w rzucie ukośnym z przerywanymi krawędziami niewidocznymi
   (prostopadłościan, sześcian, graniastosłup, ostrosłupy, walec, stożek,
   kula), matematyka (układ współrzędnych, oś liczbowa, okrąg
-  trygonometryczny, trójkąty, kąt, parabola, sinusoida) i chemia (pierścień
-  benzenowy, cykloheksan, łańcuch, wiązania, strzałki reakcji i równowagi,
-  cząsteczka wody, klatki orbitalne, probówka, zlewka, kolba).
+  trygonometryczny, trójkąty, kąt, parabola, sinusoida), czworokąty (romb,
+  równoległobok, trapez równoramienny i prostokątny), tabele od 3×3 do 9×9
+  z numerami wierszy i kolumn od 1 oraz chemia (pierścień benzenowy,
+  cykloheksan, probówka, zlewka, kolba). Czworokąty i tabele wstawiają się
+  jako jedna grupa - przesuwa się je w całości, nie po kresce.
   Własne rysunki dodane przez „dodaj do biblioteki" zapisują się **na
   koncie** (ta sama biblioteka na każdym urządzeniu), u gościa - w jego
-  przeglądarce.
+  przeglądarce. Żeby coś trafiło do wbudowanych (dla wszystkich), trzeba to
+  dopisać w `frontend/src/tablica/library.js` i wdrożyć - z poziomu
+  aplikacji się nie da. Przycisk **„Opublikuj"** w panelu biblioteki nie
+  udostępnia niczego w aplikacji: wysyła kształty do publicznego
+  repozytorium Excalidrawa w internecie.
 - **Kratka** (ikonka na pasku) - ustawienie widoku tylko dla tego, kto ją
   włączył, pamiętane per tablica w przeglądarce.
 - **Pełny ekran** (ikonka obok kratki) - chowa pasek adresu przeglądarki, co

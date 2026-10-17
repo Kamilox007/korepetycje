@@ -66,6 +66,12 @@ function halfEllipse(cx, cy, rx, ry, front, n = 14) {
 /** Zamknięty wielokąt (ostatni punkt = pierwszy). */
 const poly = (item, pts, opts) => line(item, [...pts, pts[0]], opts);
 
+/** Wspólna grupa dla całego kształtu: po wstawieniu łapie się go i przesuwa
+ *  w całości, a nie po jednej kresce - przy tabeli 9×9 to 38 elementów.
+ *  Stałe id grupy, z tego samego powodu co stałe id elementów. */
+const grouped = (name, elements) =>
+  elements.map((e) => ({ ...e, groupIds: [`${BUILTIN_PREFIX}grupa-${name}`] }));
+
 function cuboid(name, w, h, dx, dy) {
   // przód: A(0,h) B(w,h) C(w,0) D(0,0); tył przesunięty o (dx,-dy)
   const A = [0, h + dy], B = [w, h + dy], C = [w, dy], D = [0, dy];
@@ -284,6 +290,53 @@ function sine(name) {
   ];
 }
 
+// ---------------------------------------------------------------- czworokąty
+
+function rhombus(name) {
+  // przekątne 180 i 110: wszystkie boki równe, a jednak nie kwadrat
+  return grouped(name, [poly(name, [[90, 0], [180, 55], [90, 110], [0, 55]])]);
+}
+
+function parallelogram(name) {
+  return grouped(name, [poly(name, [[50, 0], [220, 0], [170, 110], [0, 110]])]);
+}
+
+function isoscelesTrapezoid(name) {
+  return grouped(name, [poly(name, [[50, 0], [170, 0], [220, 110], [0, 110]])]);
+}
+
+function rightTrapezoid(name) {
+  const h = 110, m = 16;   // m - znak kąta prostego, jak w trójkącie prostokątnym
+  return grouped(name, [
+    poly(name, [[0, 0], [130, 0], [210, h], [0, h]]),
+    line(name, [[m, 0], [m, m], [0, m]]),
+    line(name, [[0, h - m], [m, h - m], [m, h]]),
+  ]);
+}
+
+// ---------------------------------------------------------------- tabele
+
+/** Tabela n×n z numerami kolumn (u góry) i wierszy (z lewej) od 1. Siatka
+ *  z linii, nie z prostokąta na każdą kratkę: przy 9×9 to 38 elementów
+ *  zamiast 99, a wygląda tak samo. */
+function table(name, n, c = 40) {
+  const size = n * c, out = [];
+  for (let i = 0; i <= n; i++) {
+    out.push(line(name, [[i * c, 0], [i * c, size]]));
+    out.push(line(name, [[0, i * c], [size, i * c]]));
+  }
+  for (let i = 0; i < n; i++) {
+    const nad = text(name, 0, 0, String(i + 1));
+    nad.x = i * c + (c - nad.width) / 2;
+    nad.y = -nad.height - 4;
+    const obok = text(name, 0, 0, String(i + 1));
+    obok.x = -obok.width - 8;
+    obok.y = i * c + (c - obok.height) / 2;
+    out.push(nad, obok);
+  }
+  return grouped(name, out);
+}
+
 // ---------------------------------------------------------------- chemia
 
 function hexagon(cx, cy, r) {
@@ -305,63 +358,11 @@ function cyclohexane(name) {
   return [poly(name, hexagon(r, r, r))];
 }
 
-function zigzag(name) {
-  const pts = [];
-  for (let i = 0; i < 6; i++) pts.push([i * 40, i % 2 ? 0 : 30]);
-  return [line(name, pts)];
-}
 
-function bonds(name) {
-  const out = [];
-  [[0, 1], [50, 2], [100, 3]].forEach(([y, n]) => {
-    for (let k = 0; k < n; k++) {
-      const off = (k - (n - 1) / 2) * 6;
-      out.push(line(name, [[0, y + off], [90, y + off]]));
-    }
-  });
-  return out;
-}
 
-function reactionArrow(name) {
-  return [arrow(name, [[0, 20], [140, 20]])];
-}
 
-function equilibrium(name) {
-  // dwie strzałki w przeciwne strony, jak ⇌
-  return [
-    arrow(name, [[0, 14], [140, 14]]),
-    arrow(name, [[140, 30], [0, 30]]),
-  ];
-}
 
-function water(name) {
-  const O = [80, 50], H1 = [20, 100], H2 = [140, 100];
-  // wiązanie od brzegu do brzegu kółek, nie przez ich środki
-  const bond = (P, rp, Q, rq) => {
-    const dx = Q[0] - P[0], dy = Q[1] - P[1], d = Math.hypot(dx, dy);
-    return line(name, [[P[0] + (dx / d) * rp, P[1] + (dy / d) * rp], [Q[0] - (dx / d) * rq, Q[1] - (dy / d) * rq]]);
-  };
-  return [
-    bond(O, 22, H1, 15), bond(O, 22, H2, 15),
-    ellipse(name, O[0] - 22, O[1] - 22, 44, 44),
-    ellipse(name, H1[0] - 15, H1[1] - 15, 30, 30),
-    ellipse(name, H2[0] - 15, H2[1] - 15, 30, 30),
-    text(name, O[0] - 8, O[1] - 11, "O", 18),
-    text(name, H1[0] - 6, H1[1] - 9, "H", 15),
-    text(name, H2[0] - 6, H2[1] - 9, "H", 15),
-  ];
-}
 
-function orbitals(name) {
-  const out = [];
-  for (let i = 0; i < 3; i++) {
-    const x = i * 44;
-    out.push(poly(name, [[x, 0], [x + 36, 0], [x + 36, 36], [x, 36]]));
-  }
-  out.push(arrow(name, [[10, 30], [10, 6]]), arrow(name, [[26, 6], [26, 30]]));   // ↑↓
-  out.push(arrow(name, [[54, 30], [54, 6]]));                                     // ↑
-  return out;
-}
 
 function testTube(name) {
   const w = 40, h = 150;
@@ -416,15 +417,16 @@ const BUILTIN_SHAPES = [
   ["Kąt α", () => angle("kat")],
   ["Parabola na osiach", () => parabola("parabola")],
   ["Sinusoida", () => sine("sinus")],
+  // --- czworokąty ---
+  ["Romb", () => rhombus("romb")],
+  ["Równoległobok", () => parallelogram("rownoleglobok")],
+  ["Trapez równoramienny", () => isoscelesTrapezoid("trapez-rownoramienny")],
+  ["Trapez prostokątny", () => rightTrapezoid("trapez-prostokatny")],
+  // --- tabele ---
+  ...[3, 4, 5, 6, 7, 8, 9].map((n) => [`Tabela ${n}×${n}`, () => table(`tabela-${n}`, n)]),
   // --- chemia ---
   ["Pierścień benzenowy", () => benzene("benzen")],
   ["Cykloheksan", () => cyclohexane("cykloheksan")],
-  ["Łańcuch węglowy (zygzak)", () => zigzag("zygzak")],
-  ["Wiązania: pojedyncze, podwójne, potrójne", () => bonds("wiazania")],
-  ["Strzałka reakcji", () => reactionArrow("reakcja")],
-  ["Strzałki równowagi", () => equilibrium("rownowaga")],
-  ["Cząsteczka wody", () => water("woda")],
-  ["Klatki orbitalne", () => orbitals("orbitale")],
   ["Probówka", () => testTube("probowka")],
   ["Zlewka", () => beaker("zlewka")],
   ["Kolba stożkowa", () => flask("kolba")],
