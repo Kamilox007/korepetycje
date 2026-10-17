@@ -474,7 +474,10 @@ chwytają pola po widocznym tekście zamiast po strukturze HTML.
 **Edycja serii propaguje się zależnie od rodzaju pola.** Metadane (przedmiot,
 poziom, prowadzący) trafiają na wszystkie przyszłe zajęcia, także te ręcznie
 przesunięte - opisują, czym zajęcia są, niezależnie od terminu. Zmiana terminu
-pomija zajęcia z ręcznie zmienioną datą, bo cofnęłaby czyjąś decyzję. Cena idzie
+pomija zajęcia z ręcznie zmienioną datą, bo cofnęłaby czyjąś decyzję. Zmiana dnia
+tygodnia przesuwa zajęcia zawsze **do przodu**, na najbliższy nowy dzień (sobota na
+poniedziałek = +2 dni, nie -5): przesunięcie w tył lądowało z bieżącymi zajęciami
+w przeszłości. Co po przesunięciu wypada za datą końca serii, jest usuwane. Cena idzie
 na przyszłe; odbyte zachowują stawkę zamrożoną w momencie odbycia.
 
 **Usunięcie ucznia archiwizuje, nie kasuje.** `cascade delete` na wpłatach

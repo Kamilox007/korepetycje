@@ -795,11 +795,19 @@ def update_series(
         # Shift by the weekday delta rather than deleting and regenerating:
         # origin_date moves with the lesson, so the (series_id, origin_date)
         # constraint holds and the generator lines up with the new slots.
-        delta = timedelta(days=data["weekday"] - old_weekday)
+        # Always FORWARD (0..6 days): a signed delta moved e.g. Saturday ->
+        # Monday by -5 days, which put this week's lesson in the past.
+        delta = timedelta(days=(data["weekday"] - old_weekday) % 7)
         for lesson in untouched.all():
             lesson.date = lesson.date + delta
             if lesson.origin_date:
                 lesson.origin_date = lesson.origin_date + delta
+        # Shifting forward can push the last lessons past the series end.
+        # The session has autoflush off, so flush first - otherwise the
+        # filter below would see the old dates and drop nothing.
+        if series.end_date:
+            db.flush()
+            _delete_lessons(db, untouched.filter(models.Lesson.date > series.end_date))
 
     # An end date pulled earlier drops occurrences past it.
     if data.get("end_date"):
