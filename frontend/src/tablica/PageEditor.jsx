@@ -6,6 +6,7 @@ import { api } from "../api";
 import { PageSync, fetchFileData } from "./sync";
 import { BUILTIN_LIBRARY, isBuiltin, makeLibrarySaver } from "./library";
 import { STROKE_MIN, STROKE_MAX } from "./stroke";
+import { poprawKoncowki } from "./kreski";
 
 /**
  * Jedna strona tablicy w Excalidrawie.
@@ -169,6 +170,35 @@ const PageEditor = forwardRef(function PageEditor(
   // uploadzie, ale między jego POST a naszym GET może być chwila - stąd
   // kilka prób z odstępem zamiast jednego strzału.
   const penModeRef = useRef(false);
+  // Kreska odręczna w trakcie rysowania (id) - żeby złapać chwilę, w której
+  // się kończy, i poprawić jej końcówki (kreski.js: „3" zamieniane w „B").
+  const rysowana = useRef(null);
+  function poprawKreske(id) {
+    const a = apiRef.current;
+    if (!a) return;
+    const el = a.getSceneElementsIncludingDeleted().find((e) => e.id === id);
+    if (!el || el.isDeleted || el.type !== "freedraw") return;
+    const wynik = poprawKoncowki(el.points);
+    if (!wynik) return;
+    // Nacisk rysika idzie punkt w punkt z punktami - odcinamy te same końce.
+    let pressures = el.pressures;
+    if (!el.simulatePressure && Array.isArray(pressures) && pressures.length === el.points.length) {
+      pressures = pressures.slice(wynik.zPoczatku, pressures.length - wynik.zKonca);
+    }
+    a.updateScene({
+      elements: a.getSceneElementsIncludingDeleted().map((e) => (e.id !== id ? e : {
+        ...e, points: wynik.points, pressures,
+        x: e.x + wynik.dx, y: e.y + wynik.dy, width: wynik.width, height: wynik.height,
+        lastCommittedPoint: null, version: e.version + 1,
+        versionNonce: Math.floor(Math.random() * 2 ** 31), updated: Date.now(),
+      })),
+      // Poprawka jest nasza, nie użytkownika - nie osobny krok w Ctrl+Z.
+      captureUpdate: CaptureUpdateAction.NEVER,
+    });
+    // Po własnym updateScene Excalidraw nie zawsze zgłasza onChange, a ta
+    // wersja ma wyjść do pozostałych od razu, zanim zobaczą „B".
+    syncRef.current?.handleChange(a.getSceneElementsIncludingDeleted(), a.getFiles());
+  }
   const fetching = useRef(new Set());
   async function fetchMissingFiles(elements) {
     const a = apiRef.current;
@@ -440,6 +470,14 @@ const PageEditor = forwardRef(function PageEditor(
         saveLibrary(items);
       }}
       onChange={(elements, appState, files) => {
+        // Kreska odręczna właśnie się skończyła: poprawka końcówek. Po
+        // bieżącym onChange, żeby nie zmieniać sceny w trakcie jej zgłaszania.
+        const teraz = appState.newElement?.type === "freedraw" ? appState.newElement.id : null;
+        if (rysowana.current && rysowana.current !== teraz) {
+          const skonczona = rysowana.current;
+          setTimeout(() => poprawKreske(skonczona), 0);
+        }
+        rysowana.current = teraz;
         syncRef.current?.handleChange(elements, files);
         saveView(appState);
         // Tryb rysika Excalidraw potrafi włączyć sam (pierwsze dotknięcie

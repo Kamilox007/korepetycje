@@ -110,6 +110,14 @@ Moduł tablicy interaktywnej (Excalidraw) do prowadzenia korepetycji online.
   pobieranie, PDF, motyw, imiona, usuwanie strony, powrót do panelu -
   siedzi w menu **⋯** po prawej. Hamburger Excalidrawa jest schowany, bo
   wszystko z niego jest w **⋯**.
+- **Naprawa końcówek kresek.** Część tabletów i telefonów zgłasza skrajny
+  punkt kreski w złym miejscu - zwykle tam, gdzie się zaczęła - i Excalidraw
+  dokleja odcinek domykający: ręcznie pisana „3" robi się „B". Na produkcji
+  były takich kresek setki, u jednych osób stale, u innych wcale. Gdy kreska
+  się kończy, `tablica/kreski.js` usuwa skrajny punkt, który jest naraz
+  wyraźnym skokiem i ostrym zawrotem (szybki ruch ręki na końcu idzie dalej
+  w tę samą stronę, więc zostaje). Poprawiona wersja idzie do pozostałych
+  osób jak zwykła zmiana.
 - **Dotyk na tablecie**: jeden palec rysuje, dwa palce przesuwają i
   przybliżają. W trybie rysika (niżej) palec nie rysuje, tylko przesuwa -
   ale wyłącznie wtedy, gdy pióro nie dotyka ekranu, żeby dłoń sunąca

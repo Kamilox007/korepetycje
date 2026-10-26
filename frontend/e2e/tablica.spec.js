@@ -509,6 +509,75 @@ test.describe("tablica", () => {
     for (const p of paddingi) expect(p).toBe("0px");
   });
 
+  test("„3” nie zamienia się w „B”, gdy urządzenie zgłosi ostatni punkt na starcie kreski", async ({ page, browser }) => {
+    const { path } = await createBoard(page, "Trójki E2E");
+    const ctx = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+      viewport: { width: 1024, height: 768 }, hasTouch: true,
+    });
+    const tablet = await ctx.newPage();
+    await tablet.goto(path);
+    await tablet.getByLabel("Imię").fill("Uczeń");
+    await tablet.getByRole("button", { name: "Gotowe" }).click();
+    await waitForBoard(tablet);
+    await tablet.evaluate(() => window.__tablicaAPI.setActiveTool({ type: "freedraw" }));
+    const cdp = await ctx.newCDPSession(tablet);
+    const dotyk = (type, p) => cdp.send("Input.dispatchTouchEvent", {
+      type, touchPoints: p ? [{ x: p[0], y: p[1], id: 1, radiusX: 4, radiusY: 4, force: 1 }] : [],
+    });
+
+    // Ręcznie pisana „3": start u góry z lewej, dwa brzuszki, koniec na dole z lewej.
+    const trojka = (ox, oy) => {
+      const pts = [];
+      for (let t = 0; t <= 1.0001; t += 0.05) pts.push([ox + 40 * Math.sin(Math.PI * t) + 10 * t, oy + 50 * t]);
+      for (let t = 0.05; t <= 1.0001; t += 0.05) pts.push([ox + 45 * Math.sin(Math.PI * t), oy + 50 + 50 * t]);
+      return pts.map(([x, y]) => [Math.round(x), Math.round(y)]);
+    };
+    const napisz = async (pts) => {
+      await dotyk("touchStart", pts[0]);
+      for (const p of pts.slice(1)) { await dotyk("touchMove", p); await tablet.waitForTimeout(12); }
+      await dotyk("touchEnd");
+      await tablet.waitForTimeout(500);
+    };
+    const kreski = () => tablet.evaluate(() => window.__tablicaAPI.getSceneElements()
+      .filter((e) => e.type === "freedraw" && !e.isDeleted)
+      .map((e) => {
+        // najdłuższy z ostatnich trzech odcinków - przy „B" to ten domykający
+        const p = e.points, ost = [];
+        for (let i = Math.max(1, p.length - 3); i < p.length; i++) ost.push(Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]));
+        return { id: e.id, n: p.length, h: Math.round(e.height), ostatni: p.at(-1), koncowka: Math.round(Math.max(...ost)) };
+      }));
+
+    // Zwykła „3" - nic nie może zniknąć.
+    const zwykla = trojka(300, 250);
+    await napisz(zwykla);
+    const [pierwsza] = await kreski();
+    expect(pierwsza.h).toBeGreaterThan(90);
+
+    // „3" z usterką: ostatni ruch wraca na start - bez poprawki to jest „B".
+    const zUsterka = trojka(500, 250);
+    await napisz([...zUsterka, zUsterka[0]]);
+    const druga = (await kreski()).find((k) => k.id !== pierwsza.id);
+    // Ostatni punkt kończy się na dole trójki, a nie na jej górze.
+    expect(druga.ostatni[1]).toBeGreaterThan(80);
+    // Bez odcinka domykającego (w „B" ma ~100 px), żaden prawdziwy punkt nie zginął.
+    expect(druga.koncowka).toBeLessThan(20);
+    expect(druga.n).toBeGreaterThanOrEqual(pierwsza.n - 1);
+    expect(pierwsza.koncowka).toBeLessThan(20);
+
+    // Poprawiona wersja trafia na serwer, więc inni też widzą „3".
+    const naSerwerze = await page.request.get(`/api/t/${path.split("/t/")[1]}`)
+      .then((r) => r.json())
+      .then((b) => page.request.get(`/api/t/${path.split("/t/")[1]}/pages/${b.pages[0].id}`))
+      .then((r) => r.json());
+    await expect.poll(async () => {
+      const r = await page.request.get(`/api/t/${path.split("/t/")[1]}/pages/${naSerwerze.id}`);
+      const el = (await r.json()).elements.find((e) => e.id === druga.id);
+      return el ? el.points.at(-1)[1] > 80 : false;
+    }, { timeout: 20_000 }).toBe(true);
+    await ctx.close();
+  });
+
   test("kratka i pełny ekran: ikonki na pasku, nie w menu", async ({ page }) => {
     const { path } = await createBoard(page, "Ikonki E2E");
     await page.goto(path);

@@ -208,7 +208,11 @@ which is what makes pinch zoom work with the pencil without giving up palm rejec
 pen mode makes Excalidraw drop touch input entirely, `PageEditor` also pans the viewport
 itself on a one-finger drag (drawing tools only, 8 px threshold), gated on no
 `pointerType: "pen"` being down — without that gate a palm sliding along the screen while
-writing would scroll the board. Cursor name labels are toggled with `I` (checked empirically: of b c g i j m n s u
+writing would scroll the board. When a freedraw stroke finishes (`appState.newElement` leaves it), `PageEditor` runs
+`tablica/kreski.js` on it: some devices report the last (or first) point back at the stroke
+start, often twice, which closes a handwritten "3" into a "B"; an end point that is both an
+outlier jump and a sharp reversal is dropped and the fixed version re-sent with a version bump.
+Cursor name labels are toggled with `I` (checked empirically: of b c g i j m n s u
 w x y Excalidraw only binds x) by blanking `username` on the collaborators map. PDF export (`tablica/pdf.js`) renders pages via
 `exportToBlob` and lazy-loads jsPDF; pass `"FAST"` compression to `addImage` or PDFs balloon.
 
