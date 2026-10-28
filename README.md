@@ -560,7 +560,7 @@ ekranie.
 
 **Tablica: pokoje w pamięci jednego procesu.** Otwarta strona ma pokój
 w słowniku procesu `api`; serwer jest autorytatywny, baza to siatka
-bezpieczeństwa na restart (zapis co 15 s i przy wyjściu ostatniej osoby),
+bezpieczeństwa na restart (zapis co 60 s i przy wyjściu ostatniej osoby),
 nie kanał synchronizacji. Stąd **wymóg jednego workera uvicorna** - patrz
 „Wdrożenie". Skalowanie poziome wymagałoby Redis pub/sub; przy tej skali
 celowo go nie ma i nie ma pod niego abstrakcji.

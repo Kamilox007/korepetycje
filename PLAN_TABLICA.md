@@ -121,9 +121,14 @@ snapshotu bazy i do strumienia replikacji Litestreama.
 
 ### 2.5 Zapis sceny jest zdebounce'owany
 
-Autozapis nie częściej niż **co 15 sekund** plus przy opuszczaniu strony.
-Częstszy zapis nic nie daje (strata 15 s rysowania jest nieistotna),
+Autozapis nie częściej niż **co 60 sekund** plus przy opuszczaniu strony.
+Częstszy zapis nic nie daje (strata minuty rysowania jest nieistotna),
 a mnoży ruch WAL do Backblaze.
+
+Pierwotnie było 15 s. Na produkcji strona sceny waży średnio ok. 1,8 MB
+(104 strony = 183 MB JSON), a każdy zapis przepisuje ją w całości, więc
+miesiąc lekcji dał ok. 6,2 GB samego WAL w B2 (darmowy limit to 10 GB).
+Dlatego 60 s.
 
 ### 2.6 Rotacja tokenu zamiast wygasania
 
@@ -501,7 +506,7 @@ Cykl życia pokoju:
 - **Ostatnie wyjście** — zapisz, jeśli `dirty`, i usuń pokój ze słownika.
   Pokój bez klientów nie ma prawa zostać w pamięci.
 - **Zapis okresowy** — zadanie w tle (`asyncio.create_task` w `lifespan`)
-  zapisuje brudne pokoje nie częściej niż **co 15 s** (decyzja 2.5). Zapis
+  zapisuje brudne pokoje nie częściej niż **co 60 s** (decyzja 2.5). Zapis
   przechodzi przez tę samą regułę snapshotu co `PUT` (decyzja 2.7)
   i inkrementuje `rev`.
 
