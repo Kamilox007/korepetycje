@@ -26,9 +26,12 @@ from .database import SessionLocal
 
 log = logging.getLogger("uvicorn.error")
 
-# Decision 2.5: a save at most this often per room. A lost 15 s of drawing is
-# nothing; a WAL frame every keystroke to Backblaze is not.
-SAVE_INTERVAL_SECONDS = 15
+# Decision 2.5: a save at most this often per room. Every save rewrites the
+# page's whole scene (JSON, ~1.8 MB per page on average in production) into the
+# WAL that Litestream ships to Backblaze: at 15 s that was ~6 GB of the free
+# 10 GB in a month of lessons. A hard crash now loses up to a minute of
+# drawing; a normal restart or the last person leaving still saves at once.
+SAVE_INTERVAL_SECONDS = 60
 FLUSH_TICK_SECONDS = 3
 # Bigger than this is not a drawing update.
 MAX_MESSAGE_BYTES = 1024 * 1024

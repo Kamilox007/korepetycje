@@ -170,7 +170,8 @@ first character encodes the integer-part length, so `"b9"` or `"d1"` make Excali
 `invalid order key` inside its pointer handler, nobody on that page can draw any more, and
 every client still holding the element re-uploads it after a reconnect — one bad element
 poisons the board until the field is stripped (Excalidraw then regenerates it). Live sync lives in `boards_rooms.py`: one in-process room per open page,
-periodic save every 15 s, so uvicorn must stay at **one worker**. `PUT` on a page merges (never
+periodic save every 60 s (each save rewrites the whole scene, so a short interval floods
+Litestream's WAL and the free Backblaze quota), so uvicorn must stay at **one worker**. `PUT` on a page merges (never
 overwrites) and goes through the room when one is open. Image bytes never enter the database
 (`boards_files.py`, sha256-addressed files under `BOARD_FILES_PATH`); SQLite here does not
 enforce foreign keys, so every purge deletes children explicitly. Student materials (PDF,
