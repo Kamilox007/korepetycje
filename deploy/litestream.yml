@@ -14,6 +14,7 @@ dbs:
         # are a deliberate choice: a server crash costs at most the last
         # hour of edits. Changes are kept locally in the meantime.
         sync-interval: 1h
-        # How much history to keep. 720h = 30 days.
-        retention: 720h
+        # How much history to keep. 336h = 14 days: snapshots and WAL both scale
+        # with it, and at 30 days the replica was 7.6 GB of the free 10 GB.
+        retention: 336h
         snapshot-interval: 24h
