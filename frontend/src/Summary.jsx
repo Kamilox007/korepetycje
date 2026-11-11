@@ -189,17 +189,23 @@ export default function Summary({ refreshKey, tutorView = false, myRole }) {
           <div className="card">
             <table>
               <thead>
-                <tr><th>Korepetytor</th><th className="num">Zarobiono</th><th className="num">Limit</th><th className="num">Pozostało</th></tr>
+                <tr><th>Korepetytor</th><th className="num">Zarobiono</th><th className="num">Prognoza</th><th className="num">Limit</th><th className="num">Pozostało</th><th className="num">Po prognozie</th></tr>
               </thead>
               <tbody>
                 {limits.map((l) => (
                   <tr key={l.tutor_id}>
                     <td style={{ fontWeight: 500 }}>{l.tutor_name}</td>
                     <td className="num">{fmtMoney(l.earned)}</td>
+                    <td className="num">{l.forecast != null ? fmtMoney(l.forecast) : "—"}</td>
                     <td className="num">{l.limit != null ? fmtMoney(l.limit) : <span className="muted">brak</span>}</td>
                     <td className="num">
                       {l.remaining != null ? (
                         <BalanceBadge value={l.remaining} />
+                      ) : "—"}
+                    </td>
+                    <td className="num">
+                      {l.forecast_remaining != null ? (
+                        <BalanceBadge value={l.forecast_remaining} />
                       ) : "—"}
                     </td>
                   </tr>
@@ -249,6 +255,7 @@ export default function Summary({ refreshKey, tutorView = false, myRole }) {
                 <LimitProgressBar earned={myLimit.earned} limit={myLimit.limit} />
               </>
             )}
+            {myLimit.forecast != null && <QuarterForecast data={myLimit} />}
           </div>
         </>
       )}
@@ -340,6 +347,42 @@ function QuarterSelect({ value, onChange }) {
 // Green for a credit (or zero), red for money owed - the same reading everywhere.
 function BalanceBadge({ value }) {
   return <span className={`badge ${value >= 0 ? "done" : "due"}`}>{fmtMoney(value)}</span>;
+}
+
+/** What is still ahead in the current quarter, for a tutor's own card. */
+function QuarterForecast({ data }) {
+  return (
+    <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+      <div className="section-title">Do końca kwartału</div>
+      <div className="metrics" style={{ margin: "10px 0 8px" }}>
+        <div className="metric">
+          <div className="label">Zaplanowane zajęcia</div>
+          <div className="value">{data.upcoming_lessons}</div>
+        </div>
+        <div className="metric">
+          <div className="label">Ich wartość</div>
+          <div className="value">{fmtMoney(data.upcoming_value)}</div>
+        </div>
+        <div className="metric">
+          <div className="label">Prognoza przychodu</div>
+          <div className="value">{fmtMoney(data.forecast)}</div>
+        </div>
+        {data.forecast_remaining != null && (
+          <div className="metric">
+            <div className="label">Do limitu po prognozie</div>
+            <div className={`value ${data.forecast_remaining >= 0 ? "pos" : "neg"}`}>
+              {fmtMoney(data.forecast_remaining)}
+            </div>
+          </div>
+        )}
+      </div>
+      <p className="muted" style={{ fontSize: 12, margin: 0 }}>
+        Prognoza to wpłaty z tego kwartału plus to, co jeszcze wpłynie za zajęcia do jego końca.
+        Wpłaty z góry pokrywają zajęcia i nie liczą się podwójnie, a zaległości za odbyte zajęcia
+        są doliczane. To szacunek - zakłada, że wszystko zostanie opłacone do końca kwartału.
+      </p>
+    </div>
+  );
 }
 
 function LimitProgressBar({ earned, limit }) {
