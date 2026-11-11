@@ -10,6 +10,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from icalendar import Calendar, Event
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from . import models, schemas, services, auth, money, transfer_code, boards_rooms, boards_snapshots, boards_files
@@ -1240,6 +1241,49 @@ def _quarter_on(year: int | None, quarter: int | None) -> date:
     return date(year, (quarter - 1) * 3 + 1, 1)
 
 
+def _forecast_grosze(db: Session, tutor: models.User, today: date, end: date) -> tuple[int, int, int]:
+    """(upcoming lessons, their value, further payments expected) to `end`.
+
+    The lessons are this tutor's open ones from today to the end of the quarter.
+    Their value is not simply added to what was paid: per student, what is still
+    expected is the upcoming value plus whatever is owed for lessons already
+    held, minus any credit (an advance payment, from this quarter or an earlier
+    one, already covers them). A student with credit beyond their upcoming
+    lessons contributes nothing; one who owes contributes the debt too.
+    Assumes everything is paid by the end of the quarter - an estimate.
+    """
+    L, P, S = models.Lesson, models.Payment, models.Student
+    active = db.query(S.id).filter(S.archived_at.is_(None))
+    mine = L.assigned_tutor_id == tutor.id
+
+    upcoming = {
+        sid: (n, g or 0)
+        for sid, n, g in db.query(L.student_id, func.count(L.id), func.sum(L.price_grosze))
+        .filter(mine, L.completed.is_(False), L.cancelled.is_(False),
+                L.date >= today, L.date <= end, L.student_id.in_(active))
+        .group_by(L.student_id)
+    }
+    due = dict(
+        db.query(L.student_id, func.sum(L.price_grosze))
+        .filter(mine, L.completed.is_(True), L.cancelled.is_(False), L.student_id.in_(active))
+        .group_by(L.student_id)
+    )
+    paid = dict(
+        db.query(P.student_id, func.sum(P.amount_grosze))
+        .filter(P.assigned_tutor_id == tutor.id, P.student_id.in_(active))
+        .group_by(P.student_id)
+    )
+    expected = 0
+    for sid in set(upcoming) | set(due) | set(paid):
+        balance = (paid.get(sid) or 0) - (due.get(sid) or 0)
+        expected += max(0, upcoming.get(sid, (0, 0))[1] - balance)
+    return (
+        sum(n for n, _ in upcoming.values()),
+        sum(g for _, g in upcoming.values()),
+        expected,
+    )
+
+
 def _quarterly_progress(db: Session, tutor: models.User, on: date | None = None) -> schemas.QuarterlyLimitOut:
     """This tutor's income against the quarterly limit, cash basis: only
     payments credited to them (assigned_tutor_id), counted on the date paid.
@@ -1252,10 +1296,23 @@ def _quarterly_progress(db: Session, tutor: models.User, on: date | None = None)
         models.Payment.date >= start,
         models.Payment.date <= end,
     ).all()
-    earned = money.to_zlote(sum(p.amount_grosze for p in payments))
+    earned_grosze = sum(p.amount_grosze for p in payments)
+    earned = money.to_zlote(earned_grosze)
     setting = _limit_for(db, start)
     limit = setting.limit if setting else None
     roman = ["I", "II", "III", "IV"][(start.month - 1) // 3]
+
+    forecast_fields: dict = {}
+    today = date.today()
+    if start <= today <= end:
+        n, value, expected = _forecast_grosze(db, tutor, today, end)
+        forecast = money.to_zlote(earned_grosze + expected)
+        forecast_fields = dict(
+            upcoming_lessons=n,
+            upcoming_value=money.to_zlote(value),
+            forecast=forecast,
+            forecast_remaining=(limit - forecast) if limit is not None else None,
+        )
     return schemas.QuarterlyLimitOut(
         tutor_id=tutor.id,
         tutor_name=tutor.label,
@@ -1265,6 +1322,7 @@ def _quarterly_progress(db: Session, tutor: models.User, on: date | None = None)
         limit=limit,
         earned=earned,
         remaining=(limit - earned) if limit is not None else None,
+        **forecast_fields,
     )
 
 

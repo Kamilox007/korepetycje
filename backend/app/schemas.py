@@ -260,6 +260,12 @@ class QuarterlyLimitOut(BaseModel):
     limit: float | None = None
     earned: float
     remaining: float | None = None
+    # Forecast to the end of the quarter. Only for a quarter that contains
+    # today; None for a finished one, where there is nothing left to plan.
+    upcoming_lessons: int | None = None
+    upcoming_value: float | None = None
+    forecast: float | None = None
+    forecast_remaining: float | None = None
 
 
 # ---------- Auth / User ----------
